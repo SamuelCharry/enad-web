@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, Navigate, Route, Routes } from 'react-router-dom'
+import { Link, Navigate, Route, Routes, useSearchParams } from 'react-router-dom'
 import { useSession } from '../../data/session'
 import type { UserProfile } from '../../domain/types'
 import { useSchools } from '../../data/scope'
@@ -15,6 +15,8 @@ import { Schools, Teachers } from './Directories'
 import { History } from './History'
 import { Program } from './Program'
 import { FileImport } from './FileImport'
+import { TaskGuide } from '../teacher/TaskGuide'
+import '../teacher/teacher.css'
 import './collect.css'
 
 const teacherSections = [['asistencia', 'Asistencia'], ['evaluacion', 'Evaluación formativa'], ['horas', 'Horas'], ['grupos', 'Grupos'], ['estudiantes', 'Estudiantes']] as const
@@ -26,15 +28,30 @@ function ImportButton({ kind }: { kind: ImportKind }) {
     <Button disabled={loading} onClick={() => setOpen(true)}>Importar archivo</Button>{open && <FileImport {...{ kind, schools }} onClose={() => setOpen(false)} />}</>
 }
 function TeacherScreen({ section, profile }: { section: typeof teacherSections[number][0]; profile: UserProfile }) {
-  return <SchoolScope profile={profile} withCampus={section !== 'asistencia' && section !== 'horas'}>{(school, campus) => {
+  const [params, setParams] = useSearchParams()
+  const [revision, setRevision] = useState(0)
+  const groupId = params.get('group') || ''
+  const scopeParams = new URLSearchParams(params)
+  scopeParams.delete('guide')
+  const content = <><SchoolScope key={revision + scopeParams.toString()} includeUnassigned={section === 'estudiantes' || section === 'evaluacion'} allSites={section === 'grupos'} onScopeChange={(school, campus) => {
+    const next = new URLSearchParams({ school })
+    if (campus !== null) next.set('campus', campus)
+    if (params.has('guide')) next.set('guide','1')
+    setParams(next, { replace: true })
+  }} initialSchool={params.get('school') || ''} initialCampus={params.get('campus')} profile={profile} withCampus={section !== 'asistencia' && section !== 'horas'}>{(school, campus) => {
     switch (section) {
-      case 'asistencia': return <Attendance schoolId={school.id} />
-      case 'evaluacion': return <Evaluations schoolId={school.id} campus={campus} />
+      case 'asistencia': return <Attendance schoolId={school.id} initialDate={params.get('date')} initialGroup={groupId} uid={profile.uid} school={school} />
+      case 'evaluacion': return <Evaluations schoolId={school.id} campus={campus} initialGroup={groupId} initialSubject={params.get('subject')} initialMoment={params.get('moment')} school={school} studentId={params.get('student')} />
       case 'horas': return <Hours schoolId={school.id} />
-      case 'grupos': return <Groups schoolId={school.id} {...{ campus, profile }} />
-      case 'estudiantes': return <Students {...{ school, campus }} admin={false} />
+      case 'grupos': return <Groups schoolId={school.id} initialGroup={groupId} campuses={school.campuses.filter(c => !profile.campusIds[school.id]?.length || profile.campusIds[school.id].includes(c.id))} {...{ campus, profile }} />
+      case 'estudiantes': return <Students {...{ school, campus }} admin={false} uid={profile.uid} initialStudent={params.get('student')} scanOnOpen={params.has('scan')} />
     }
-  }}</SchoolScope>
+  }}</SchoolScope><Button variant="ghost" onClick={() => setRevision(v => v + 1)}>Volver a cargar los datos</Button></>
+  return <TaskGuide enabled={params.has('guide')} section={section} onClose={() => {
+    const next = new URLSearchParams(params)
+    next.delete('guide')
+    setParams(next, { replace: true })
+  }}>{content}</TaskGuide>
 }
 function AdminScreen({ section, profile }: { section: typeof adminSections[number][0]; profile: UserProfile }) {
   if (section === 'configuracion') return <Program />
@@ -66,7 +83,7 @@ export function CollectRoutes() {
       <h2>{label}</h2>
       <AdminScreen {...{ section, profile }} />
     </div>} />) :
-      teacherSections.map(([section, label]) => <Route path={section} key={section} element={<div key={section}>
+      teacherSections.map(([section, label]) => <Route path={section} key={section} element={<div className="teacher-screen" key={section}>
         <h2>{label}</h2>
         <TeacherScreen {...{ section, profile }} />
       </div>} />)}

@@ -4,6 +4,7 @@ import type { UserProfile, Role } from '../domain/types'
 import { colombiaToday, weekOf } from '../domain/weeks'
 import { Badge, PageHeader } from '../ui/components'
 import { Icon } from '../ui/Icon'
+import { TeacherHome } from '../features/teacher/TeacherHome'
 import { ManagerHome } from '../features/manage/ManagerHome'
 
 const descriptions: Record<Role, [string, string]> = {
@@ -72,5 +73,5 @@ export function LegacyHome() {
 
 export function Home() {
   const profile = useOutletContext<UserProfile>()
-  return profile.rol === 'docente' ? <LegacyHome /> : <ManagerHome profile={profile} />
+  return profile.rol === 'docente' ? <TeacherHome profile={profile} /> : <ManagerHome profile={profile} />
 }

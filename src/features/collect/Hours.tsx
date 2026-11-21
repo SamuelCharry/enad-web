@@ -1,13 +1,17 @@
 import { useState } from 'react'
-import type { HoursEntry } from '../../domain/types'
+import type { HoursEntry, ProgramConfig } from '../../domain/types'
 import { saveHours, useMyHours } from '../../data/hours'
 import { useProgramConfig } from '../../data/scope'
 import { formatReason, parseReason, REASON_CATEGORIES, validateHours } from '../../domain/hoursReason'
 import { colombiaToday, rangeOf, weekOf } from '../../domain/weeks'
-import { Button, Card, Field, NumberInput, TextInput } from '../../ui/components'
+import { Button, Card, Dialog, SyncStatus, Field, NumberInput, TextInput } from '../../ui/components'
 import { useAction } from './useAction'
 import { validDay } from './formValues'
 import { Choice, SessionDate } from './common'
+
+import { BarChart } from '../../ui/charts'
+import { useGuideReceipt } from '../teacher/guideContext'
+import { hourSeries } from '../teacher/hourSeries'
 
 function shortDate(day: string) { return day.slice(8, 10) + '/' + day.slice(5, 7) }
 export function Hours({ schoolId }: { schoolId: string }) {
@@ -20,11 +24,12 @@ export function Hours({ schoolId }: { schoolId: string }) {
     <SessionDate {...{ date, today, setDate }} />
     {loading ? <p>Cargando calendario…</p> : !config ? <p>Falta configurar el calendario del programa.</p> : week === null ?
       <p>Semana fuera del periodo de implementación</p> :
-      <WeeklyHours {...{ date, schoolId, week, today, setDate }} {...rangeOf(week, config)} />}</>
+      <WeeklyHours {...{ date, schoolId, week, today, setDate, config }} {...rangeOf(week, config)} />}</>
 }
-function WeeklyHours({ date, schoolId, week, from, to, today, setDate }: { today:string;setDate:(date:string)=>void;date: string; schoolId: string; week: number; from: string; to: string }) {
-  const { hours, loading, error } = useMyHours(from, to)
+function WeeklyHours({ date, schoolId, week, from, to, today, setDate, config }: { config: ProgramConfig; today:string;setDate:(date:string)=>void;date: string; schoolId: string; week: number; from: string; to: string }) {
+  const { hours, loading, error } = useMyHours(rangeOf(Math.max(1,week - 3),config).from, to)
   const entries = hours.filter(h => h.schoolId === schoolId && h.date >= from && h.date <= to)
+  const series = hourSeries(hours.filter(h => h.schoolId === schoolId), from, week, config)
   const total = (field: 'plannedHours' | 'workedHours') => entries.reduce((sum, h) => sum + h[field], 0).toLocaleString('es-CO')
   if (error) return <p role="alert">{error}</p>
   return <Card>
@@ -40,12 +45,15 @@ function WeeklyHours({ date, schoolId, week, from, to, today, setDate }: { today
     {loading ? <p>Cargando horas…</p> : <>
       <p>Total semanal: <strong>{total('workedHours')} h realizadas</strong> de {total('plannedHours')} h planeadas.</p>
       <HoursForm key={date} {...{ date, schoolId }} entry={entries.find(h => h.date === date)} />
+      <BarChart label="Horas realizadas por día" data={series.days} />
+      <BarChart label="Horas acumuladas por semana de implementación" data={series.weeks} />
     </>}</Card>
 }
 function HoursForm({ date, schoolId, entry }: { date: string; schoolId: string; entry?: HoursEntry }) {
   const [draft, setDraft] = useState<Partial<Record<'planned' | 'worked' | 'category' | 'detail', string>>>({})
   const action = useAction()
-  const [receipt, setReceipt] = useState<{ previous: HoursEntry | undefined; report: HoursEntry } | null>(null)
+  const guideSaved = useGuideReceipt()
+  const [receipt, setReceipt] = useState<{ previous: HoursEntry | undefined; report: HoursEntry & { syncState: string } } | null>(null)
   const current = receipt && receipt.previous === entry ? receipt.report : entry
   const stored = parseReason(current?.reason ?? '')
   const planned = draft.planned ?? String(current?.plannedHours ?? '')
@@ -58,29 +66,37 @@ function HoursForm({ date, schoolId, entry }: { date: string; schoolId: string; 
     +planned === 0 && +worked === 0 ? 'Las horas planeadas y realizadas no pueden ser ambas cero.' : short && (!category || !detail.trim()) ? 'Selecciona un motivo y escribe el detalle.' :
       validateHours({ planned: +planned, worked: +worked, reason })
   function change(key: keyof typeof draft, value: string) { setDraft(d => ({ ...d, [key]: value })) }
+  const [confirm, setConfirm] = useState(false)
+  function save() {
+    setConfirm(false)
+    void action.run(async () => {
+      const receipt = await saveHours({ date, schoolId, plannedHours: +planned, workedHours: +worked, reason })
+      setReceipt({ previous: entry, report: { ...receipt.report, syncState: receipt.syncState } })
+      setDraft({})
+      guideSaved?.(receipt.syncState === 'pending')
+    }, '')
+  }
   return <form onSubmit={e => {
     e.preventDefault()
-    if (!invalid) void action.run(async () => {
-      const receipt = await saveHours({ date, schoolId, plannedHours: +planned, workedHours: +worked, reason })
-      setReceipt({ previous: entry, report: receipt.report })
-      setDraft({})
-      return receipt
-    }, 'Reporte de horas guardado')
+    if (!invalid) { if (current) setConfirm(true); else save() }
   }}>
+    {current && <SyncStatus pending={'syncState' in current && current.syncState === 'pending'} />}
     <fieldset disabled={action.busy}>
       <div className="collect-fields">
         <Field label="Horas planeadas">
-          <NumberInput required min="0" max="24" step="any" value={planned} onChange={e => change('planned', e.target.value)} />
+          <NumberInput data-guide="planned" required min="0" max="24" step="any" value={planned} onChange={e => change('planned', e.target.value)} />
         </Field>
         <Field label="Horas realizadas">
-          <NumberInput required min="0" max="24" step="any" value={worked} onChange={e => change('worked', e.target.value)} />
+          <NumberInput data-guide="worked" required min="0" max="24" step="any" value={worked} onChange={e => change('worked', e.target.value)} />
         </Field>
         {short && <>
           <Choice label="Motivo" value={category} placeholder="Selecciona un motivo" options={REASON_CATEGORIES.map(id => ({ id, name: id }))} onChange={v => change('category', v)} />
           <Field label="Detalle del motivo">
-            <TextInput required maxLength={480} value={detail} onChange={e => change('detail', e.target.value)} />
+            <TextInput data-guide="reason" data-complete={!!category && !!detail.trim()} required maxLength={480} value={detail} onChange={e => change('detail', e.target.value)} />
           </Field>
         </>}</div>
-      {invalid && <p>{invalid}</p>}<Button type="submit" variant="primary" disabled={Boolean(invalid)}>Guardar horas</Button>
-    </fieldset>{action.feedback}</form>
+      {invalid && <p>{invalid}</p>}<div className="teacher-save"><Button data-guide="save" type="submit" variant="primary" disabled={Boolean(invalid)}>Guardar horas</Button></div>
+    </fieldset>{action.feedback}
+    {confirm && <Dialog title="¿Actualizar las horas de este día?" onClose={() => setConfirm(false)}><p>El nuevo reporte reemplazará las horas del {date}.</p>
+      <Button variant="primary" onClick={save}>Reemplazar reporte</Button></Dialog>}</form>
 }

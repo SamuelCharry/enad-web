@@ -1,3 +1,6 @@
+import { Link, useNavigate } from 'react-router-dom'
+import { GroupDetail } from '../teacher/GroupDetail'
+import { groupLink } from '../teacher/navigation'
 import { useState } from 'react'
 import type { Group, Moment, Student, Subject, UserProfile } from '../../domain/types'
 import { useUsers } from '../../data/admin'
@@ -12,36 +15,58 @@ import { Choice, MomentField, Search, SubjectField } from './common'
 
 type Proposal = ReturnType<typeof suggestGroups>[number]
 type Site = { schoolId: string; campus: string }
-export function Groups({ schoolId, campus, profile }: Site & { profile: UserProfile }) {
+export function Groups({ schoolId, campus, profile, initialGroup, campuses = [] }: Site & { campuses?: { id: string; name: string }[]; initialGroup?: string; profile: UserProfile }) {
+  const navigate = useNavigate()
   const { groups, loading, error } = useGroups(schoolId)
   const { students, loading: loadingStudents, error: studentError } = useStudents(schoolId)
   const [search, setSearch] = useState('')
   const [edit, setEdit] = useState<string | null>(null)
   const [suggest, setSuggest] = useState(false)
   const admin = profile.rol === 'admin'
-  const roster = students.filter(s => s.schoolId === schoolId && s.campus === campus && s.active && !s.retired)
-  const directory = groups.filter(g => g.schoolId === schoolId && g.campus === campus && matches(search, g.name, g.teacherName, subjectLabel(g.subject)))
+  const [area, setArea] = useState<Subject | ''>('')
+  const [selectedCampus, setSelectedCampus] = useState('')
+  const actionCampus = campus || selectedCampus || (campuses.length === 1 ? campuses[0].id : '')
+  const chooseCampus = !admin && !actionCampus && campuses.length > 1
+  const allSites = !admin && !campus
+  const roster = students.filter(s => s.schoolId === schoolId && (allSites || s.campus === campus) && s.active && !s.retired)
+  const directory = groups.filter(g => g.schoolId === schoolId && (allSites || g.campus === campus) && (!area || g.subject === area) && matches(search, g.name, g.teacherName, subjectLabel(g.subject)))
+  const assigned = new Set(groups.filter(g => g.subject === area).flatMap(g => g.studentIds))
+  const unassigned = roster.filter(s => !assigned.has(s.id)).length
   const group = groups.find(g => g.id === edit)
   const eligible = new Set(roster.map(s => s.id))
   const members = new Set(group?.studentIds)
   const editorRoster = students.filter(s => s.schoolId === schoolId && (eligible.has(s.id) || members.has(s.id)))
   if (error || studentError) return <p role="alert">{error || studentError}</p>
+  const detail = !admin && groups.find(g => g.id === initialGroup && (allSites || g.campus === campus))
+  if (initialGroup && !admin) {
+    if (loading || loadingStudents) return <p role="status">Cargando grupo…</p>
+    return detail ? <GroupDetail group={detail} students={students} owner={detail.teacherId === profile.uid} /> :
+      <p>El grupo ya no está disponible en esta sede. <Link to="/recoleccion/grupos">Ver los grupos</Link></p>
+  }
   return <>
     <div className="collect-toolbar">
+      {!admin && <Choice label="Área" value={area} placeholder="Todas las áreas" options={(['lectura','matematicas'] as const).map(id => ({ id, name: subjectLabel(id) }))} onChange={setArea} />}
       <Search value={search} onChange={setSearch} />
       <Button variant="primary" onClick={() => setEdit('')}>Crear grupo</Button>
-      {!admin && <Button onClick={() => setSuggest(true)}>Sugerir grupos</Button>}</div>
-    {loading ? <p>Cargando grupos…</p> : !directory.length ? <p>Sin grupos en esta selección.</p> : directory.map(g =>
+      {!admin && <Button disabled={loadingStudents} onClick={() => setSuggest(true)}>Sugerir grupos</Button>}</div>
+    {loading ? <p>Cargando grupos…</p> : !directory.length ? <p>Cambia la búsqueda o crea un grupo en esta sede.</p> : directory.map(g =>
       <Card key={g.id}>
         <div className="collect-row">
           <div>
-            <h3>{g.name}</h3>
+            <h3>{admin ? g.name : <Link to={groupLink('grupos', g)}>{g.name}</Link>}</h3>
             <small>{subjectLabel(g.subject)} · {g.teacherName} · {g.studentIds.length} integrantes</small>
           </div>
-          {(admin || profile.uid === g.teacherId) && <Button onClick={() => setEdit(g.id)}>Administrar grupo</Button>}</div>
+          {admin && <Button onClick={() => setEdit(g.id)}>Administrar grupo</Button>}</div>
       </Card>)}
-    {edit !== null && (!edit || (group && (admin || group.teacherId === profile.uid))) && <GroupEditor {...{ group, schoolId, campus, admin }} roster={editorRoster} onClose={() => setEdit(null)} />}
-    {suggest && !loadingStudents && <Suggestions {...{ schoolId, campus, roster }} onClose={() => setSuggest(false)} />}</>
+    {area && !loading && !loadingStudents && <p>{unassigned} estudiantes sin grupo de {subjectLabel(area)} en esta selección</p>}
+    {(suggest || edit === '') && chooseCampus && <Dialog title="Selecciona una sede" onClose={() => { setEdit(null); setSuggest(false) }}>
+      {campuses.map(c => <Button key={c.id} onClick={() => setSelectedCampus(c.id)}>{c.name}</Button>)}</Dialog>}
+    {edit !== null && !chooseCampus && (!edit || (group && (admin || group.teacherId === profile.uid))) &&
+      <GroupEditor {...{ group, schoolId, admin }} campus={actionCampus} initialSubject={area || 'lectura'}
+        onCreated={admin ? undefined : g => navigate(groupLink('grupos',g))} roster={editorRoster}
+        onClose={() => { setEdit(null); setSelectedCampus('') }} />}
+    {suggest && !chooseCampus && <Suggestions schoolId={schoolId} campus={actionCampus} initialSubject={area || 'lectura'}
+      roster={roster.filter(s => s.campus === actionCampus)} onClose={() => { setSuggest(false); setSelectedCampus('') }} />}</>
 }
 
 function TeacherPicker({ schoolId, value, onChange }: { schoolId: string; value: string; onChange: (v: string) => void }) {
@@ -49,9 +74,9 @@ function TeacherPicker({ schoolId, value, onChange }: { schoolId: string; value:
   return <Choice label="Docente" required placeholder="Selecciona el docente" value={value}
     options={users.filter(u => u.uid === value || (u.activo && u.schoolIds.includes(schoolId))).map(u => ({ id: u.uid, name: u.fullName }))} onChange={onChange} />
 }
-function GroupEditor({ group, schoolId, campus, admin, roster, onClose }: Site & { group?: Group; admin: boolean; roster: Student[]; onClose: () => void }) {
+function GroupEditor({ group, schoolId, campus, admin, roster, onClose, initialSubject, onCreated }: Site & { initialSubject: Subject; onCreated?: (group: Group) => void; group?: Group; admin: boolean; roster: Student[]; onClose: () => void }) {
   const [name, setName] = useState(group?.name ?? '')
-  const [subject, setSubject] = useState<Subject>(group?.subject ?? 'lectura')
+  const [subject, setSubject] = useState<Subject>(group?.subject ?? initialSubject)
   const [teacherId, setTeacher] = useState(group?.teacherId ?? '')
   const [confirm, setConfirm] = useState(false)
   const [search, setSearch] = useState('')
@@ -64,7 +89,10 @@ function GroupEditor({ group, schoolId, campus, admin, roster, onClose }: Site &
         void action.run(async () => {
           const fields = { name: name.trim(), ...(admin ? { teacherId } : {}) }
           if (group) await patchGroup(group.id, fields)
-          else await createGroup({ ...fields, subject, schoolId, campus })
+          else {
+            const created = await createGroup({ ...fields, subject, schoolId, campus })
+            onCreated?.(created)
+          }
           onClose()
         })
       }}>
@@ -73,7 +101,7 @@ function GroupEditor({ group, schoolId, campus, admin, roster, onClose }: Site &
         </Field>
         <SubjectField value={subject} onChange={setSubject} disabled={!!group} />
         {admin && <TeacherPicker {...{ schoolId }} value={teacherId} onChange={setTeacher} />}
-        <Button variant="primary" type="submit">Guardar grupo</Button>
+        <Button variant="primary" type="submit" disabled={!name.trim() || (admin && !teacherId)}>Guardar grupo</Button>
       </form>
       {group && <>
         <h3>Integrantes</h3>
@@ -97,8 +125,8 @@ function GroupEditor({ group, schoolId, campus, admin, roster, onClose }: Site &
     </fieldset>{action.feedback}</Dialog>
 }
 
-function Suggestions({ schoolId, campus, roster, onClose }: Site & { roster: Student[]; onClose: () => void }) {
-  const [subject, setSubject] = useState<Subject>('lectura')
+function Suggestions({ schoolId, campus, roster, initialSubject, onClose }: Site & { initialSubject: Subject; roster: Student[]; onClose: () => void }) {
+  const [subject, setSubject] = useState<Subject>(initialSubject)
   const [moment, setMoment] = useState<Moment>('linea_base')
   const [count, setCount] = useState('1')
   const [preview, setPreview] = useState<Proposal[] | null>(null)
@@ -138,7 +166,7 @@ function Suggestions({ schoolId, campus, roster, onClose }: Site & { roster: Stu
           setSelected(i)
           setMembers(p.studentIds)
           setName(proposalName(p, i))
-        }}>{proposalName(p, i)} · {p.studentIds.length} estudiantes</Button>)}</> : <p>No hay estudiantes evaluados para esta selección.</p>)}
+        }}>{proposalName(p, i)} · {p.studentIds.length} estudiantes</Button>)}</> : <p>Evalúa estudiantes de esta sede en el área y momento elegidos para generar una propuesta.</p>)}
       {selected !== null && preview && <>
         <Field label="Nombre de mi grupo">
           <TextInput value={name} onChange={e => setName(e.target.value)} />

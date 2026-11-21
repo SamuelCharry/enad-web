@@ -1,4 +1,5 @@
 import { createWorker, OEM, type Worker } from 'tesseract.js'
+import { set } from 'idb-keyval'
 import workerPath from 'tesseract.js/dist/worker.min.js?url'
 import corePath from 'tesseract.js-core/tesseract-core-lstm.wasm.js?url'
 import { parseRows } from '../../domain/ocr/rowParser'
@@ -10,9 +11,12 @@ export async function readPhoto(file: File, progress: (percent: number) => void,
   // Tesseract 7 reports some initialization errors to errorHandler without rejecting createWorker.
   const worker = await new Promise<Worker>((resolve, reject) => {
     const start = async () => {
-      const language = model ? [{ code: 'spa', data: new Uint8Array(await model.arrayBuffer()) }] : 'spa'
-      return createWorker(language, OEM.LSTM_ONLY, {
-        workerPath, corePath, langPath,
+      // Tesseract 7 initializes Lang objects with their bytes as the name.
+      // Stage an optional local model in its existing IndexedDB cache and initialize by ISO code.
+      const cachePath = model ? 'enad-ocr-local' : undefined
+      if (model) await set(cachePath + '/spa.traineddata', new Uint8Array(await model.arrayBuffer()))
+      return createWorker('spa', OEM.LSTM_ONLY, {
+        workerPath, corePath, langPath, cachePath,
         logger: event => {
           if (event.status === 'recognizing text') progress(Math.round(event.progress * 100))
         },
