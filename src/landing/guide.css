@@ -1,0 +1,61 @@
+.guide-intro { padding-block: var(--space-12) var(--space-8); border-bottom: 1px solid var(--line); }
+.guide-intro h1 { margin: 0; font-size: clamp(2.25rem,4.4vw,4rem); font-weight: 600; letter-spacing: -.04em; }
+.guide-intro p { margin: var(--space-2) 0 var(--space-6); color: var(--soft-ink); font-size: var(--text-lg); }
+.guide-reader { display: grid; grid-template-columns: minmax(12rem,1fr) minmax(0,3.3fr); gap: var(--space-12); padding-block: var(--space-8) var(--space-12); }
+.guide-contents h2, .guide-portal-note h3 { font: 600 var(--text-md)/1.5 var(--heading); margin: 0 0 var(--space-2); }
+.guide-contents ol { list-style: none; margin: 0; padding: 0; }
+.guide-contents button {
+  display: flex; gap: var(--space-3); align-items: baseline; width: 100%; min-height: 48px;
+  padding: var(--space-3); text-align: left; color: var(--soft-ink); border: 0; background: transparent;
+  line-height: 1.4; border-radius: 8px;
+}
+.guide-contents button span { min-width: 1ch; font-variant-numeric: tabular-nums; }
+.guide-contents button:hover { text-decoration: underline; }
+.guide-contents button[aria-current=step] { background: var(--canvas); font-weight: 600; color: var(--ink); }
+.guide-contents button[aria-current=step] span, .guide-progress { color: var(--error); }
+.guide-picker { display: none; }
+.guide-step { display: flex; align-items: flex-start; gap: var(--space-8); min-width: 0; }
+.guide-instructions { flex: 1; min-width: 0; max-width: 64ch; }
+.guide-progress { margin: 0 0 var(--space-2); font-weight: 600; font-size: var(--text-sm); }
+.guide-step h2, .guide-reference h2 { margin: 0; font-size: var(--text-display); font-weight: 600; letter-spacing: -.03em; }
+.guide-instructions ol { padding-left: 1.5em; margin: var(--space-6) 0; }
+.guide-instructions li { padding-left: var(--space-1); margin-bottom: var(--space-3); }
+.guide-instructions li::marker { font-weight: 600; }
+.guide-portal-note { border-top: 1px solid var(--line); padding-top: var(--space-4); }
+.guide-portal-note p { margin: 0; color: var(--soft-ink); }
+.guide-image { flex: 0 1 17rem; min-width: 0; padding: var(--space-4); align-self: flex-start; }
+.guide-image img { width: min(100%, 16rem); }
+.guide-image figcaption { text-align: center; margin-top: var(--space-2); }
+.guide-pager { display: flex; gap: var(--space-2); margin-top: var(--space-6); }
+.guide-reference { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,2fr); gap: var(--space-12); padding-block: var(--space-8); border-top: 1px solid var(--line); }
+.guide-reference > div { max-width: 68ch; }
+.guide-reference p { margin: 0; }
+.guide-devices { margin: 0; }
+.guide-devices dt { margin-top: var(--space-4); font-weight: 600; }
+.guide-devices dd { margin: var(--space-1) 0 0; color: var(--soft-ink); }
+.guide-questions details { border-bottom: 1px solid var(--line); }
+.guide-questions summary { padding-block: var(--space-3); cursor: pointer; font-weight: 600; min-height: 48px; }
+.guide-questions p { margin-bottom: var(--space-4); color: var(--soft-ink); }
+.guide-footer { color: var(--ink); background: var(--canvas); }
+.guide-footer > div { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: var(--space-2); padding-block: var(--space-4); }
+.guide-footer span { font-size: var(--text-sm); color: var(--soft-ink); }
+@media (max-width: 960px) {
+  .guide-reader { grid-template-columns: 1fr; gap: var(--space-6); }
+  .guide-contents { display: none; }
+  .guide-picker { display: block; max-width: 32rem; }
+}
+@media (max-width: 640px) {
+  .guide-intro { padding-block: var(--space-8) var(--space-6); }
+  .guide-intro p { font-size: var(--text-md); }
+  .guide-intro .ui-segmented { display: grid; grid-template-columns: auto minmax(0,1fr) auto; border-radius: var(--radius); gap: 2px; }
+  .guide-intro .ui-segmented span { width: 100%; min-height: 48px; height: 100%; padding: var(--space-1) var(--space-2); line-height: 1.25; text-align: center; border-radius: 12px; }
+  .guide-reader { padding-block: var(--space-6) var(--space-8); }
+  .guide-step { flex-direction: column; gap: var(--space-6); }
+  .guide-step h2, .guide-reference h2 { font-size: var(--text-title); }
+  .guide-image { flex: auto; width: 100%; }
+  .guide-reference { grid-template-columns: 1fr; gap: var(--space-4); }
+}
+
+@media (max-width: 360px) {
+  .guide-intro .ui-segmented { grid-template-columns: 1fr; }
+}

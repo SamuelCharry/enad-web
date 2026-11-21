@@ -3,6 +3,7 @@ import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import './shell.css'
 
 const Landing = lazy(() => import('../landing/Landing').then(m => ({ default: m.Landing })))
+const Guide = lazy(() => import('../landing/Guide'))
 const Login = lazy(() => import('./Login').then(m => ({ default: m.Login })))
 const RequireSession = lazy(() => import('./RequireSession').then(m => ({ default: m.RequireSession })))
 const PortalLayout = lazy(() => import('./PortalLayout').then(m => ({ default: m.PortalLayout })))
@@ -17,6 +18,7 @@ function LoadingPage() {
 export function App() {
   return <HashRouter><Suspense fallback={<LoadingPage />}><Routes>
     <Route path="/" element={<Landing />} />
+    <Route path="/guia" element={<Guide />} />
     <Route path="/login" element={<Login />} />
     <Route element={<RequireSession />}>
       <Route element={<PortalLayout />}>
