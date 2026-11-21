@@ -1,0 +1,44 @@
+.collect { width: min(100%, var(--page, 1240px)); margin-inline: auto; padding: clamp(12px, 3vw, 32px); color: var(--ink, #1d1d1b); }
+.collect, .collect * { box-sizing: border-box; }
+.collect h2 { margin-block: 1.4em .8em; }
+.collect h3 { margin: 0 0 .35em; }
+.collect .collect-card, .collect .ui-card { margin-block: var(--space-3, 12px); }
+.collect-card, .collect-dialog { padding: var(--inset, 20px); background: var(--paper, white); border: 1px solid var(--line, #dedbd7); border-radius: var(--radius, 16px); }
+.collect-dialog { width: min(94vw, 48rem); max-height: 88dvh; color: inherit; }
+.collect dialog:has(table) { width: min(94vw, 72rem); }
+.collect dialog::backdrop { background: var(--veil, #2229); }
+.collect-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem),1fr)); gap: var(--space-4, 16px); }
+.collect-field, .collect .ui-field { display: grid; min-width: 0; gap: .3rem; margin-block: .65rem; }
+.collect fieldset { min-width: 0; border: 0; margin: .7rem 0; padding: 0; }
+.collect fieldset legend { font-weight: 600; margin-block: .4rem; }
+.collect-toolbar, .collect-actions, .collect-row, .collect-heading { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2, 8px); }
+.collect-toolbar { align-items: end; margin-block: var(--space-4, 16px); }
+.collect-toolbar > label, .collect-toolbar > .ui-field { flex: 1 1 13rem; margin-block: 0; }
+.collect-row, .collect-heading { justify-content: space-between; }
+.collect-row { padding-block: var(--space-3, 12px); border-block-end: 1px solid var(--line, #dedbd7); }
+.collect-row:last-child { border-block-end: 0; }
+.collect small, .collect .collect-indent { display: block; color: var(--soft-ink, #50504d); }
+.collect .collect-indent { padding-inline-start: 1.5rem; }
+.collect p, .collect strong, .collect h3 { overflow-wrap: anywhere; }
+.collect button:not(.ui-button), .collect :where(input:not([type=checkbox]),select):not(.ui-control) {
+  max-width: 100%; min-height: 44px; border-radius: 8px; padding: .55rem .8rem; font: inherit; border: 1px solid var(--soft-ink, #50504d); background: var(--paper, white); color: inherit;
+}
+.collect button[data-variant=primary]:not(.ui-button), .collect button[aria-pressed=true]:not([style]) { color: var(--paper, white); background: var(--ink, #1d1d1b); }
+.collect button[aria-pressed=true][style] { outline: 2px solid var(--ink, #1d1d1b); outline-offset: 1px; }
+.collect button:disabled { opacity: .55; }
+.collect [role=alert] { color: var(--error, #b72619); }
+.collect .ui-table { max-width: 100%; overflow: auto; }
+.collect table { border-collapse: collapse; width: 100%; text-align: start; }
+.collect th, .collect td { padding: .6rem; border-block-end: 1px solid var(--line, #dedbd7); }
+.collect table input { min-width: 6rem; }
+.collect .ui-tabs { display: flex; flex-wrap: wrap; gap: .4rem; }
+.collect .ui-tabs a { padding: .6rem .8rem; }
+.collect .ui-tabs [aria-current=page] { font-weight: 650; }
+.collect label:has(> input[type=checkbox]) { display: block; padding-block: .35rem; }
+.collect pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 480px) {
+  .collect .collect-row { align-items: start; }
+  .collect .collect-row > div:has(strong) { flex-basis: 100%; }
+  .collect .ui-tabs { flex-wrap: nowrap; overflow-x: auto; }
+  .collect .ui-tabs a { white-space: nowrap; }
+}
