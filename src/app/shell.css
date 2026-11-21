@@ -1,0 +1,46 @@
+.shell-width { width: min(calc(100% - 2 * var(--inset)), var(--page)); margin-inline: auto; }
+.skip-link { position: fixed; z-index: 10; top: 6px; left: 6px; padding: 12px; background: var(--paper); color: var(--ink); transform: translateY(-150%); }
+.skip-link:focus { transform: none; }
+.portal-header { background: var(--ink); color: var(--paper); }
+.portal-bar { min-height: 76px; display: flex; align-items: center; gap: var(--space-4); padding-block: 8px; }
+.portal-brand { display: flex; align-items: center; gap: var(--space-4); line-height: 1.2; font-weight: 600; text-decoration: none; }
+.portal-brand img { object-fit: contain; flex-shrink: 0; }
+.first-name { border-left: 1px solid var(--line); padding-left: var(--space-4); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.portal-bar .switch-user { margin-left: auto; flex-shrink: 0; }
+.portal-bar .ui-button { background: transparent; color: var(--paper); border-color: var(--paper); border-radius: var(--pill); }
+.portal-bar .ui-button:hover { color: var(--ink); background: var(--paper); }
+.switch-user p { margin: 4px 0; max-width: 16rem; font-size: var(--text-sm); }
+.portal-main { padding-block: var(--space-8); }
+.portal-home { padding-block: var(--space-4); }
+.home-actions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: var(--space-6); max-width: 64rem; }
+.home-action { padding: var(--space-8); border: 1px solid var(--line); border-radius: var(--radius); text-decoration: none; transition: border-color var(--fast); }
+.home-action:hover { border-color: var(--ink); }
+.action-icons { display: flex; align-items: center; justify-content: space-between; color: var(--red); }
+.action-icons svg:last-child { color: var(--soft-ink); }
+.home-action h2 { margin: var(--space-8) 0 var(--space-2); }
+.home-action p { margin: 0; color: var(--soft-ink); }
+.home-action .ui-badge { margin-top: var(--space-4); }
+.session-state { max-width: 36rem; text-align: center; margin: 15vh auto; padding: var(--inset); }
+.session-state h1 { margin: 16px 0 0; }
+.login-page { min-height: 100svh; width: min(calc(100% - 2 * var(--inset)),var(--page)); margin: auto; padding-block: var(--space-6); }
+.back-link { display: inline-flex; align-items: center; gap: var(--space-2); min-height: 44px; text-decoration: none; }
+.back-link:hover { text-decoration: underline; }
+.login-form { max-width: 26rem; margin: clamp(40px,10vh,116px) auto; }
+.login-logo { width: 172px; height: auto; }
+.login-form h1 { margin: var(--space-8) 0 var(--space-2); }
+.login-form > p { margin: 0; color: var(--soft-ink); }
+.login-form form { display: grid; gap: var(--inset); margin-top: var(--space-8); }
+.login-form form > button { border-radius: var(--pill); }
+.login-form form > p { margin: 0; }
+.password-control { position: relative; }
+.password-control input { padding-right: 6rem; }
+.password-control button { position: absolute; inset: 2px 3px 2px auto; border: 0; border-radius: var(--radius); background: var(--paper); padding-inline: 12px; color: var(--ink); font-size: var(--text-sm); font-weight: 600; }
+@media (max-width: 640px) {
+  .portal-bar { gap: var(--space-2); width: calc(100% - 24px); }
+  .portal-brand { gap: var(--space-2); font-size: var(--text-sm); max-width: 9rem; }
+  .role-name { display: block; }
+  .first-name { padding-left: var(--space-2); font-size: var(--text-sm); }
+  .portal-bar .ui-button { padding-inline: 10px; font-size: var(--text-xs); }
+  .home-actions { grid-template-columns: 1fr; gap: var(--space-4); }
+  .home-action { padding: var(--space-6); }
+}
