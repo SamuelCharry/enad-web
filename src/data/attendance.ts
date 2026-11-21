@@ -1,11 +1,25 @@
 import { useMemo } from 'react'
 import { collectionGroup, doc, onSnapshot, query, where, writeBatch } from 'firebase/firestore'
-import type { AttendanceStatus } from '../domain/types'
+import type { AttendanceMark, AttendanceStatus } from '../domain/types'
 import { db } from './firebase'
 import { api, caller, commit, fail, now, requireDate } from './core'
 import { groupDoc } from './groups'
-import { useLive, withSession } from './live'
+import { listenMany, useLive, withSession } from './live'
 
+type DailyMark = AttendanceMark & { syncState?: 'pending' | 'synced' }
+
+/** One school/date subscription shared by all group cards or the open attendance sheet. */
+export function useSchoolAttendance(schoolId: string, date: string) {
+  const source = useMemo(() => withSession<DailyMark[]>([], (p, next, error) => {
+    if (p.rol !== 'docente' || !p.schoolIds.includes(schoolId) || !date) {
+      next([])
+      return () => {}
+    }
+    return listenMany([query(collectionGroup(db, 'attendance'), where('schoolId', '==', schoolId),
+      where('date', '==', date))], next, error)
+  }), [schoolId, date])
+  return useLive(source, [])
+}
 /** Watches group attendance on a calendar date using the deployed school/date index. */
 export function useGroupAttendance(groupId: string, date: string): Record<string, AttendanceStatus> {
   const source = useMemo(() => withSession<Record<string, AttendanceStatus>>({}, (p, next, error) => {
@@ -38,20 +52,15 @@ export function saveGroupAttendance(groupId: string, date: string, marks: Record
       if (!members.has(sid)) fail(400, 'Hay estudiantes que no pertenecen a este grupo.')
       if (!['vino', 'no_vino', 'retirado'].includes(status)) fail(400, 'La asistencia debe ser vino, no_vino o retirado.')
     }
-    let batch = writeBatch(db), ops = 0, syncState: 'synced' | 'pending' = 'synced'
+    const operations = entries.length + entries.filter(([, status]) => status === 'retirado').length
+    if (operations > 400) fail(400, 'Esta lista supera el límite de 400 operaciones por guardado.')
+    const batch = writeBatch(db)
     for (const [studentId, status] of entries) {
-      const count = status === 'retirado' ? 2 : 1
-      if (ops + count > 400) {
-        if (await commit(batch.commit()) === 'pending') syncState = 'pending'
-        batch = writeBatch(db)
-        ops = 0
-      }
       const ref = doc(db, 'students', studentId), savedAt = now()
       batch.set(doc(ref, 'attendance', groupId + '_' + date), { groupId, date, status, teacherId: p.uid, savedAt, schoolId, studentId })
       if (status === 'retirado') batch.update(ref, { retired: true, updatedAt: savedAt })
-      ops += count
     }
-    if (await commit(batch.commit()) === 'pending') syncState = 'pending'
+    const syncState = await commit(batch.commit())
     return { groupId, date, saved: entries.length, syncState }
   })
 }

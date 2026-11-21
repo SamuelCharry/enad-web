@@ -2,7 +2,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
 import type { Group, Student } from '../../domain/types'
-import { saveGroupAttendance, useGroupAttendance } from '../../data/attendance'
+import { saveGroupAttendance, useSchoolAttendance } from '../../data/attendance'
 import { useGroups } from '../../data/groups'
 import { saveHours, useMyHours } from '../../data/hours'
 import { useProgramConfig } from '../../data/scope'
@@ -10,7 +10,7 @@ import { useStudents } from '../../data/students'
 import { Attendance } from './Attendance'
 import { Hours } from './Hours'
 
-vi.mock('../../data/attendance', () => ({ saveGroupAttendance: vi.fn(), useGroupAttendance: vi.fn() }))
+vi.mock('../../data/attendance', () => ({ saveGroupAttendance: vi.fn(), useSchoolAttendance: vi.fn() }))
 vi.mock('../../data/groups', () => ({ useGroups: vi.fn() }))
 vi.mock('../../data/hours', () => ({ saveHours: vi.fn(), useMyHours: vi.fn() }))
 vi.mock('../../data/scope', () => ({ useProgramConfig: vi.fn() }))
@@ -37,7 +37,7 @@ beforeEach(() => {
   vi.resetAllMocks()
   vi.mocked(useGroups).mockReturnValue({ groups: [group], loading: false, error: undefined })
   vi.mocked(useStudents).mockReturnValue({ students: roster, loading: false, error: undefined })
-  vi.mocked(useGroupAttendance).mockReturnValue({})
+  mockAttendance({})
   vi.mocked(useProgramConfig).mockReturnValue({ config: { projectName: 'ENAd', year: 2026, implementationStartDate: '2026-03-23', breaks: [] }, loading: false, error: undefined })
   vi.mocked(useMyHours).mockReturnValue({ hours: [], loading: false, error: undefined })
   vi.mocked(saveHours).mockImplementation(async input => ({
@@ -46,6 +46,12 @@ stored: true, syncState: 'synced', report: {
     }
 }))
 })
+function mockAttendance(marks: Record<string, 'vino' | 'no_vino'>) {
+  vi.mocked(useSchoolAttendance).mockReturnValue({ loading: false, error: undefined, data: Object.entries(marks).map(([studentId, status]) => ({
+    studentId, status, schoolId: 's', groupId: 'g', date: '2026-04-08', teacherId: 't', savedAt: ''
+  })) })
+}
+function confirmAttendance() { fireEvent.click(screen.getByRole('button', { name: 'Confirmar asistencia' })) }
 function showAttendance() {
   render(<Attendance schoolId="s" />)
   fireEvent.change(screen.getByLabelText('Grupo'), { target: { value: 'g' } })
@@ -72,14 +78,16 @@ describe('Asistencia', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar retiro' }))
     expect(save).toBeEnabled()
     fireEvent.click(save)
+    confirmAttendance()
     expect(await screen.findByRole('alert')).toHaveTextContent('Intenta de nuevo')
     fireEvent.click(save)
-    await screen.findByText('Asistencia guardada')
+    confirmAttendance()
+    await screen.findAllByText('Guardado')
     expect(saveGroupAttendance).toHaveBeenLastCalledWith('g', '2026-04-08', { a: 'vino', b: 'retirado' })
     expect(save).toBeDisabled()
   })
   it('guarda solo cambios reales y separa los borradores por fecha', async () => {
-    vi.mocked(useGroupAttendance).mockReturnValue({ a: 'vino', b: 'no_vino' })
+    mockAttendance({ a: 'vino', b: 'no_vino' })
     vi.mocked(saveGroupAttendance).mockResolvedValue({ groupId: 'g', date: '2026-04-08', saved: 1, syncState: 'synced' })
     const save = showAttendance()
     expect(save).toBeDisabled()
@@ -93,6 +101,7 @@ describe('Asistencia', () => {
     expect(screen.getByRole('button', { name: 'Guardar asistencia' })).toBeDisabled()
     fill('Fecha', '2026-04-08')
     fireEvent.click(screen.getByRole('button', { name: 'Guardar asistencia' }))
+    confirmAttendance()
     await waitFor(() => expect(saveGroupAttendance).toHaveBeenCalledWith('g', '2026-04-08', { b: 'vino' }))
     fill('Fecha', '2026-04-09')
     expect(screen.queryByRole('button', { name: 'Guardar asistencia' })).toBeNull()

@@ -1,7 +1,9 @@
-import { doc, runTransaction, writeBatch, type DocumentReference, type DocumentData } from 'firebase/firestore'
+import { useMemo } from 'react'
+import { listenMany, useLive, withSession } from './live'
+import { collectionGroup, query, where, doc, runTransaction, writeBatch, type DocumentReference, type DocumentData } from 'firebase/firestore'
 import { LEVELS, MOMENTS, SUBJECTS, shouldOverwriteLevel } from '../domain/levels'
 import { colombiaToday } from '../domain/weeks'
-import type { Moment, Subject } from '../domain/types'
+import type { Evaluation, Moment, Subject } from '../domain/types'
 import { api, caller, commit, fail, now, reportCache, isOffline } from './core'
 import { db } from './firebase'
 import { patchStudent, studentDoc } from './students'
@@ -76,7 +78,22 @@ export function saveEvaluation(input: Input) {
     // A local batch keeps the event and the cached level together while offline.
     const batch = writeBatch(db)
     apply(batch, student.data())
-    const syncState = await commit(batch.commit().then(acknowledged))
+    const syncState = await commit(batch.commit())
+    // A locally accepted correction is a separate history event, even before reconnecting.
+    acknowledged()
     return { id, syncState }
   })
+}
+
+/** Includes historical moments and verification events that never overwrite a current level. */
+export function useSchoolEvaluations(schoolId: string, subject: Subject) {
+  const source = useMemo(() => withSession<Evaluation[]>([], (p, next, error) => {
+    if (p.rol !== 'docente' || !p.schoolIds.includes(schoolId)) {
+      next([])
+      return () => {}
+    }
+    return listenMany([query(collectionGroup(db, 'evaluations'), where('schoolId', '==', schoolId),
+      where('subject', '==', subject))], next, error)
+  }), [schoolId, subject])
+  return useLive(source, [])
 }
