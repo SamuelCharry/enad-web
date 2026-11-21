@@ -3,7 +3,6 @@ import { useReportQuery } from './navigation'
 import type { ReportFilters, School } from '../../domain/types'
 import { useGroups } from '../../data/groups'
 import { getAttendanceReport } from '../../data/reports'
-import { useSchools } from '../../data/scope'
 import { subjectLabel } from '../../domain/levels'
 import { Button, Card, EmptyState } from '../../ui/components'
 import { matchesSchool, number, percent } from './model'
@@ -11,10 +10,10 @@ import { LiveState, ReportRead } from './ReportState'
 import { GroupRoster } from './StudentHistory'
 
 function SchoolDetail({ school, filters }: { school: School; filters: ReportFilters }) {
-  const { groups, loading, error } = useGroups(school.id)
   const {params, update} = useReportQuery()
   const campus = params.get('campus') ?? undefined
   const groupId = params.get('group')
+  const { groups, loading, error } = useGroups(school.id,{campus,campusName:school.campuses.find(c=>c.id===campus)?.name,groupId:campus && groupId || undefined})
   const setCampus = (value?:string) => update({campus:value,group:undefined})
   const setGroup = (value:string) => update({group:value || undefined})
   const campuses = new Map(school.campuses.map(c => [c.id, c.name]))
@@ -46,18 +45,17 @@ function SchoolDetail({ school, filters }: { school: School; filters: ReportFilt
   </LiveState>
 }
 
-export function Institutions({ filters }: { filters: ReportFilters }) {
-  const { schools, loading, error } = useSchools()
+export function Institutions({ filters, schools }: { filters: ReportFilters; schools: School[] }) {
   const {update} = useReportQuery()
   const selected = filters.schoolId
   const setSchool = (id:string) => update({schoolId:id || undefined,campus:undefined,group:undefined})
   const visible = schools.filter(s => matchesSchool(s, filters))
   const school = visible.find(s => s.id === selected)
-  return <><h2>Instituciones</h2><Card><LiveState loading={loading} error={error}>
+  return <><h2>Instituciones</h2><Card>
     {school ? <><Button onClick={() => setSchool('')}>Volver a instituciones</Button>
       <SchoolDetail key={school.id} school={school} filters={filters} /></> :
       visible.length ? <Table caption="Instituciones en la selección" headers={['Institución', 'Municipio', 'Departamento', 'Sedes']}
         rows={visible.map(s => ({ key: s.id, cells: [<Button key="open" variant="ghost" onClick={() => setSchool(s.id)}>{s.name}</Button>, s.municipality, s.department, number(s.campuses.length)] }))} />
         : <EmptyState title="No hay instituciones en esta selección." description="Limpia los filtros para consultar otras instituciones." />}
-  </LiveState></Card></>
+  </Card></>
 }

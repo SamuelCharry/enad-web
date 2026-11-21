@@ -1,3 +1,4 @@
+import { LoadError } from '../../ui/LoadError'
 import { useEffect, useRef, useState } from 'react'
 import type { PropsWithChildren, ReactNode } from 'react'
 import { refreshReports } from '../../data/reports'
@@ -9,7 +10,7 @@ export function Skeleton() {
 
 export function LiveState({ loading, error, children }: PropsWithChildren<{ loading: boolean; error?: string | null }>) {
   if (loading) return <Skeleton />
-  if (error) return <p role="alert">{error}</p>
+  if (error) return <LoadError message={error} />
   return <>{children}</>
 }
 
@@ -30,14 +31,12 @@ function ReadInstance<T>({ load, children }: { load: (signal: AbortSignal) => Pr
   const loader = useRef(load)
   useEffect(() => { loader.current = load }, [load])
   useEffect(() => {
-    const refresh = () => setRevision(v => v + 1)
-    window.addEventListener('focus', refresh)
-    const timer = window.setInterval(() => { if (!document.hidden) refresh() }, 5 * 60_000)
-    return () => { window.removeEventListener('focus', refresh); window.clearInterval(timer) }
-  }, [])
-  useEffect(() => {
     const controller = new AbortController()
     const { signal } = controller
+    const timer = window.setTimeout(() => {
+      controller.abort()
+      setSettled({ revision, ok: false })
+    }, 20_000)
     async function read() {
       try {
         if (signal.aborted) return
@@ -47,16 +46,16 @@ function ReadInstance<T>({ load, children }: { load: (signal: AbortSignal) => Pr
         setSettled({ revision, ok: true })
       } catch {
         if (!signal.aborted) setSettled({ revision, ok: false })
-      }
+      } finally { window.clearTimeout(timer) }
     }
     queueMicrotask(() => { void read() })
-    return () => controller.abort()
+    return () => { window.clearTimeout(timer); controller.abort() }
   }, [revision])
   return <>
     <div className="rep-refresh"><small role="status">{result && <>Última actualización · {localTime.format(result.time)}</>}</small>
       <Button loading={state === 'loading'} onClick={() => {refreshReports();setRevision(v => v + 1)}}>Actualizar</Button>
     </div>
-    {state === 'error' && <p role="alert">No se pudo cargar el informe. Vuelve a intentarlo con «Actualizar».</p>}
+    {state === 'error' && <p role="alert">No pudimos cargar los datos ahora. Intenta de nuevo en unos minutos con «Actualizar».</p>}
     {!result && state === 'loading' && <Skeleton />}
     {state !== 'error' && result && children(result.value)}
   </>

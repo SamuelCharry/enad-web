@@ -1,3 +1,4 @@
+import { LoadError } from '../../ui/LoadError'
 import { lazy, Suspense, useState } from 'react'
 import type { School, Student } from '../../domain/types'
 import { createStudent, importStudents, patchStudent, useStudents } from '../../data/students'
@@ -25,7 +26,7 @@ export function Students({ school, campus, admin, uid, initialStudent, scanOnOpe
   const detail = students.find(s => s.id === selected && s.campus === campus)
   const visible = students.filter(s => s.schoolId === school.id && s.campus === campus && matches(search, s.fullName, s.code, s.grade))
   const existing = edit ? students.find(s => s.id === edit) : undefined
-  if (error) return <p role="alert">{error}</p>
+  if (error) return <LoadError message={error} />
   return <>
     {notice && <p role="status">{notice}</p>}
     {receipt && 'syncState' in receipt && <SyncStatus pending={receipt.syncState === 'pending'} />}

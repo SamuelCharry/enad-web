@@ -1,3 +1,4 @@
+import { LoadError } from '../../ui/LoadError'
 import { Link, useNavigate } from 'react-router-dom'
 import { GroupDetail } from '../teacher/GroupDetail'
 import { groupLink } from '../teacher/navigation'
@@ -36,7 +37,7 @@ export function Groups({ schoolId, campus, profile, initialGroup, campuses = [] 
   const eligible = new Set(roster.map(s => s.id))
   const members = new Set(group?.studentIds)
   const editorRoster = students.filter(s => s.schoolId === schoolId && (eligible.has(s.id) || members.has(s.id)))
-  if (error || studentError) return <p role="alert">{error || studentError}</p>
+  if (error || studentError) return <LoadError message={error || studentError} />
   const detail = !admin && groups.find(g => g.id === initialGroup && (allSites || g.campus === campus))
   if (initialGroup && !admin) {
     if (loading || loadingStudents) return <p role="status">Cargando grupo…</p>

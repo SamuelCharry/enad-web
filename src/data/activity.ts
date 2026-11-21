@@ -1,63 +1,6 @@
-import { useMemo } from 'react'
-import { collection, collectionGroup, query, where } from 'firebase/firestore'
 import type { AttendanceMark, Evaluation, Group, HoursEntry, School, Student } from '../domain/types'
-import { ApiError } from '../domain/types'
-import { compare, reportCache, schoolQueries } from './core'
-import { db } from './firebase'
-import { listenMany, useLive, withSession, type Stream } from './live'
+import { compare } from './core'
 import type { SchoolData } from './reportMath'
-
-/** Keep every child query within a single authorized school. Regional changes tear down old listeners. */
-export function watchManagement(): Stream<SchoolData[]> {
-  return withSession<SchoolData[]>([], (profile, next, error, reset) => {
-    if (!profile.activo || profile.rol === 'docente') {
-      error(new ApiError(403, 'Necesitas un perfil de gestión.'))
-      return () => { }
-    }
-    let stops: (() => void)[] = []
-    let generation = 0
-    function clear() {
-      generation++
-      stops.forEach(stop => stop())
-      stops = []
-      reset()
-    }
-    const stopSchools = listenMany<School>(schoolQueries(profile), schools => {
-      clear()
-      const version = generation
-      if (!schools.length) { next([]); return }
-      const parts = schools.map(school => ({ school } as SchoolData))
-      const ready = new Set<string>()
-      function failed(cause: unknown) {
-        if (generation === version) { clear(); error(cause) }
-      }
-      for (const row of parts) {
-        const scope = where('schoolId', '==', row.school.id)
-        for (const field of ['attendance', 'evaluations', 'groups', 'students', 'hours', 'teachers'] as const) {
-          const source = field === 'teachers' ? collection(db, 'schools', row.school.id, 'teachers')
-            : query(field === 'attendance' || field === 'evaluations' ? collectionGroup(db, field) : collection(db, field), scope)
-          function listen<K extends Exclude<keyof SchoolData, 'school'>>(key: K) {
-            return listenMany<SchoolData[K][number]>([source], records => {
-              if (generation !== version) return
-              Object.assign(row, { [key]: records })
-              ready.add(JSON.stringify([row.school.id, key]))
-              if (ready.size === parts.length * 6) {
-                reportCache.clear()
-                next(parts.map(p => ({ ...p })))
-              }
-            }, failed)
-          }
-          stops.push(listen(field))
-        }
-      }
-    }, cause => { clear(); error(cause) })
-    return () => { stopSchools(); clear() }
-  })
-}
-export function useManagementActivity() {
-  const stream = useMemo(() => watchManagement(), [])
-  return useLive(stream, [])
-}
 
 export function activityFeed(schools: SchoolData[]) {
   type Event = { key: string; kind: string; author: string; school: string; savedAt: string; detail: string }

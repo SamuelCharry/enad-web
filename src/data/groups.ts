@@ -1,9 +1,11 @@
-import { arrayRemove, arrayUnion, collection, deleteDoc, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore'
+import { arrayRemove, arrayUnion, collection, deleteDoc, doc, getDoc, setDoc, updateDoc, where, documentId } from 'firebase/firestore'
 import type { Group, Subject, UserProfile } from '../domain/types'
 import { SUBJECTS } from '../domain/levels'
 import { db } from './firebase'
 import { api, caller, commit, compare, fail, now, recordOf, requireSchool, str } from './core'
-import { useScopedRows } from './scope'
+import { scopedRows } from './scope'
+import { useLive } from './live'
+import { useMemo } from 'react'
 import { studentDoc } from './students'
 
 function groupView<T extends Group>(group: T) {
@@ -18,8 +20,14 @@ function groupView<T extends Group>(group: T) {
   }
 }
 /** Live groups in the caller's schools, optionally limited to their own groups. */
-export function useGroups(schoolId?: string, opts?: { mine?: boolean }) {
-  const { data, loading, error } = useScopedRows<Group>('groups', schoolId, opts?.mine)
+export function useGroups(schoolId?: string, opts?: { mine?: boolean; campus?: string; campusName?: string; groupId?: string }) {
+  const { mine, campus, campusName, groupId } = opts ?? {}
+  const source = useMemo(() => scopedRows<Group>('groups',schoolId,p => [
+    ...(mine ? [where('teacherId','==',p.uid)] : []),
+    ...(campus !== undefined ? [where('campus','in',[...new Set([campus,campusName ?? campus])])] : []),
+    ...(groupId ? [where(documentId(),'==',groupId)] : [])
+  ]),[schoolId,mine,campus,campusName,groupId])
+  const {data,loading,error}=useLive(source,[])
   return { groups: data.map(groupView).sort((a, b) => compare(a.name, b.name)), loading, error }
 }
 /** Loads a scoped group and checks ownership when editing. */

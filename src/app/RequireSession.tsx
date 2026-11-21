@@ -1,3 +1,4 @@
+import { Button } from '../ui/components'
 import { Link, Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useSession } from '../data/session'
 import { CheckingSession, SwitchUser } from './sessionControls'
@@ -14,6 +15,7 @@ export function RequireSession() {
       <Icon name="lock" size={32} /><h1>{inactive ? 'Tu cuenta está desactivada' : 'No se pudo acceder al portal'}</h1>
       <p>{inactive ? 'Comunícate con la persona que administra ENAd para activar tu cuenta.'
         : error || 'Revisa tu conexión. Si el problema continúa, pide que verifiquen tu perfil de ENAd.'}</p>
+      {error && <Button onClick={() => window.location.reload()}>Reintentar</Button>}
       {user ? <SwitchUser /> : <Link className="ui-link-button" to="/login">Volver al ingreso</Link>}
     </main>
   }

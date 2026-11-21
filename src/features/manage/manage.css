@@ -21,3 +21,7 @@
   .manage .home-action p,.manage .home-action .ui-badge { grid-column:1/-1;margin:var(--space-1) 0 0;justify-self:start; }
   .manage .coverage-counts { gap:var(--space-4); }
 }
+
+.manage .rep-refresh { display:flex; flex-wrap:wrap; align-items:center; gap:var(--space-3); margin-block:var(--space-3); }
+.manage .rep-refresh small { color:var(--soft-ink); }
+.manage .manage-columns .ui-field { margin-block:var(--space-3); }

@@ -1,3 +1,4 @@
+import { LoadError } from '../../ui/LoadError'
 import { useState, type ReactNode } from 'react'
 import type { School, Subject, Moment, UserProfile } from '../../domain/types'
 import { useSchools } from '../../data/scope'
@@ -30,7 +31,7 @@ export function SchoolScope({ profile, children, withCampus = true, initialSchoo
   const [site, setSite] = useState<string | null>(initialCampus)
   const visible = profile.rol === 'admin' ? schools : schools.filter(s => profile.schoolIds.includes(s.id))
   const school = visible.find(s => s.id === id) ?? visible[0]
-  if (error) return <p role="alert">{error}</p>
+  if (error) return <LoadError message={error} />
   if (loading) return <p role="status">Cargando instituciones…</p>
   if (!school) return <p>Solicita a coordinación que asigne una institución a tu cuenta.</p>
   const assigned = profile.campusIds[school.id] ?? []

@@ -1,13 +1,17 @@
-import { doc, getDoc, setDoc } from 'firebase/firestore'
+import { doc, getDoc, setDoc, where } from 'firebase/firestore'
 import { weekOf } from '../domain/weeks'
 import type { HoursEntry } from '../domain/types'
 import { api, caller, commit, compare, configOf, fail, now, requireDate, requireSchool, str } from './core'
 import { db } from './firebase'
-import { useScopedRows } from './scope'
+import { scopedRows } from './scope'
+import { useMemo } from 'react'
+import { useLive } from './live'
 
 /** Own hours for the inclusive date range, most recent first. */
 export function useMyHours(from: string, to: string) {
-  const { data, loading, error } = useScopedRows<HoursEntry>('hours', undefined, true)
+  const stream = useMemo(() => scopedRows<HoursEntry>('hours', undefined, p => [where('teacherId','==',p.uid),
+    ...(from ? [where('date','>=',from)] : []), ...(to ? [where('date','<=',to)] : [])]),[from,to])
+  const { data, loading, error } = useLive(stream, [])
   const hours = data.filter(h => (!from || h.date >= from) && (!to || h.date <= to)).sort((a, b) => compare(b.date, a.date))
   return { hours, loading, error }
 }

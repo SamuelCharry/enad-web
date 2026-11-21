@@ -127,14 +127,14 @@ export function importStudents(schoolId: string, rows: readonly (StudentFields &
   })
 }
 /** Returns chronological attendance and evaluation history of an accessible student. */
-export function getStudentHistory(id: string) {
+export function getStudentHistory(id: string, filters: { evaluationsOnly?:boolean } = {}) {
   return api(async () => {
     const d = await studentDoc(await caller(), id)
     async function rows<T extends AttendanceMark | Evaluation>(path: string) {
       const snap = await getDocs(query(collection(d.ref, path), where('schoolId', '==', d.data().schoolId)))
       return snap.docs.map(s => recordOf<T>(s)).sort((a, b) => compare(a.date, b.date) || compare(a.savedAt, b.savedAt))
     }
-    const [attendance, evaluations] = await Promise.all([rows<AttendanceMark>('attendance'), rows<Evaluation>('evaluations')])
+    const [attendance, evaluations] = await Promise.all([filters.evaluationsOnly ? [] : rows<AttendanceMark>('attendance'), rows<Evaluation>('evaluations')])
     return { attendance, evaluations }
   })
 }

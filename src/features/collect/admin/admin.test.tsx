@@ -1,3 +1,5 @@
+import { getDataQuality } from '../../../data/reports'
+import { qualityIssues } from '../../../data/quality'
 import { beforeEach, afterEach, expect, it, vi } from 'vitest'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
@@ -10,6 +12,7 @@ import { saveStudentAssignment } from '../../../data/adminStudent'
 import { Teachers } from '../Directories'
 import { DataQuality, ImportHistory } from './Audit'
 import { Rosters } from './Rosters'
+vi.mock('../../../data/reports',()=>({refreshReports:vi.fn(),getDataQuality:vi.fn()}))
 vi.mock('../../../data/firebase', () => ({ db: {}, auth: {} }))
 vi.mock('../../../data/admin', () => ({ useUsers: vi.fn(), useImportHistory: vi.fn(), patchUser: vi.fn() }))
 vi.mock('../../../data/adminStudent', () => ({ saveStudentAssignment: vi.fn() }))
@@ -56,9 +59,10 @@ it('ofrece retiro con confirmación y conserva el editor si falla el guardado', 
   expect((await screen.findByRole('alert')).textContent).toBe('El registro cambió.')
   expect(saveStudentAssignment).toHaveBeenCalledWith(student, expect.objectContaining({ retired: true }), [], [])
 })
-it('vincula cada hallazgo al directorio y conserva filas y responsable del historial', () => {
+it('vincula cada hallazgo al directorio y conserva filas y responsable del historial', async () => {
+  vi.mocked(getDataQuality).mockResolvedValue(qualityIssues([student],[],[teacher],[school]))
   const view = render(<MemoryRouter><DataQuality /></MemoryRouter>)
-  expect(screen.getByRole('link', { name: 'Ana Paz' }).getAttribute('href')).toBe('/recoleccion/evaluaciones?schoolId=s&student=s_001')
+  expect((await screen.findByRole('link', { name: 'Ana Paz' })).getAttribute('href')).toBe('/recoleccion/evaluaciones?schoolId=s&student=s_001')
   view.unmount()
   vi.mocked(useImportHistory).mockReturnValue({ ...ready, data: [{ id: 'i', at: '2026-04-08T12:00:00Z', by: 't', kind: 'students', rows: 12, created: 10, errors: 1 }] })
   render(<MemoryRouter><ImportHistory /></MemoryRouter>)

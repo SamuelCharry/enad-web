@@ -1,3 +1,4 @@
+import { reportCache } from './reportCache'
 import { collection, doc, documentId, getDoc, getDocs, query, where, type DocumentSnapshot, type Query } from 'firebase/firestore'
 import { ApiError, type ProgramConfig, type School, type UserProfile } from '../domain/types'
 import { colombiaToday } from '../domain/weeks'
@@ -118,7 +119,7 @@ export function configOf(d: DocumentSnapshot): ProgramConfig {
   return { projectName: 'ENAd', year, implementationStartDate: year + '-01-01', breaks: [], ...d.data() }
 }
 /** Cached report promises shared by all accessors. */
-export const reportCache = new Map<string, { expires: number; value: Promise<unknown> }>()
+export { reportCache } from './reportCache'
 /** Bounded local write acknowledgement, with invalidation on enqueue and settlement. */
 export async function commit(write: Promise<void>): Promise<'synced' | 'pending'> {
   reportCache.clear()

@@ -1,3 +1,4 @@
+import { LoadError } from '../../ui/LoadError'
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import type { Evaluation, Moment, Student, Subject } from '../../domain/types'
@@ -18,7 +19,7 @@ export function History({ schoolId }: { schoolId: string }) {
   const setId = (student:string) => setParams({schoolId,student})
   const rows = students.filter(s => matches(q, s.fullName, s.code))
   const student = rows.find(s => s.id === id)
-  if (error) return <p role="alert">{error}</p>
+  if (error) return <LoadError message={error} />
   return <>
     <div className="collect-fields">
       <Search value={q} onChange={setQ} />
@@ -40,10 +41,12 @@ function HistoryList({ student }: { student: Student }) {
   }
   useEffect(() => {
     let active = true
-    void getStudentHistory(student.id).then(h => { if (active) setItems(h.evaluations) }).catch((e: unknown) => {
+    const timer = setTimeout(() => { active = false; setError('No pudimos cargar los datos ahora. Intenta de nuevo en unos minutos.') },20_000)
+    void getStudentHistory(student.id, { evaluationsOnly:true }).then(h => { if (active) setItems(h.evaluations) }).catch((e: unknown) => {
       if (active) setError(e instanceof Error ? e.message : 'No se pudo cargar el historial.')
     })
-    return () => { active = false }
+    .finally(() => clearTimeout(timer))
+    return () => { active = false; clearTimeout(timer) }
   }, [student.id, version])
   return <>
     <Button variant="primary" onClick={() => setEdit('new')}>Registrar evaluación histórica</Button>

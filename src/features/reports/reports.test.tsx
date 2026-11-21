@@ -23,12 +23,13 @@ vi.mock('../../data/session', () => ({ useSession: vi.fn() }))
 vi.mock('../../data/groups', () => ({ useGroups: vi.fn() }))
 vi.mock('../../data/hours', () => ({ useMyHours: vi.fn() }))
 vi.mock('../../data/profile', () => ({ updateMyName: vi.fn() }))
-vi.mock('../../data/reports', () => ({ refreshReports: vi.fn(), getManagement: vi.fn(), getMovement: vi.fn().mockResolvedValue([]), getAttendanceReport: vi.fn(), getExport: vi.fn(), getHoursReport: vi.fn(), getLevels: vi.fn(), getSubmissions: vi.fn(), getSummary: vi.fn(), getTeacherMetrics: vi.fn(), useFilterOptions: vi.fn() }))
+vi.mock('../../data/reports', () => ({ refreshReports: vi.fn(), getStudentReport:vi.fn(),getGroupRoster:vi.fn(), getFollowup:vi.fn(), getComparison:vi.fn(), getMovement: vi.fn().mockResolvedValue([]), getAttendanceReport: vi.fn(), getExport: vi.fn(), getHoursReport: vi.fn(), getLevels: vi.fn(), getSubmissions: vi.fn(), getSummary: vi.fn(), getTeacherMetrics: vi.fn(), useFilterOptions: vi.fn() }))
 vi.mock('../../data/scope', () => ({ useProgramConfig: vi.fn(), useSchools: vi.fn() }))
 vi.mock('../../data/students', () => ({ getStudentHistory: vi.fn(), useStudents: vi.fn() }))
 vi.mock('../../domain/export/excel', () => ({ buildExcelExport: vi.fn() }))
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.mocked(scopeApi.useProgramConfig).mockReturnValue({loading:false,config:null,error:undefined})
   vi.spyOn(reportsApi, 'useFilterOptions').mockReturnValue({ projects: [], departments: [], municipalities: [], schools: [], campuses: [], error: undefined, loading: false })
 })
 
@@ -68,7 +69,7 @@ describe('Presentación de informes', () => {
     expect(filters.campus).toBe('s1')
   })
 
-  it('aplica el alcance visible a la consulta y vuelve a cargar al regresar a la ventana', async () => {
+  it('aplica el alcance visible a la consulta sin repetir lecturas al enfocar la ventana', async () => {
     const get = vi.spyOn(reportsApi, 'getSummary').mockResolvedValue(summary)
     vi.spyOn(reportsApi, 'useFilterOptions').mockImplementation(f => ({
       projects: ['p'], departments: f.projectId ? ['Caldas'] : [], municipalities: [], schools: [], campuses: [], error: undefined, loading: false,
@@ -83,7 +84,7 @@ describe('Presentación de informes', () => {
     await waitFor(() => expect(get).toHaveBeenLastCalledWith({}))
     const requests = get.mock.calls.length
     fireEvent.focus(window)
-    await waitFor(() => expect(get).toHaveBeenCalledTimes(requests + 1))
+    expect(get).toHaveBeenCalledTimes(requests)
     expect(await screen.findByText(/Última actualización/)).toBeTruthy()
   })
 
@@ -95,12 +96,12 @@ describe('Presentación de informes', () => {
         { uid: 'd1', schoolId: 'ie2', schoolName: 'Segunda IE', fullName: 'Docente Uno', attendanceSent: false, hoursSent: true }] })
     open('/visualizacion/seguimiento')
     expect(await screen.findByText('Primera IE')).toBeTruthy()
-    expect(get).toHaveBeenCalledWith({}, 2)
+    expect(get).toHaveBeenCalledWith({}, 3)
     fireEvent.click(screen.getByLabelText('Solo pendientes'))
     expect(screen.queryByText('Primera IE')).toBeNull()
     expect(screen.getByText('Segunda IE')).toBeTruthy()
-    fireEvent.change(screen.getByLabelText('Semana de implementación'), { target: { value: '3' } })
-    await waitFor(() => expect(get).toHaveBeenLastCalledWith({}, 3))
+    fireEvent.change(screen.getByLabelText('Semana de implementación'), { target: { value: '2' } })
+    await waitFor(() => expect(get).toHaveBeenLastCalledWith({}, 2))
   })
 
   it('abre una sola institución, sede y grupo, y presenta niveles y asistencia', async () => {
@@ -109,6 +110,8 @@ describe('Presentación de informes', () => {
     vi.spyOn(studentsApi, 'useStudents').mockReturnValue({ students: [student], loading: false, error: '' })
     vi.spyOn(reportsApi, 'getAttendanceReport').mockResolvedValue({ bySchool: [], byTeacher: [], byGroup: [{ schoolId: 'ie1', subject: 'lectura', teacherId: 'd1', groupId: 'g1', name: 'Grupo Uno', teacherName: 'D', rate: 82, sessions: 6 }] })
     vi.spyOn(studentsApi, 'getStudentHistory').mockResolvedValue({ attendance: [mark, { ...mark, date: '2026-04-02', status: 'no_vino' }], evaluations: [] })
+    vi.mocked(reportsApi.getGroupRoster).mockResolvedValue([{student:{...student,syncState:'synced'},level:undefined,rate:50}])
+    vi.mocked(reportsApi.useFilterOptions).mockReturnValue({projects:[],departments:[],municipalities:[],schools:[school],campuses:school.campuses,loading:false,error:undefined})
     open('/visualizacion/instituciones')
     expect(groups).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: school.name }))
@@ -117,7 +120,7 @@ describe('Presentación de informes', () => {
     fireEvent.click(screen.getByRole('button', { name: group.name }))
     expect(await screen.findByText('50 %')).toBeTruthy()
     expect(screen.getByText('Párrafo')).toBeTruthy()
-    expect(groups).toHaveBeenCalledWith('ie1')
+    expect(groups).toHaveBeenCalledWith('ie1',expect.objectContaining({campus:'s1',groupId:'g1'}))
   })
 
   it('excluye retirados, otros grupos y fechas fuera del rango de la tasa del estudiante', () => {
@@ -247,12 +250,12 @@ it('muestra la tabla semanal y permite consultar las tres agrupaciones de asiste
 })
 
 it('abre la comparación de una sede desde un enlace compartido y enlaza el grupo de la docente', async () => {
-  const data = {config:{projectName:'Prueba',implementationStartDate:'2026-04-06',year:2026,breaks:[]},dateFiltered:true,from:'2026-04-06',to:'2026-04-12',
-    schools:[{school,students:[student],groups:[group],teachers:[{uid:group.teacherId,fullName:group.teacherName}],evaluations:[],hours:[],attendance:[{...mark,date:'2026-04-08'}]}]}
-  vi.mocked(reportsApi.getManagement).mockResolvedValue(data)
+  vi.mocked(reportsApi.getComparison).mockResolvedValue([{school,campus:school.campuses[0],students:1,groups:1,evaluated:0,attendance:100}])
+  vi.mocked(reportsApi.getFollowup).mockResolvedValue({from:'2026-04-06',to:'2026-04-12',moment:'linea_base',teachers:[{
+    uid:group.teacherId,fullName:group.teacherName,school,groups:[{...group,syncState:'synced'}],last:'',weeks:1,expected:1,attendanceRate:100,worked:0,planned:0,evaluated:0,members:1,coverage:0}]})
   const view = open('/visualizacion/comparacion?schoolId=ie1&campus=s1')
   expect(await screen.findByRole('row',{name:/Institución de prueba · Sede Uno 1 1 0 100 %/})).toBeTruthy()
-  expect(reportsApi.getManagement).toHaveBeenCalledWith({schoolId:'ie1',campus:'s1'})
+  expect(reportsApi.getComparison).toHaveBeenCalledWith({schoolId:'ie1',campus:'s1'},true)
   view.unmount()
   open('/visualizacion/docentes?schoolId=ie1&teacher=d1&orden=asistencia')
   expect(await screen.findByRole('row',{name:/1 \/ 1 · 100 %/})).toBeTruthy()
@@ -260,7 +263,7 @@ it('abre la comparación de una sede desde un enlace compartido y enlaza el grup
 })
 it('abre directamente la ficha de un estudiante y conserva el período al regresar al grupo',async () => {
   vi.mocked(studentsApi.useStudents).mockReturnValue({students:[student],loading:false,error:undefined})
-  vi.mocked(studentsApi.getStudentHistory).mockResolvedValue({evaluations:[],attendance:[mark,{...mark,date:'2025-01-01'}]})
+  vi.mocked(reportsApi.getStudentReport).mockResolvedValue({student:{...student,syncState:'synced'},evaluations:[],attendance:[mark]})
   open('/visualizacion/estudiante?schoolId=ie1&campus=s1&group=g1&student=e1&from=2026-01-01')
   expect(await screen.findByText('Asistió')).toBeTruthy()
   expect(screen.queryByText('2025-01-01')).toBeNull()

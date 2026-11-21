@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { LoadError } from '../ui/LoadError'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { signOut } from '../data/session'
 import { Button, Spinner } from '../ui/components'
@@ -25,5 +26,11 @@ export function SwitchUser() {
 }
 
 export function CheckingSession() {
+  const [expired, setExpired] = useState(false)
+  useEffect(() => {
+    const timer = setTimeout(() => setExpired(true),20_000)
+    return () => clearTimeout(timer)
+  },[])
+  if (expired) return <main className="session-state"><LoadError /></main>
   return <main className="session-state"><Spinner label="Verificando sesión" /><p>Verificando tu sesión…</p></main>
 }

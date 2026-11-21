@@ -8,7 +8,7 @@ export interface SchoolData {
   students: Student[];
   groups: Group[];
   teachers: { uid: string; fullName: string }[]
-  attendance: AttendanceMark[];
+  attendance: (AttendanceMark & { present?: number; absent?: number })[];
   hours: HoursEntry[];
   evaluations: Evaluation[]
 }
@@ -37,11 +37,11 @@ function grouped<K, T>(rows: T[], key: (r: T) => K) {
   }
   return map
 }
-function counted(marks: AttendanceMark[]) {
+function counted(marks: SchoolData['attendance']) {
   let present = 0, absent = 0
   for (const m of marks) {
-    if (m.status === 'vino') present++
-    if (m.status === 'no_vino') absent++
+    present += m.present ?? Number(m.status === 'vino')
+    absent += m.absent ?? Number(m.status === 'no_vino')
   }
   return { present, absent, rate: pct(present, present + absent) }
 }
@@ -127,7 +127,7 @@ export function levels(data: ReportData, subject: Subject, moments: Moment[] = M
       distribution: Object.fromEntries(moments.map(m => [m, zeroCounts(order)]))
     }
   }
-  function add(b: ReturnType<typeof block>, marks: Map<Moment, Evaluation>) {
+  function add(b: ReturnType<typeof block>, marks: Map<Moment, { level: string }>) {
     b.n++
     for (const [m, e] of marks) {
       if (order.includes(e.level)) b.distribution[m][e.level]++

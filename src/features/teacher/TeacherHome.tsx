@@ -1,3 +1,4 @@
+import { LoadError } from '../../ui/LoadError'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useSchoolAttendance } from '../../data/attendance'
@@ -17,9 +18,9 @@ import { draftDates } from './useAttendanceDrafts'
 import './teacher.css'
 
 function EvaluationTasks({ groups, schoolId, subject, moment }: { groups: Group[]; schoolId: string; subject: Subject; moment: Moment }) {
-  const events = useSchoolEvaluations(schoolId, subject)
+  const events = useSchoolEvaluations(schoolId, subject, moment, groups.flatMap(g => g.studentIds))
   const roster = useStudents(schoolId)
-  if (events.error || roster.error) return <p role="alert">{events.error || roster.error}</p>
+  if (events.error || roster.error) return <LoadError message={events.error || roster.error} />
   if (events.loading || roster.loading) return <p role="status">Consultando evaluaciones de {subjectLabel(subject)}…</p>
   const done = new Set(events.data.filter(e => e.moment === moment).map(e => e.studentId))
   const active = new Set(roster.students.filter(s => s.active && !s.retired).map(s => s.id))
@@ -31,10 +32,10 @@ function EvaluationTasks({ groups, schoolId, subject, moment }: { groups: Group[
 }
 
 function SchoolWork({ school, today, groups, from, hours }: { school: School; today: string; groups: Group[]; from?: string; hours: ReturnType<typeof useMyHours> }) {
-  const attendance = useSchoolAttendance(school.id, today)
+  const attendance = useSchoolAttendance(school.id, today, groups.map(g => g.id))
   const [moment, setMoment] = useState<Moment | ''>('')
   return <section className="teacher-school"><h3>{school.name}</h3>
-    {attendance.error && <p role="alert">{attendance.error}</p>}
+    {attendance.error && <LoadError message={attendance.error} />}
     <div className="teacher-groups">{groups.map(g => {
       const marks = attendance.data.filter(m => m.groupId === g.id && g.studentIds.includes(m.studentId))
       const complete = g.studentIds.length > 0 && new Set(marks.map(m => m.studentId)).size === g.studentIds.length
@@ -48,7 +49,7 @@ function SchoolWork({ school, today, groups, from, hours }: { school: School; to
       </Card>
     })}</div>
     {!groups.length && <p>Aún no tienes grupos en esta institución. <Link to={collectLink('grupos', { school: school.id })}>Crear un grupo</Link></p>}
-    {from && (hours.error ? <p role="alert">{hours.error}</p> : hours.loading ? <p>Consultando horas…</p> :
+    {from && (hours.error ? <LoadError message={hours.error} /> : hours.loading ? <p>Consultando horas…</p> :
       <Link to={collectLink('horas', { school: school.id })}>{hours.hours.some(h => h.schoolId === school.id) ? 'Ver las horas de esta semana' : 'Pendiente · Registrar horas de esta semana'}</Link>)}
     {groups.length > 0 && <details><summary>Evaluaciones pendientes</summary><MomentField value={moment} onChange={setMoment} />
       {moment && (['lectura', 'matematicas'] as const).map(subject => {
@@ -61,7 +62,7 @@ function MyGroups({ today, from, to }: { today: string; from?: string; to?: stri
   const schools = useSchools()
   const hours = useMyHours(from ?? today, to ?? today)
   const groups = useGroups(undefined, { mine: true })
-  if (schools.error || groups.error) return <p role="alert">{schools.error || groups.error}</p>
+  if (schools.error || groups.error) return <LoadError message={schools.error || groups.error} />
   if (schools.loading || groups.loading) return <p role="status">Cargando tus grupos…</p>
   if (!schools.schools.length) return <p>Solicita a coordinación que revise las instituciones asignadas a tu cuenta.</p>
   return <>{schools.schools.map(s => <SchoolWork key={s.id} school={s} groups={groups.groups.filter(g => g.schoolId === s.id)} {...{ today, from, hours }} />)}</>
@@ -71,7 +72,7 @@ function ScanSchool({ onClose }: { onClose: () => void }) {
   const { schools, error, loading } = useSchools()
   const navigate = useNavigate()
   return <Dialog title="¿De qué institución es la lista?" onClose={onClose}>
-    {error ? <p role="alert">{error}</p> : loading ? <p role="status">Cargando instituciones…</p> : !schools.length ? <p>Solicita a coordinación que asigne tu institución.</p> :
+    {error ? <LoadError message={error} /> : loading ? <p role="status">Cargando instituciones…</p> : !schools.length ? <p>Solicita a coordinación que asigne tu institución.</p> :
       schools.map(s => <Button key={s.id} onClick={() => navigate(collectLink('estudiantes',{ school: s.id, scan: '1' }))}>{s.name}</Button>)}
   </Dialog>
 }

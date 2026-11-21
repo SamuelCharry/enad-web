@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { collection, doc, getDoc, query, setDoc, where, type WriteBatch } from 'firebase/firestore'
+import { collection, doc, getDoc, query, limit, orderBy, documentId, startAfter, setDoc, where, type WriteBatch } from 'firebase/firestore'
 import { ApiError, type ProgramConfig, type Role, type School, type UserProfile } from '../domain/types'
 import { db } from './firebase'
 import { api, caller, commit, compare, fail, requireDate, schoolsOf, slug, str } from './core'
@@ -93,11 +93,16 @@ export function patchUser(uid: string, fields: Partial<UserProfile>) {
 export { adminImport } from './adminImport'
 
 export interface ImportReceipt { id: string; kind: string; rows: number; errors: number; created: number; by: string; at: string }
-const importStream = withSession<ImportReceipt[]>([], (p,next,error) => {
-  if (p.rol !== 'admin') {
-    error(new ApiError(403,'Solo administración puede consultar las importaciones.'))
-    return () => {}
-  }
-  return listenMany<ImportReceipt>([collection(db,'imports')], rows => next(rows.sort((a,b) => compare(b.at,a.at))),error)
-})
-export function useImportHistory() { return useLive(importStream,[]) }
+export function useImportHistory(after?:{ at:string; id:string }) {
+  const at=after?.at, id=after?.id
+  const source=useMemo(() => withSession<ImportReceipt[]>([], (p,next,error) => {
+    if (p.rol !== 'admin') {
+      error(new ApiError(403,'Solo administración puede consultar las importaciones.'))
+      return () => {}
+    }
+    const page=query(collection(db,'imports'),orderBy('at','desc'),orderBy(documentId(),'desc'),
+      ...(at && id ? [startAfter(at,id)] : []),limit(21))
+    return listenMany<ImportReceipt>([page],next,error)
+  }),[at,id])
+  return useLive(source,[])
+}

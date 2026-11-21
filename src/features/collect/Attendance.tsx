@@ -1,3 +1,4 @@
+import { LoadError } from '../../ui/LoadError'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { AttendanceStatus, Group, School, Student } from '../../domain/types'
@@ -31,7 +32,7 @@ export function Attendance({ schoolId, initialGroup = '', initialDate, school, u
   const group = groups.find(g => g.id === id)
   const key = JSON.stringify([id, date])
   const valid = validDay(date, today)
-  if (error || studentError) return <p role="alert">{error || studentError}</p>
+  if (error || studentError) return <LoadError message={error || studentError} />
   return <>
     <fieldset disabled={saving} className="collect-fields">
       <Choice guide="group" label="Grupo" placeholder="Selecciona un grupo" options={groups} value={group?.id ?? ''} onChange={setId} />
@@ -47,7 +48,7 @@ export function Attendance({ schoolId, initialGroup = '', initialDate, school, u
       <p>{groups.length ? 'Selecciona el grupo para tomar asistencia.' : 'Crea un grupo y añade estudiantes para tomar asistencia.'}</p>}</>
 }
 function AttendanceSheet({ date, group, students, draft, setDraft, setSaving, school }: { date: string; group: Group; students: Student[]; draft: Marks; setDraft: (v: Marks) => void; setSaving: (v: boolean) => void; school?: School }) {
-  const live = useSchoolAttendance(group.schoolId, date)
+  const live = useSchoolAttendance(group.schoolId, date, [group.id])
   const action = useAction()
   const guideSaved = useGuideReceipt()
   const [receipt, setReceipt] = useState<{ snapshot: typeof live.data; marks: Marks; pending: boolean } | null>(null)
@@ -55,7 +56,7 @@ function AttendanceSheet({ date, group, students, draft, setDraft, setSaving, sc
   const [confirmSave, setConfirmSave] = useState(false)
   const [adding, setAdding] = useState(false)
   if (live.loading) return <p role="status">Cargando asistencia…</p>
-  if (live.error) return <p role="alert">{live.error}</p>
+  if (live.error) return <LoadError message={live.error} />
   const saved = live.data.filter(m => m.groupId === group.id)
   const pending = new Set(saved.filter(m => m.syncState === 'pending').map(m => m.studentId))
   const baseline: Marks = Object.fromEntries(saved.map(m => [m.studentId, m.status]))

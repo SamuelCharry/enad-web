@@ -1,3 +1,4 @@
+import { LoadError } from '../../ui/LoadError'
 import { useState } from 'react'
 import type { Jornada, School, UserProfile } from '../../domain/types'
 import { createTeacher, patchUser, upsertSchool, useUsers } from '../../data/admin'
@@ -12,7 +13,7 @@ import { Credentials } from './FileImport'
 const shifts = [{ id: 'mañana', name: 'Mañana' }, { id: 'tarde', name: 'Tarde' }, { id: 'única', name: 'Única' }] as const
 export function Schools() {
   const { schools, loading, error } = useSchools()
-  if (error) return <p role="alert">{error}</p>
+  if (error) return <LoadError message={error} />
   return <Directory title="Instituciones y sedes" loading={loading} headers={['Institución','Municipio','Sedes','Estado']} create="Crear institución"
     rows={schools.map(s => ({id:s.id,search:[s.name,s.id,s.municipality,s.region,...s.campuses.map(c => c.name)].join(' '),
       cells:[s.name,s.municipality,s.campuses.map(c => c.name).join(' · ') || 'Sin sedes',s.active ? 'Activa':'Inactiva']}))}
@@ -60,7 +61,7 @@ function SchoolEditor({ school, onClose }: { school?: School; onClose: (notice?:
 export function Teachers() {
   const { users, loading, error } = useUsers('docente')
   const directory = useSchools(), schools = directory.schools
-  if (error || directory.error) return <p role="alert">{error || directory.error}</p>
+  if (error || directory.error) return <LoadError message={error || directory.error} />
   return <Directory title="Directorio docente" loading={loading || directory.loading} headers={['Docente','Instituciones','Jornada','Estado']} create="Crear docente"
     rows={users.map(u => {
       const names = schools.filter(s => u.schoolIds?.includes(s.id)).map(s => s.name).join(' · ')

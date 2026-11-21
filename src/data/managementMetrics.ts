@@ -75,11 +75,13 @@ export function comparison(s: SchoolData, campus?: string) {
   const students = s.students.filter(v => campus === undefined || campusId(s.school, v.campus) === campus)
   const ids = new Set(students.map(v => v.id))
   const groups = new Set(s.groups.filter(g => campus === undefined || campusId(s.school, g.campus) === campus).map(g => g.id))
-  const marks = s.attendance.filter(m => (campus === undefined || groups.has(m.groupId)) && (m.status === 'vino' || m.status === 'no_vino'))
+  const marks = s.attendance.filter(m => campus === undefined || groups.has(m.groupId))
+  const present = marks.reduce((n,m) => n + (m.present ?? Number(m.status === 'vino')), 0)
+  const absent = marks.reduce((n,m) => n + (m.absent ?? Number(m.status === 'no_vino')), 0)
   const tested = new Set(s.evaluations.filter(e => ids.has(e.studentId)).map(e => e.studentId))
   return {
     students: students.filter(enrolled).length, groups: groups.size, evaluated: tested.size,
-    attendance: ratio(marks.filter(m => m.status === 'vino').length, marks.length)
+    attendance: ratio(present, present + absent)
   }
 }
 export function dashboardAlerts(schools: SchoolData[], cfg: ProgramConfig, today: string, moment: Moment) {

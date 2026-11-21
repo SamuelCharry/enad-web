@@ -83,7 +83,14 @@ const mem = vi.hoisted(() => {
   const fs = {
     doc: child, collection: child, collectionGroup: (_: Ref, name: string) => ({ ...ref(name), group: true }),
     documentId: () => '__name__', where: (field: string, op: string, value: unknown) => ({ field, op, value }),
-    query: (r: Ref, ...filters: Ref['filters'][]) => ({ ...r, filters }), getDocs: async (r: Ref) => page(r), getDoc: async (r: Ref) => snapshot(r),
+    query: (r: Ref, ...filters: NonNullable<Ref['filters']>) => ({ ...r, filters:[...(r.filters ?? []),...filters] }), getDocs: async (r: Ref) => page(r), getDoc: async (r: Ref) => snapshot(r),
+    orderBy:(field:string)=>({field,op:'order'}),limit:(value:number)=>({field:'',op:'limit',value}),startAfter:(value:string)=>({field:'studentId',op:'after',value}),
+    getCountFromServer:async (q:Ref) => ({data:() => ({count:page(q).docs.length})}),
+    sum:(field:string)=>field,
+    getAggregateFromServer:async(q:Ref, fields:Record<string,string>) => {
+      const docs = page(q).docs
+      return {data:()=>Object.fromEntries(Object.entries(fields).map(([alias,field])=>[alias,docs.reduce((n,d)=>n+Number(d.data()?.[field] ?? 0),0)]))}
+    },
     onSnapshot, writeBatch: batch, setDoc: async (r: Ref, d: Data) => { docs.set(r.path, d) }, updateDoc: async (r: Ref, d: Data) => update(r, d),
     runTransaction: async (_db: unknown, fn: (tx: unknown) => Promise<unknown>) => {
       const tx = batch(), result = await fn({ ...tx, get: async (r: Ref) => snapshot(r) })
@@ -175,10 +182,10 @@ it('usa la clave compuesta para horas e invalida los reportes después de escrib
   const reads = mem.reads.length
   await getSummary({})
   expect(mem.reads).toHaveLength(reads)
-  const input = { schoolId: 's', date: '2026-09-14', plannedHours: 4, workedHours: 2 }
+  const input = { schoolId: 's', date: '2026-11-17', plannedHours: 4, workedHours: 2 }
   await expect(saveHours(input)).rejects.toMatchObject({ status: 400 })
   await saveHours({ ...input, reason: 'Salud: cita médica' })
-  expect(mem.docs.get('hours/t_s_2026-09-14')).toMatchObject({ ...input, week: 2, teacherId: 't' })
+  expect(mem.docs.get('hours/t_s_2026-11-17')).toMatchObject({ ...input, week: 11, teacherId: 't' })
   expect((await getSummary({})).hoursWorked).toBe(2)
   expect(mem.reads.filter(r => r.path === 'attendance').every(q => q.filters?.some(f => f.field === 'schoolId' && f.value === 's'))).toBe(true)
 })
@@ -222,14 +229,14 @@ it('refleja cambios remotos y cancela los listeners de Auth, perfil y escuela al
   expect(mem.listeners.size).toBe(0)
 })
 
-it('vence la caché a los cinco minutos y la separa por usuario y filtros', async () => {
+it('vence la caché a los diez minutos y la separa por usuario y filtros', async () => {
   const start = Date.now()
   const initial = await getSummary({})
   mem.docs.set('students/s_B', { schoolId: 's', active: true })
-  vi.mocked(Date.now).mockReturnValue(start + 299999)
+  vi.mocked(Date.now).mockReturnValue(start + 599999)
   expect(await getSummary({})).toEqual(initial)
   expect((await getSummary({ schoolId: 's' })).students).toBe(2)
-  vi.mocked(Date.now).mockReturnValue(start + 300000)
+  vi.mocked(Date.now).mockReturnValue(start + 600000)
   expect((await getSummary({})).students).toBe(2)
   mem.auth.currentUser.uid = 'admin'
   expect((await getSummary({})).schools).toBe(2)

@@ -1,10 +1,11 @@
+import { getGroupRoster } from '../../data/reports'
 import { useGroups } from '../../data/groups'
 import { useState } from 'react'
 import type { Group, ReportFilters, Student } from '../../domain/types'
 import { getStudentHistory, useStudents } from '../../data/students'
 import { momentLabel, SUBJECTS, subjectLabel } from '../../domain/levels'
 import { Button, Card, EmptyState, LevelChip, Table } from '../../ui/components'
-import { number, percent, studentRate } from './model'
+import { number, percent } from './model'
 import { LiveState, ReportRead } from './ReportState'
 
 const statusLabels = { vino: 'Asistió', no_vino: 'No asistió', retirado: 'Retirado' }
@@ -35,18 +36,6 @@ export function StudentDetail({ student, onBack, backLabel = 'Volver al grupo' }
   </>}</ReportRead></>
 }
 
-async function readRates(students: Student[], groupId: string, filters: ReportFilters, signal: AbortSignal) {
-  const rates = new Map<string, number | null>()
-  for (let i = 0; i < students.length; i += 5) {
-    signal.throwIfAborted()
-    await Promise.all(students.slice(i, i + 5).map(async student => {
-      const h = await getStudentHistory(student.id)
-      rates.set(student.id, studentRate(h.attendance, groupId, filters))
-    }))
-  }
-  return rates
-}
-
 export function Roster({ group, filters, profiles = false }: { group: Group; filters: ReportFilters; profiles?: boolean }) {
   const { students, loading, error } = useStudents(group.schoolId)
   const [selected, select] = useState('')
@@ -67,7 +56,7 @@ export function Roster({ group, filters, profiles = false }: { group: Group; fil
         {!roster.length ? <EmptyState title="Este grupo aún no tiene estudiantes." /> : profiles ? roster.map(s => <div className="teacher-record" key={s.id}>
             <Button variant="ghost" onClick={() => select(s.id)}>{s.fullName}</Button><p>{s.code} · Grado {s.grade}°</p>
             {SUBJECTS.map(subject => <p key={subject}>{subjectLabel(subject)} · <LevelChip subject={subject} level={s.levels[subject]?.level} /></p>)}</div>) :
-          <ReportRead query={JSON.stringify([group.id, filters, roster.map(s => s.id)])} load={signal => readRates(roster, group.id, filters, signal)}>{rates => table(rates)}</ReportRead>}
+          <ReportRead query={JSON.stringify([group.id, filters, roster.map(s => s.id)])} load={() => getGroupRoster(group, filters)}>{rows => table(new Map(rows.map(r => [r.student.id, r.rate])))}</ReportRead>}
       </>}
   </LiveState>
 }

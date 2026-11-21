@@ -1,29 +1,38 @@
+import { useState } from 'react'
 import { ReportTable as Table } from './TableExport'
 import { Link } from 'react-router-dom'
-import { getManagement, getMovement } from '../../data/reports'
-import { comparison, milestones, observedMoment, teacherFollowup } from '../../data/managementMetrics'
+import { getComparison, getFollowup, getMovement } from '../../data/reports'
+import { milestones } from '../../data/managementMetrics'
 import { momentLabel, subjectLabel } from '../../domain/levels'
-import type { Moment, ReportFilters, Subject } from '../../domain/types'
-import { Card, EmptyState, Field, Select } from '../../ui/components'
+import type { ReportFilters, Subject } from '../../domain/types'
+import { Button, Card, EmptyState, Field, Select } from '../../ui/components'
 import { ReportRead } from './ReportState'
 import { number, percent, ratio } from './model'
 import { reportLink, savedTime, useReportQuery } from './navigation'
 
 type Props = { filters: ReportFilters }
 export function MovementTable({ filters, subject }: Props & { subject: Subject }) {
-  return <ReportRead query={JSON.stringify([filters, subject])} load={() => getMovement(filters, subject)}>{rows => {
-    return <Card><h3>Cambios de nivel por estudiante</h3><p>Se compara la última evaluación de {subjectLabel(subject).toLowerCase()} de cada estudiante en ambos momentos.</p>
-      {rows.some(m => m.total > 0) ? <Table caption="Movimiento entre momentos" headers={['Momentos', 'Con ambas evaluaciones', 'Subieron', 'Se mantuvieron', 'Bajaron']}
-        rows={rows.map(m => ({ key: m.from + m.to, cells: [momentLabel(m.from) + ' → ' + momentLabel(m.to), m.total, m.up, m.stable, m.down] }))} /> : <EmptyState title="Aún no hay estudiantes con dos momentos comparables." description="Amplía el período o revisa si se registró la evaluación siguiente." />}</Card>
-  }}</ReportRead>
+  const { params, update } = useReportQuery()
+  const start = milestones.slice(0,-1).find(m => m === params.get('inicio')) ?? milestones[0]
+  const later = milestones.slice(milestones.indexOf(start)+1)
+  const end = later.find(m => m === params.get('fin')) ?? later[0]
+  const [open, setOpen] = useState(false)
+  return <Card><h3>Cambios de nivel por estudiante</h3>
+    <div className="rep-filter-grid">{([['Primer momento',start,'inicio'],['Segundo momento',end,'fin']] as const).map(([label,value,key]) =>
+      <Field key={key} label={label}><Select value={value} onChange={e => update({[key]:e.target.value})}>
+        {(key === 'inicio' ? milestones.slice(0,-1) : later).map(m => <option key={m} value={m}>{momentLabel(m)}</option>)}</Select></Field>)}</div>
+    <p>Compara la última evaluación de {subjectLabel(subject).toLowerCase()} de cada estudiante en ambos momentos del período.</p>
+    {!open ? <Button onClick={() => setOpen(true)}>Comparar momentos</Button> : <ReportRead query={JSON.stringify([filters, subject,start,end])} load={() => getMovement(filters, subject,start,end)}>{rows =>
+      rows.some(m => m.total > 0) ? <Table caption="Movimiento entre momentos" headers={['Momentos', 'Con ambas evaluaciones', 'Subieron', 'Se mantuvieron', 'Bajaron']}
+        rows={rows.map(m => ({ key: m.from + m.to, cells: [momentLabel(m.from) + ' → ' + momentLabel(m.to), m.total, m.up, m.stable, m.down] }))} /> : <EmptyState title="Aún no hay estudiantes con dos momentos comparables." description="Amplía el período o revisa si se registró la evaluación siguiente." />
+    }</ReportRead>}</Card>
 }
 export function TeacherFollowUp({ filters }: Props) {
   const { params, update } = useReportQuery()
   const sort = params.get('orden') || 'nombre', teacher = params.get('teacher')
-  return <><h2>Seguimiento docente</h2><ReportRead query={JSON.stringify(filters)} load={() => getManagement(filters)}>{data => {
-    const selected = params.get('moment') as Moment
-    const moment = milestones.includes(selected) ? selected : observedMoment(data.schools, data.from, data.to)
-    const rows = data.schools.flatMap(s => teacherFollowup(s, data.config, data.from, data.to, moment)).filter(t => !teacher || t.uid === teacher)
+  const selected = milestones.find(m => m === params.get('moment'))
+  return <><h2>Seguimiento docente</h2><ReportRead query={JSON.stringify([filters,selected,teacher])} load={() => getFollowup(filters,selected,teacher || undefined)}>{data => {
+    const moment = data.moment, rows = [...data.teachers]
     type Row = typeof rows[number]
     const value = (t: Row) => sort === 'asistencia' ? t.attendanceRate : sort === 'horas' ? ratio(t.worked, t.planned) : t.coverage
     rows.sort((a, b) => {
@@ -52,13 +61,10 @@ export function CompareView({ filters }: Props) {
   const sites = !!filters.campus || params.get('por') === 'sede'
   return <><h2>Comparación de cobertura</h2><Field label="Comparar por"><Select value={sites ? 'sede' : 'institucion'} disabled={!!filters.campus} onChange={e => update({ por: e.target.value })}>
     <option value="institucion">Institución</option><option value="sede">Sede</option></Select></Field>
-    <ReportRead query={JSON.stringify(filters)} load={() => getManagement(filters)}>{data => {
-      const rows = data.schools.flatMap(s => (sites ? s.school.campuses.filter(c => !filters.campus || c.id === filters.campus) : [undefined]).map(c => {
-        const v = comparison(s, c?.id)
-        return {
-          key: JSON.stringify([s.school.id, c?.id]), cells: [<Link key="institucion" to={reportLink('instituciones', filters, { schoolId: s.school.id, ...(c ? { campus: c.id } : {}) })}>{s.school.name}{c && ' · ' + c.name}</Link>,
-          v.students, v.groups, v.evaluated, percent(v.attendance)]
-        }
+    <ReportRead query={JSON.stringify([filters,sites])} load={() => getComparison(filters,sites)}>{data => {
+      const rows = data.map(({school,campus,students,groups,evaluated,attendance}) => ({
+        key: JSON.stringify([school.id,campus?.id]), cells: [<Link key="institucion" to={reportLink('instituciones',filters,{schoolId:school.id,...(campus ? {campus:campus.id} : {})})}>{school.name}{campus && ' · ' + campus.name}</Link>,
+          students,groups,evaluated,percent(attendance)]
       }))
       return rows.length ? <Table caption="Comparación de instituciones y sedes" headers={[sites ? 'Institución y sede' : 'Institución', 'Estudiantes activos', 'Grupos', 'Estudiantes evaluados', 'Asistencia']} rows={rows} /> :
         <EmptyState title="Sin instituciones para comparar." description="Amplía la selección geográfica." />

@@ -1,6 +1,10 @@
+import { LoadError } from '../../ui/LoadError'
 import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import type { ReportFilters } from '../../domain/types'
+import { useProgramConfig } from '../../data/scope'
+import { withReadTimeout } from '../../data/reportCache'
+import { reportRange, submissionWindow } from '../../data/reportRange'
 import { getExport, useFilterOptions } from '../../data/reports'
 import { Button, DateInput, Field, PageHeader, Select } from '../../ui/components'
 import { geography, changeFilter, filterChoices } from './model'
@@ -25,7 +29,7 @@ function FilterBar({ filters, options, onChange }: { filters: ReportFilters; opt
   const count = Object.values(filters).filter(Boolean).length
   return <details className="rep-filters"><summary>Filtros{count > 0 && ' (' + count.toLocaleString('es-CO') + ')'}</summary>
     {options.loading && <p role="status">Cargando opciones…</p>}
-    {options.error && <p role="alert">{options.error}</p>}
+    {options.error && <LoadError message={options.error} />}
     <div className="rep-filter-grid">
       {geography.map(key => <Field key={key} label={fields[key]}>
         <Select value={filters[key] ?? ''} disabled={!choices[key].length || (key === 'campus' && !filters.schoolId)}
@@ -56,7 +60,7 @@ function ExportButton({ filters, disabled }: { filters: ReportFilters; disabled:
     setBusy(true)
     setError(false)
     try {
-      const [data, { buildExcelExport }] = await Promise.all([getExport(filters), import('../../domain/export/excel')])
+      const [data, { buildExcelExport }] = await withReadTimeout(Promise.all([getExport(filters), import('../../domain/export/excel')]))
       if (!active.current) return
       const url = URL.createObjectURL(buildExcelExport(data))
       const link = document.createElement('a')
@@ -70,7 +74,7 @@ function ExportButton({ filters, disabled }: { filters: ReportFilters; disabled:
     } catch { if (active.current) setError(true) }
     finally { if (active.current) setBusy(false) }
   }
-  return <div><Button variant="primary" loading={busy} disabled={disabled} onClick={download}>{busy ? 'Preparando archivo…' : 'Exportar Excel'}</Button>
+  return <div><Button variant="primary" loading={busy} disabled={disabled} onClick={download}>{busy ? 'Esto puede tardar…' : 'Exportar Excel'}</Button>
     {error && <p role="alert">No se pudo exportar el informe. Intenta de nuevo.</p>}
   </div>
 }
@@ -91,16 +95,23 @@ export function Foundation() {
   const tabPath = pathname.endsWith('/estudiante') ? '/visualizacion/instituciones' : pathname.replace(/\/$/,'')
   const target = (to:string) => ({pathname:to,search:new URLSearchParams(filters as Record<string,string>).toString()})
   const invalid = !!(filters.from && filters.to && filters.from > filters.to)
+  const calendar = useProgramConfig()
+  const validDates = [filters.from,filters.to].every(v => !v || (/^\d{4}-\d{2}-\d{2}$/.test(v) && Number.isFinite(Date.parse(v))))
+  const current = validDates && calendar.config && (tabPath.endsWith('/seguimiento')
+    ? submissionWindow(calendar.config, filters, Number(params.get('week'))).range
+    : reportRange(calendar.config, filters, tabPath === '/visualizacion' ? 4 : 1))
   return <>
-    <PageHeader title="Visualización de datos"><ExportButton key={JSON.stringify([filters,visibility])} filters={filters} disabled={invalid || options.loading || !!options.error} /></PageHeader>
+    <PageHeader title="Visualización de datos"><ExportButton key={JSON.stringify([filters,visibility,current])} filters={current ? {...filters,...current} : filters} disabled={!validDates || invalid || (!!current && current.from > current.to) || options.loading || !!options.error} /></PageHeader>
     <nav className="ui-tabs" aria-label="Secciones del informe"><div className="ui-tab-links">{tabs.map(t => <Link key={t.to} to={target(t.to)} aria-current={tabPath===t.to ? 'page':undefined} className={tabPath===t.to ? 'active':undefined}>{t.label}</Link>)}</div>
       <div className="ui-tab-picker"><Field label="Sección"><Select value={tabPath} onChange={e => navigate(target(e.target.value))}>{tabs.map(t => <option key={t.to} value={t.to}>{t.label}</option>)}</Select></Field></div></nav>
+    {current && !tabPath.endsWith('/seguimiento') && <p>Período del informe · {current.from} al {current.to}</p>}
+    {calendar.error && <LoadError message={calendar.error}/>}
     <FilterBar options={options} filters={filters} onChange={setFilters} />
-    <div ref={content} key={visibility}>{options.loading ? <p role="status">Cargando instituciones…</p> : options.error ? <p role="alert">{options.error}</p> : invalid ? <p role="alert">La fecha final debe ser igual o posterior a la fecha inicial.</p> :
+    <div ref={content} key={visibility}>{options.loading ? <p role="status">Cargando instituciones…</p> : options.error ? <LoadError message={options.error} /> : !validDates ? <p role="alert">Escribe fechas válidas en los filtros del informe.</p> : invalid ? <p role="alert">La fecha final debe ser igual o posterior a la fecha inicial.</p> :
       <Routes>
         <Route index element={<SummaryView filters={filters} />} />
-        <Route path="seguimiento" element={<SubmissionsView filters={filters} />} />
-        <Route path="instituciones" element={<Institutions key={JSON.stringify(filters)} filters={filters} />} />
+        <Route path="seguimiento" element={<SubmissionsView filters={filters} calendar={calendar} />} />
+        <Route path="instituciones" element={<Institutions key={JSON.stringify(filters)} filters={filters} schools={options.schools} />} />
         <Route path="horas" element={<HoursView filters={filters} />} />
         <Route path="niveles" element={<LevelsView filters={filters} />} />
         <Route path="*" element={<Navigate to="/visualizacion" replace />} />

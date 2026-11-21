@@ -10,8 +10,8 @@ const initial: Session = { loading: true, user: null, profile: null }
 let state = initial
 const listeners = new Set<() => void>()
 function publish(next: Session) {
+  if (state.profile && JSON.stringify(state.profile) !== JSON.stringify(next.profile)) reportCache.clear()
   state = next
-  reportCache.clear()
   listeners.forEach(listener => listener())
 }
 let stop: (() => void) | undefined

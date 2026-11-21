@@ -1,3 +1,4 @@
+import { LoadError } from '../../ui/LoadError'
 import { useState } from 'react'
 import type { HoursEntry, ProgramConfig } from '../../domain/types'
 import { saveHours, useMyHours } from '../../data/hours'
@@ -19,7 +20,7 @@ export function Hours({ schoolId }: { schoolId: string }) {
   const today = colombiaToday()
   const [date, setDate] = useState(today)
   const week = config && validDay(date, today) ? weekOf(date, config) : null
-  if (error) return <p role="alert">{error}</p>
+  if (error) return <LoadError message={error} />
   return <>
     <SessionDate {...{ date, today, setDate }} />
     {loading ? <p>Cargando calendario…</p> : !config ? <p>Falta configurar el calendario del programa.</p> : week === null ?
@@ -31,7 +32,7 @@ function WeeklyHours({ date, schoolId, week, from, to, today, setDate, config }:
   const entries = hours.filter(h => h.schoolId === schoolId && h.date >= from && h.date <= to)
   const series = hourSeries(hours.filter(h => h.schoolId === schoolId), from, week, config)
   const total = (field: 'plannedHours' | 'workedHours') => entries.reduce((sum, h) => sum + h[field], 0).toLocaleString('es-CO')
-  if (error) return <p role="alert">{error}</p>
+  if (error) return <LoadError message={error} />
   return <Card>
     <h3>Semana {week} de implementación · del {shortDate(from)} al {shortDate(to)}</h3>
     <div className="collect-actions" role="group" aria-label="Día de la semana">

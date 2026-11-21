@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { listenMany, useLive, withSession } from './live'
-import { collectionGroup, query, where, doc, runTransaction, writeBatch, type DocumentReference, type DocumentData } from 'firebase/firestore'
+import { collectionGroup, query, where, doc, orderBy, limit, runTransaction, writeBatch, type DocumentReference, type DocumentData } from 'firebase/firestore'
 import { LEVELS, MOMENTS, SUBJECTS, shouldOverwriteLevel } from '../domain/levels'
 import { colombiaToday } from '../domain/weeks'
 import type { Evaluation, Moment, Subject } from '../domain/types'
@@ -86,14 +86,17 @@ export function saveEvaluation(input: Input) {
 }
 
 /** Includes historical moments and verification events that never overwrite a current level. */
-export function useSchoolEvaluations(schoolId: string, subject: Subject) {
+export function useSchoolEvaluations(schoolId: string, subject: Subject, moment: Moment | '', studentIds: string[]) {
+  const ids = JSON.stringify([...new Set(studentIds)].sort())
   const source = useMemo(() => withSession<Evaluation[]>([], (p, next, error) => {
-    if (p.rol !== 'docente' || !p.schoolIds.includes(schoolId)) {
+    if (!moment || p.rol !== 'docente' || !p.schoolIds.includes(schoolId)) {
       next([])
       return () => {}
     }
-    return listenMany([query(collectionGroup(db, 'evaluations'), where('schoolId', '==', schoolId),
-      where('subject', '==', subject))], next, error)
-  }), [schoolId, subject])
+    const members: string[] = JSON.parse(ids)
+    const queries = members.map(id => query(collectionGroup(db, 'evaluations'), where('schoolId','==',schoolId),
+      where('studentId','==',id), where('subject','==',subject), where('moment','==',moment), orderBy('savedAt','desc'),limit(1)))
+    return listenMany(queries, next, error)
+  }), [schoolId, subject, moment, ids])
   return useLive(source, [])
 }

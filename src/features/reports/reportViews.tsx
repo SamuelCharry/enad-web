@@ -3,10 +3,10 @@ import { useReportQuery } from './navigation'
 import { MovementTable } from './ManagementViews'
 import type { ReportFilters, Subject } from '../../domain/types'
 import { getAttendanceReport, getHoursReport, getLevels, getSubmissions, getSummary } from '../../data/reports'
-import { useProgramConfig } from '../../data/scope'
+import type { useProgramConfig } from '../../data/scope'
 import { levelColor } from '../../domain/levelPalette'
 import { LEVELS, levelLabel, MOMENTS, momentLabel, SUBJECTS, subjectLabel } from '../../domain/levels'
-import { colombiaToday, weeksElapsed } from '../../domain/weeks'
+import { submissionWindow } from '../../data/reportRange'
 import { Chart } from './Chart'
 import { Button, Card, EmptyState, Field, Select } from '../../ui/components'
 import { hoursRows, number, percent } from './model'
@@ -30,21 +30,20 @@ export function SummaryView({ filters }: Props) {
   }}</ReportRead></>
 }
 
-export function SubmissionsView({ filters }: Props) {
-  const { config, loading, error } = useProgramConfig()
-  const latest = config ? weeksElapsed(config, colombiaToday()) : 0
+export function SubmissionsView({ filters, calendar }: Props & {calendar:ReturnType<typeof useProgramConfig>}) {
+  const { config, loading, error } = calendar
   const {params,update} = useReportQuery()
   const input = Number(params.get('week'))
   const selected = Number.isSafeInteger(input) && input > 0 ? input : undefined
   const pending = params.get('pendientes') === '1'
   const teacher = params.get('teacher')
-  const week = Math.min(latest, selected ?? Math.max(latest - 1, 1))
+  const { week, latest, range } = config ? submissionWindow(config, filters, selected) : {week:1,latest:0,range:undefined}
   return <><h2>Seguimiento de envíos</h2><LiveState loading={loading} error={error}>
     {latest === 0 ? <EmptyState title="Todavía no hay semanas de implementación." description="Revisa la fecha de inicio en la configuración del programa." /> : <>
       <Field label="Semana de implementación"><Select value={week} onChange={e => update({week:e.target.value})}>
         {Array.from({ length: latest }, (_, i) => latest - i).map(w => <option key={w} value={w}>Semana {number(w)}</option>)}
       </Select></Field>
-      <ReportRead query={JSON.stringify([filters, week])} load={() => getSubmissions(filters, week)}>{r => {
+      {range && range.from > range.to ? <EmptyState title="Las fechas están fuera de esta semana." description="Selecciona otra semana o cambia las fechas en los filtros." /> : <ReportRead query={JSON.stringify([filters, week])} load={() => getSubmissions(filters, week)}>{r => {
         const rows = r.teachers.filter(t => (!teacher || t.uid===teacher) && (!pending || !t.attendanceSent || !t.hoursSent))
         return <Card><h3>Envíos del {r.range.from} al {r.range.to}</h3>
           <p>{number(r.attendanceSent)} de {number(r.total)} docentes enviaron asistencia · {number(r.hoursSent)} de {number(r.total)} enviaron horas</p>
@@ -54,7 +53,7 @@ export function SubmissionsView({ filters }: Props) {
             rows={rows.map(t => ({ key: JSON.stringify([t.schoolId, t.uid]), cells: [t.fullName, t.schoolName || t.schoolId, t.attendanceSent ? 'Enviado' : 'Pendiente', t.hoursSent ? 'Enviado' : 'Pendiente'] }))} />
             : <EmptyState title={pending ? 'No hay envíos pendientes.' : 'No hay docentes en esta selección.'} />}
         </Card>
-      }}</ReportRead>
+      }}</ReportRead>}
     </>}
   </LiveState></>
 }
@@ -99,12 +98,12 @@ export function LevelsView({ filters }: Props) {
     <ReportRead query={JSON.stringify([filters, subject])} load={() => getLevels(filters, subject, MOMENTS)}>{r => {
       const ages = Object.keys(r.age).map(Number).filter(n => n >= 5 && n <= 18 && r.age[n] > 0)
       const ageBins = ages.length ? Array.from({ length: Math.max(...ages) - Math.min(...ages) + 1 }, (_, i) => i + Math.min(...ages)) : []
-      return <><Card><h3>Distribución de niveles por momento</h3>
+      return <><Card><h3>Nivel actual por momento de registro</h3>
         {MOMENTS.map(m => {
           const data = LEVELS[subject].map((l, i) => ({ label: levelLabel(subject, l), value: r.overall.distribution[m]?.[l] ?? 0, color: levelColor(i).bg })).filter(p => p.value > 0)
           return <div key={m}><h4>{momentLabel(m)}</h4>{data.length ? <Chart type="levels" axis="Nivel" label={momentLabel(m)} data={data} /> : <EmptyState title="Sin evaluaciones." description="Revisa el área y el período." />}</div>
-        })}</Card><Card><h3>Rezago por institución</h3><p>Porcentaje de estudiantes evaluados en los tres primeros niveles de {subjectLabel(subject).toLocaleLowerCase('es-CO')}.</p>
-        {r.bySchool.length ? <Table caption="Rezago por institución y momento" headers={['Institución', 'Línea base', 'Línea media 1']}
+        })}</Card><Card><h3>Rezago en los niveles actuales</h3><p>Porcentaje de estudiantes evaluados en los tres primeros niveles de {subjectLabel(subject).toLocaleLowerCase('es-CO')}.</p>
+        {r.bySchool.length ? <Table caption="Rezago en los niveles actuales y momento" headers={['Institución', 'Línea base', 'Línea media 1']}
           rows={r.bySchool.map(s => ({ key: s.schoolId, cells: [s.name, ...(['linea_base', 'linea_media_1'] as const).map((m, i) => {
             const measured = Object.values(s.distribution[m] ?? {}).some(n => n > 0)
             const value = measured ? s.rezago[m] : null

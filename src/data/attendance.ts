@@ -2,22 +2,24 @@ import { useMemo } from 'react'
 import { collectionGroup, doc, onSnapshot, query, where, writeBatch } from 'firebase/firestore'
 import type { AttendanceMark, AttendanceStatus } from '../domain/types'
 import { db } from './firebase'
-import { api, caller, commit, fail, now, requireDate } from './core'
+import { api, caller, chunks, commit, fail, now, requireDate } from './core'
 import { groupDoc } from './groups'
 import { listenMany, useLive, withSession } from './live'
 
 type DailyMark = AttendanceMark & { syncState?: 'pending' | 'synced' }
 
 /** One school/date subscription shared by all group cards or the open attendance sheet. */
-export function useSchoolAttendance(schoolId: string, date: string) {
+export function useSchoolAttendance(schoolId: string, date: string, groupIds?: string[]) {
+  const keys = groupIds && JSON.stringify(groupIds)
   const source = useMemo(() => withSession<DailyMark[]>([], (p, next, error) => {
     if (p.rol !== 'docente' || !p.schoolIds.includes(schoolId) || !date) {
       next([])
       return () => {}
     }
-    return listenMany([query(collectionGroup(db, 'attendance'), where('schoolId', '==', schoolId),
-      where('date', '==', date))], next, error)
-  }), [schoolId, date])
+    const pages = keys ? chunks<string>(JSON.parse(keys),30).map(ids => [where('groupId','in',ids)]) : [[]]
+    return listenMany(pages.map(page => query(collectionGroup(db, 'attendance'), where('schoolId', '==', schoolId),
+      where('date', '==', date), ...page)), next, error)
+  }), [schoolId, date, keys])
   return useLive(source, [])
 }
 /** Watches group attendance on a calendar date using the deployed school/date index. */
@@ -30,7 +32,7 @@ export function useGroupAttendance(groupId: string, date: string): Record<string
     let live = true, stop: (() => void) | undefined
     void groupDoc(p, groupId).then(d => {
       if (!live) return
-      stop = onSnapshot(query(collectionGroup(db, 'attendance'), where('schoolId', '==', d.data().schoolId), where('date', '==', date)),
+      stop = onSnapshot(query(collectionGroup(db, 'attendance'), where('schoolId', '==', d.data().schoolId), where('groupId','==',groupId), where('date', '==', date)),
         { includeMetadataChanges: true }, snap => next(Object.fromEntries(snap.docs.map(s => s.data()).filter(m => m.groupId === groupId).map(m => [m.studentId, m.status]))), error)
     }).catch(e => { if (live) error(e) })
     return () => {

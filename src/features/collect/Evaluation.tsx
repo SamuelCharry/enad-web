@@ -1,3 +1,4 @@
+import { LoadError } from '../../ui/LoadError'
 import { useState } from 'react'
 import type { Evaluation, Moment, School, Student, Subject } from '../../domain/types'
 import { saveEvaluation, useSchoolEvaluations } from '../../data/evaluations'
@@ -22,17 +23,17 @@ export function Evaluations({ schoolId, campus, initialGroup = '', initialSubjec
   const [moment, setMoment] = useState<Moment | ''>(MOMENTS.find(m => m === initialMoment) ?? '')
   const [groupId, setGroup] = useState(initialGroup)
   const [adding, setAdding] = useState(false)
-  const events = useSchoolEvaluations(schoolId, subject)
-  const latest = new Map<string, Evaluation>()
-  for (const event of events.data) {
-    if (event.moment === moment && (!latest.has(event.studentId) || latest.get(event.studentId)!.savedAt < event.savedAt)) latest.set(event.studentId, event)
-  }
   const { groups, loading: loadingGroups, error: groupError } = useGroups(schoolId, { mine: true })
   const { students, loading, error } = useStudents(schoolId)
   const options = groups.filter(g => g.subject === subject && (!g.campus || g.campus === campus))
   const group = options.find(g => g.id === groupId)
   const roster = students.filter(s => s.schoolId === schoolId && (s.campus === campus || group?.campus === '') && !s.retired && s.active && (!groupId || group?.studentIds.includes(s.id)))
-  if (error || groupError || events.error) return <p role="alert">{error || groupError || events.error}</p>
+  const events = useSchoolEvaluations(schoolId, subject, moment, roster.map(s => s.id))
+  const latest = new Map<string, Evaluation>()
+  for (const event of events.data) {
+    if (event.moment === moment && (!latest.has(event.studentId) || latest.get(event.studentId)!.savedAt < event.savedAt)) latest.set(event.studentId, event)
+  }
+  if (error || groupError || events.error) return <LoadError message={error || groupError || events.error} />
   return <>
     <div className="collect-fields">
       <SubjectField value={subject} onChange={s => {

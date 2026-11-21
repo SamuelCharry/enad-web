@@ -11,13 +11,35 @@ export function useLive<T>(source: Stream<T>, initial: T) {
   const [state, set] = useState<{ source: Stream<T>; data?: T; error?: string }>()
   useEffect(() => {
     let live = true
-    const receive = (data: T) => { if (live) set({ source, data }) }
-    const failed = (e: unknown) => { if (live) set({ source, error: apiError(e).message }) }
-    const stop = source(receive, failed, () => { if (live) set(undefined) })
-    return () => {
-      live = false;
-      stop()
+    let stop: (() => void) | undefined
+    let timer: ReturnType<typeof setTimeout>
+    function detach() {
+      const unsubscribe = stop
+      stop = undefined
+      unsubscribe?.()
     }
+    function fail(message:string) {
+      if (!live) return
+      live = false
+      clearTimeout(timer)
+      set({source,error:message})
+      detach()
+    }
+    function arm() {
+      clearTimeout(timer)
+      timer = setTimeout(() => fail('No pudimos cargar los datos ahora. Intenta de nuevo en unos minutos.'),20_000)
+    }
+    arm()
+    const receive = (data:T) => {
+      if (live) { clearTimeout(timer); set({source,data}) }
+    }
+    try {
+      stop = source(receive,e => fail(apiError(e).message),() => {
+        if (live) { arm(); set(undefined) }
+      })
+      if (!live) detach()
+    } catch (e) { fail(apiError(e).message) }
+    return () => { live = false; clearTimeout(timer); detach() }
   }, [source])
   return state?.source === source ? { data: state.data ?? initial, error: state.error, loading: false } : { data: initial, loading: true, error: undefined }
 }

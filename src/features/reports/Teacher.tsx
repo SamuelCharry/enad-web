@@ -1,3 +1,4 @@
+import { LoadError } from '../../ui/LoadError'
 import { Link, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import type { FormEvent } from 'react'
@@ -8,12 +9,12 @@ import { signOut } from '../../data/session'
 import { useAction } from '../collect/useAction'
 import { groupLink } from '../teacher/navigation'
 import { updateMyName, useMyProfilePending, useProjectName } from '../../data/profile'
-import { getTeacherMetrics } from '../../data/reports'
+import { getTeacherDay, getTeacherMetrics } from '../../data/reports'
 import { useProgramConfig, useSchools } from '../../data/scope'
 import { subjectLabel } from '../../domain/levels'
 import { colombiaToday } from '../../domain/weeks'
 import { LineChart } from '../../ui/charts'
-import { Button, Card, EmptyState, Field, PageHeader, SyncStatus, TextInput } from '../../ui/components'
+import { Button, Card, DateInput, EmptyState, Field, PageHeader, SyncStatus, TextInput } from '../../ui/components'
 import { number, percent, ratio, shiftDay } from './model'
 import { LiveState, ReportRead } from './ReportState'
 import { Roster } from './Roster'
@@ -26,7 +27,7 @@ function ProjectName({ id, fallback }: { id: string; fallback: string }) {
 
 function ProfileReceipt({ uid }: { uid: string }) {
   const state = useMyProfilePending(uid)
-  return state.error ? <p role="alert">{state.error}</p> : <SyncStatus pending={state.loading || state.data} />
+  return state.error ? <LoadError message={state.error} /> : <SyncStatus pending={state.loading || state.data} />
 }
 
 function NameEditor({ profile }: { profile: UserProfile }) {
@@ -85,6 +86,14 @@ function TeacherHours({ uid, schoolNames, schoolIds }: { uid: string; schoolName
   </Card>
 }
 
+function EarlierReports({uid}:{uid:string}) {
+  const [date,setDate] = useState('')
+  return <><Field label="Buscar reportes de otro día"><DateInput value={date} max={colombiaToday()} onChange={e=>setDate(e.target.value)}/></Field>
+    {date && <ReportRead query={JSON.stringify([uid,date])} load={()=>getTeacherDay(uid,date)}>{rows=>rows.length ?
+      <ul>{rows.map(r=><li key={r.key}>{r.school} · {r.label} · {r.pending ? 'Pendiente de envío' : 'Enviado'}</li>)}</ul> :
+      <p>Sin reportes para esta fecha. Selecciona otro día.</p>}</ReportRead>}</>
+}
+
 export function Teacher({ profile }: { profile: UserProfile }) {
   const navigate = useNavigate()
   const logout = useAction()
@@ -114,9 +123,10 @@ export function Teacher({ profile }: { profile: UserProfile }) {
     <Card><h2>Mis indicadores</h2><ReportRead query={JSON.stringify([profile.uid, mine.map(g => [g.id, g.studentIds])])} load={() => getTeacherMetrics(profile.uid)}>
       {metrics => <><h3>Tasa de asistencia de mis grupos</h3>
         {metrics.recorded > 0 ? <p><strong>{percent(ratio(metrics.present, metrics.recorded))}</strong> · {number(metrics.present)} de {number(metrics.recorded)} registros</p> : <EmptyState title="Toma asistencia para consultar este indicador." />}
-        <details><summary>Historial de reportes</summary>
+        <details><summary>Reportes recientes</summary>
           {metrics.history.length ? <ul>{[...metrics.history].sort((a,b) => b.date.localeCompare(a.date)).map((h, i) =>
             <li key={i}>{h.date} · {h.label} · {h.pending ? 'Pendiente de envío' : 'Enviado'}</li>)}</ul> : <EmptyState title="Guarda una asistencia o evaluación para comenzar el historial." />}
+          <EarlierReports uid={profile.uid}/>
         </details></>}
     </ReportRead></Card>
     <TeacherHours uid={profile.uid} schoolIds={profile.schoolIds} schoolNames={schoolNames} />

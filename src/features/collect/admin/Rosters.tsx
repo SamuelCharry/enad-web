@@ -1,3 +1,4 @@
+import { LoadError } from '../../../ui/LoadError'
 import { useState } from 'react'
 import type { Group, School, Student, Subject, UserProfile } from '../../../domain/types'
 import { useGroups, createGroup, patchGroup, deleteGroup } from '../../../data/groups'
@@ -20,33 +21,54 @@ export function Rosters({ kind }: { kind: 'estudiantes' | 'grupos' }) {
   const directory = useSchools()
   const [selected, setSchool] = useState('')
   const selection = directory.schools.find(s => s.id === selected)
-  if (directory.error) return <p role="alert">{directory.error}</p>
+  if (directory.error) return <LoadError message={directory.error} />
   if (directory.loading) return <p role="status">Cargando instituciones…</p>
   if (!directory.schools.length) return <p>Crea primero una institución en Instituciones y sedes.</p>
   return <><Choice label="Filtrar institución" value={selection?.id || ''} placeholder="Todas las instituciones" options={directory.schools} onChange={setSchool} />
     <Records key={kind + (selection?.id ?? '')} kind={kind} schools={directory.schools} schoolId={selection?.id} /></>
 }
 function Records({ kind, schools, schoolId }: { kind: 'estudiantes' | 'grupos'; schools: School[]; schoolId?: string }) {
-  const roster = useStudents(schoolId ?? ''), teams = useGroups(schoolId), staff = useUsers('docente')
-  const error = roster.error || teams.error || staff.error
-  const loading = roster.loading || teams.loading || staff.loading
-  if (error) return <p role="alert">{error}</p>
   const schoolById = new Map(schools.map(s => [s.id, s]))
   const options = schoolId ? schools.filter(s => s.id === schoolId) : schools
   const place = (v: { schoolId: string; campus: string }) => {
     const s = schoolById.get(v.schoolId)
     return [s?.name || v.schoolId, s?.campuses.find(c => c.id === v.campus || c.name === v.campus)?.name || v.campus || 'Sin sede'].join(' · ')
   }
-  if (kind === 'grupos') return <Directory title="Grupos" headers={['Grupo', 'Institución y sede', 'Docente', 'Estudiantes']} create="Crear grupo" loading={loading}
+  return kind === 'grupos' ? <GroupDirectory schools={options} schoolId={schoolId} place={place}/> :
+    <StudentDirectory schools={options} schoolId={schoolId} place={place}/>
+}
+type DirectoryScope = { schools:School[]; schoolId?:string; place:(v:{schoolId:string;campus:string})=>string }
+function GroupDirectory({schools,schoolId,place}:DirectoryScope) {
+  const teams=useGroups(schoolId)
+  if(teams.error) return <LoadError message={teams.error}/>
+  return <Directory title="Grupos" headers={['Grupo', 'Institución y sede', 'Docente', 'Estudiantes']} create="Crear grupo" loading={teams.loading}
     rows={teams.groups.map(g => ({ id: g.id, search: [g.name, g.teacherName, place(g), subjectLabel(g.subject)].join(' '), cells: [g.name, place(g), g.teacherName || 'Sin asignar', g.studentIds.length] }))}
-    editor={(id, close) => {
-      const group = teams.groups.find(g => g.id === id)
-      return <><GroupForm key={id} group={group} schools={options} users={staff.users} close={close} />
-        {group && <GroupMembers group={group} students={roster.students} />}</>
-    }} />
-  return <Directory title="Estudiantes" headers={['Estudiante', 'Código', 'Institución y sede', 'Estado']} create="Añadir estudiante" loading={loading}
+    editor={(id, close) => <GroupEditor key={id} group={teams.groups.find(g=>g.id===id)} schools={schools} close={close}/>}/>
+}
+function GroupEditor({group,schools,close}:{group?:Group;schools:School[];close:Close}) {
+  const staff=useUsers('docente')
+  if(staff.error) return <LoadError message={staff.error}/>
+  if(staff.loading) return <p role="status">Consultando docentes…</p>
+  return <><GroupForm group={group} schools={schools} users={staff.users} close={close}/>{group && <Members group={group}/>}</>
+}
+function Members({group}:{group:Group}) {
+  const roster=useStudents(group.schoolId)
+  if(roster.error) return <LoadError message={roster.error}/>
+  if(roster.loading) return <p role="status">Consultando estudiantes…</p>
+  return <GroupMembers group={group} students={roster.students}/>
+}
+function StudentDirectory({schools,schoolId,place}:DirectoryScope) {
+  const roster=useStudents(schoolId ?? '')
+  if(roster.error) return <LoadError message={roster.error}/>
+  return <Directory title="Estudiantes" headers={['Estudiante','Código', 'Institución y sede', 'Estado']} create="Añadir estudiante" loading={roster.loading}
     rows={roster.students.map(s => ({ id: s.id, search: [s.fullName, s.code, s.grade, place(s)].join(' '), cells: [s.fullName, s.code, place(s), s.retired ? 'Retirado' : s.active === false ? 'Inactivo' : 'Activo'] }))}
-    editor={(id, close) => <StudentForm key={id} student={roster.students.find(s => s.id === id)} groups={teams.groups} schools={options} close={close} />} />
+    editor={(id, close) => <StudentEditor key={id} student={roster.students.find(s=>s.id===id)} schoolId={schoolId} schools={schools} close={close}/>}/>
+}
+function StudentEditor({student,schoolId,schools,close}:{student?:Student;schoolId?:string;schools:School[];close:Close}) {
+  const teams=useGroups(student?.schoolId || schoolId)
+  if(teams.error) return <LoadError message={teams.error}/>
+  if(teams.loading) return <p role="status">Consultando grupos…</p>
+  return <StudentForm student={student} groups={teams.groups} schools={schools} close={close}/>
 }
 function StudentForm({ student, groups, schools, close }: { student?: Student; groups: Group[]; schools: School[]; close: Close }) {
   const [initial] = useState(student)

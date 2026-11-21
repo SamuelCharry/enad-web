@@ -1,3 +1,4 @@
+import { LoadError } from '../../ui/LoadError'
 import { useState } from 'react'
 import { Link, Navigate, Route, Routes, useSearchParams } from 'react-router-dom'
 import { useSession } from '../../data/session'
@@ -26,7 +27,7 @@ const adminSections = [['instituciones', 'Instituciones y sedes'], ['docentes', 
 function ImportButton({ kind }: { kind: ImportKind }) {
   const { schools, loading, error } = useSchools()
   const [open, setOpen] = useState(false)
-  if (error) return <p role="alert">{error}</p>
+  if (error) return <LoadError message={error} />
   return <>
     <Button disabled={loading} onClick={() => setOpen(true)}>Importar archivo</Button>{open && <FileImport {...{ kind, schools }} onClose={() => setOpen(false)} />}</>
 }

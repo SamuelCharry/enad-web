@@ -1,3 +1,4 @@
+import { LoadError } from '../../ui/LoadError'
 import { useState } from 'react'
 import type { ProgramConfig } from '../../domain/types'
 import { saveProgramConfig } from '../../data/admin'
@@ -28,7 +29,7 @@ export function Program() {
   const [notice,setNotice] = useState('')
   const action = useAction()
   const visible = config && matches(q, config.projectName, config.year, config.implementationStartDate, ...config.breaks.map(b => b.label))
-  if (error) return <p role="alert">{error}</p>
+  if (error) return <LoadError message={error} />
   return <>
     <div className="collect-toolbar">
       <Search value={q} onChange={setQ} />
