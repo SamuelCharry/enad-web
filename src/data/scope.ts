@@ -13,7 +13,7 @@ export function useSchools() {
   return { schools, loading, error }
 }
 const configStream = withSession<ProgramConfig | null>(null, (_p, next, error) =>
-  onSnapshot(doc(db, 'program', 'config'), snap => next(configOf(snap)), error))
+  onSnapshot(doc(db, 'program', 'config'), snap => next(snap.exists() ? configOf(snap) : null), error))
 /** Watches the program calendar and its configured breaks. */
 export function useProgramConfig() {
   const { data: config, loading, error } = useLive(configStream, null)

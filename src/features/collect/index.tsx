@@ -12,18 +12,21 @@ import { Hours } from './Hours'
 import { Groups } from './Groups'
 import { Students } from './Students'
 import { Schools, Teachers } from './Directories'
-import { History } from './History'
+import { HistoryDirectory } from './admin/HistoryDirectory'
 import { Program } from './Program'
 import { FileImport } from './FileImport'
 import { TaskGuide } from '../teacher/TaskGuide'
 import '../teacher/teacher.css'
+import { DataQuality, ImportHistory } from './admin/Audit'
+import { Rosters } from './admin/Rosters'
 import './collect.css'
 
 const teacherSections = [['asistencia', 'Asistencia'], ['evaluacion', 'Evaluación formativa'], ['horas', 'Horas'], ['grupos', 'Grupos'], ['estudiantes', 'Estudiantes']] as const
-const adminSections = [['instituciones', 'Instituciones y sedes'], ['docentes', 'Docentes'], ['estudiantes', 'Estudiantes'], ['grupos', 'Grupos'], ['evaluaciones', 'Evaluaciones históricas'], ['configuracion', 'Configuración del programa']] as const
+const adminSections = [['instituciones', 'Instituciones y sedes'], ['docentes', 'Docentes'], ['estudiantes', 'Estudiantes'], ['grupos', 'Grupos'], ['evaluaciones', 'Evaluaciones históricas'], ['configuracion', 'Configuración del programa'], ['calidad','Calidad de datos'], ['importaciones','Historial de importaciones']] as const
 function ImportButton({ kind }: { kind: ImportKind }) {
-  const { schools, loading } = useSchools()
+  const { schools, loading, error } = useSchools()
   const [open, setOpen] = useState(false)
+  if (error) return <p role="alert">{error}</p>
   return <>
     <Button disabled={loading} onClick={() => setOpen(true)}>Importar archivo</Button>{open && <FileImport {...{ kind, schools }} onClose={() => setOpen(false)} />}</>
 }
@@ -54,13 +57,16 @@ function TeacherScreen({ section, profile }: { section: typeof teacherSections[n
   }}>{content}</TaskGuide>
 }
 function AdminScreen({ section, profile }: { section: typeof adminSections[number][0]; profile: UserProfile }) {
-  if (section === 'configuracion') return <Program />
+  if (!profile.activo || profile.rol !== 'admin') return <p role="alert">Se necesita una cuenta de administración activa.</p>
+  if (section === 'calidad') return <DataQuality/>
+  if (section === 'importaciones') return <ImportHistory/>
+  if (section === 'configuracion') return <div className="admin-workspace"><Program /></div>
   const kind = { instituciones: 'schools', docentes: 'teachers', estudiantes: 'students', grupos: 'groups', evaluaciones: 'evaluations' } as const
-  return <>
+  return <div className="admin-workspace">
     <ImportButton kind={kind[section]} />
     {section === 'instituciones' ? <Schools /> : section === 'docentes' ? <Teachers /> :
-      <SchoolScope profile={profile} withCampus={section !== 'evaluaciones'}>{(school, campus) => section === 'estudiantes' ? <Students {...{ school, campus }} admin /> :
-        section === 'grupos' ? <Groups schoolId={school.id} {...{ campus, profile }} /> : <History schoolId={school.id} />}</SchoolScope>}</>
+      section === 'estudiantes' || section === 'grupos' ? <Rosters kind={section}/> :
+      <HistoryDirectory/>}</div>
 }
 export function CollectRoutes() {
   const { loading, profile, error } = useSession()
