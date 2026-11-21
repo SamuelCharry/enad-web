@@ -17,6 +17,10 @@ export function Credentials({ items }: { items: { username: string; password: st
   return <section>
     <h3>Credenciales generadas</h3>
     <pre>{text}</pre>
+    {typeof navigator.share === 'function' && <Button loading={copy.busy} onClick={() => copy.run(async () => {
+      try { await navigator.share({title:'Accesos de ENAd',text}) }
+      catch (error) { if (!(error instanceof DOMException && error.name === 'AbortError')) throw error }
+    }, '')}>Compartir credenciales</Button>}
     <Button onClick={() => copy.run(() => navigator.clipboard.writeText(text), 'Credenciales copiadas')}>Copiar credenciales</Button>{copy.feedback}</section>
 }
 export function Pager({ page, count, setPage }: { page: number; count: number; setPage: (p: number) => void }) {
@@ -28,6 +32,7 @@ export function Pager({ page, count, setPage }: { page: number; count: number; s
   </div>
 }
 export function FileImport({ kind, schools, scope, onClose }: { kind: ImportKind; schools: School[]; scope?: { schoolId: string; campus: string; students: Student[] }; onClose: () => void }) {
+  const [filename,setFilename] = useState('')
   const [rows, setRows] = useState<ImportRow[]>([])
   const [page, setPage] = useState(0)
   const [createdIds, setCreatedIds] = useState<string[]>([])
@@ -36,6 +41,7 @@ export function FileImport({ kind, schools, scope, onClose }: { kind: ImportKind
   const valid = rows.filter(r => !r.errors.length)
   const columns = importColumns[kind] ?? []
   async function read(file: File) {
+    setFilename(file.name)
     setRows([])
     setPage(0)
     setResult(null)
@@ -48,6 +54,7 @@ export function FileImport({ kind, schools, scope, onClose }: { kind: ImportKind
   }
   async function submit() {
     if (result || !valid.length) return
+    if (kind === 'evaluations' && !window.confirm('¿Importar las evaluaciones históricas? Se reemplazarán los registros importados de la misma área y momento.')) return
     let outcome: ImportResult
     if (scope) {
       const receipt = await importStudents(scope.schoolId, valid.map(r => ({ ...r.data, campus: scope.campus })))
@@ -73,7 +80,7 @@ export function FileImport({ kind, schools, scope, onClose }: { kind: ImportKind
         }} />
       </Field>
       {rows.length > 0 && <>
-        <h3>Vista previa</h3>
+        <h3>Vista previa · {filename}</h3>
         <p>{valid.length} filas válidas de {rows.length}. Solo se importarán las filas válidas.</p>
         <Table caption="Filas del archivo" headers={['Fila', ...columns.map(c => c.label), 'Validación']} rows={rows.slice(page * 20, page * 20 + 20).map(r => ({
           key: String(r.number), cells: [r.number, ...columns.map(c => r.cells[c.key] ?? ''), r.errors.join(' · ') || 'Válida']

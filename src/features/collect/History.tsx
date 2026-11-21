@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import type { Evaluation, Moment, Student, Subject } from '../../domain/types'
 import { adminImport } from '../../data/admin'
 import { getStudentHistory, useStudents } from '../../data/students'
@@ -12,7 +13,9 @@ import { Choice, MomentField, Search, SubjectField } from './common'
 export function History({ schoolId }: { schoolId: string }) {
   const { students, loading, error } = useStudents(schoolId)
   const [q, setQ] = useState('')
-  const [id, setId] = useState('')
+  const [params, setParams] = useSearchParams()
+  const id = params.get('student') ?? ''
+  const setId = (student:string) => setParams({schoolId,student})
   const rows = students.filter(s => matches(q, s.fullName, s.code))
   const student = rows.find(s => s.id === id)
   if (error) return <p role="alert">{error}</p>
@@ -25,6 +28,7 @@ export function History({ schoolId }: { schoolId: string }) {
     {loading ? <p>Cargando estudiantes…</p> : student ? <HistoryList key={student.id} student={student} /> : <p>Selecciona un estudiante para consultar sus evaluaciones.</p>}</>
 }
 function HistoryList({ student }: { student: Student }) {
+  const [notice,setNotice] = useState('')
   const [version, setVersion] = useState(0)
   const [items, setItems] = useState<Evaluation[] | null>(null)
   const [error, setError] = useState('')
@@ -43,13 +47,14 @@ function HistoryList({ student }: { student: Student }) {
   }, [student.id, version])
   return <>
     <Button variant="primary" onClick={() => setEdit('new')}>Registrar evaluación histórica</Button>
-    {error ? <p role="alert">{error} <Button onClick={() => reload()}>Reintentar</Button>
+    {notice && <p role="status">{notice}</p>}{error ? <p role="alert">{error} <Button onClick={() => reload()}>Reintentar</Button>
     </p> : !items ? <p>Cargando historial…</p> : !items.length && <p>Sin evaluaciones registradas.</p>}
     {items?.map(ev => <Card key={ev.id}>
       <h3>{subjectLabel(ev.subject)} · {momentLabel(ev.moment)}</h3>
       <p>{ev.date} · {levelLabel(ev.subject, ev.level)}</p>
       {ev.id === 'imp_' + ev.subject + '_' + ev.moment && <Button onClick={() => setEdit(ev)}>Editar evaluación histórica</Button>}</Card>)}
     {edit && <HistoricalEditor student={student} evaluation={edit === 'new' ? undefined : edit} saved={() => {
+      setNotice('Evaluación histórica guardada.')
       reload()
       setEdit(null)
     }} onClose={() => setEdit(null)} />}</>
@@ -65,6 +70,7 @@ function HistoricalEditor({ student, evaluation, saved, onClose }: { student: St
     <p>{student.fullName}</p>
     <form onSubmit={e => {
       e.preventDefault()
+      if (!window.confirm('¿Guardar la evaluación histórica de '+student.fullName+'? Si ya existe un registro importado para esta área y momento, se reemplazará.')) return
       void action.run(async () => {
         const result = await adminImport('evaluations', [{ schoolId: student.schoolId, studentId: student.id, code: student.code, subject, moment, level, date, sample: sample ? +sample : null }])
         if (result.errors.length) throw new Error(result.errors.map(e => e.message).join(' · '))

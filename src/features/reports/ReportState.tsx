@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { PropsWithChildren, ReactNode } from 'react'
+import { refreshReports } from '../../data/reports'
 import { Button } from '../../ui/components'
 
 export function Skeleton() {
@@ -53,7 +54,7 @@ function ReadInstance<T>({ load, children }: { load: (signal: AbortSignal) => Pr
   }, [revision])
   return <>
     <div className="rep-refresh"><small role="status">{result && <>Última actualización · {localTime.format(result.time)}</>}</small>
-      <Button loading={state === 'loading'} onClick={() => setRevision(v => v + 1)}>Actualizar</Button>
+      <Button loading={state === 'loading'} onClick={() => {refreshReports();setRevision(v => v + 1)}}>Actualizar</Button>
     </div>
     {state === 'error' && <p role="alert">No se pudo cargar el informe. Vuelve a intentarlo con «Actualizar».</p>}
     {!result && state === 'loading' && <Skeleton />}

@@ -28,7 +28,7 @@ export function matchesSchool(school: School, filters: ReportFilters) {
     && (!filters.department || school.department === filters.department)
     && (!filters.municipality || school.municipality === filters.municipality)
     && (!filters.schoolId || school.id === filters.schoolId)
-    && (!filters.campus || school.campuses.some(c => c.id === filters.campus))
+    && (!filters.campus || school.id === filters.schoolId || school.campuses.some(c => c.id === filters.campus))
 }
 
 const decimal = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 1 })

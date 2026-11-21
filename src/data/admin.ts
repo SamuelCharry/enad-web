@@ -91,3 +91,13 @@ export function patchUser(uid: string, fields: Partial<UserProfile>) {
 
 /** Bulk-imports rows and records the admin audit entry. */
 export { adminImport } from './adminImport'
+
+export interface ImportReceipt { id: string; kind: string; rows: number; errors: number; created: number; by: string; at: string }
+const importStream = withSession<ImportReceipt[]>([], (p,next,error) => {
+  if (p.rol !== 'admin') {
+    error(new ApiError(403,'Solo administración puede consultar las importaciones.'))
+    return () => {}
+  }
+  return listenMany<ImportReceipt>([collection(db,'imports')], rows => next(rows.sort((a,b) => compare(b.at,a.at))),error)
+})
+export function useImportHistory() { return useLive(importStream,[]) }

@@ -2,48 +2,36 @@ import { useState } from 'react'
 import type { Jornada, School, UserProfile } from '../../domain/types'
 import { createTeacher, patchUser, upsertSchool, useUsers } from '../../data/admin'
 import { useSchools } from '../../data/scope'
-import { Button, Card, Dialog, Field, TextInput } from '../../ui/components'
+import { Button, Field, TextInput } from '../../ui/components'
 import { useAction } from './useAction'
-import { matches } from './formValues'
-import { Choice, Search } from './common'
+import { Directory } from './admin/Directory'
+import { savedNotice } from './admin/notice'
+import { Choice } from './common'
 import { Credentials } from './FileImport'
 
 const shifts = [{ id: 'mañana', name: 'Mañana' }, { id: 'tarde', name: 'Tarde' }, { id: 'única', name: 'Única' }] as const
 export function Schools() {
   const { schools, loading, error } = useSchools()
-  const [query, setQuery] = useState('')
-  const [edit, setEdit] = useState<School | 'new' | null>(null)
-  const rows = schools.filter(s => matches(query, s.name, s.id, s.municipality, s.region, ...s.campuses.map(c => c.name)))
   if (error) return <p role="alert">{error}</p>
-  return <>
-    <div className="collect-toolbar">
-      <Search value={query} onChange={setQuery} />
-      <Button variant="primary" onClick={() => setEdit('new')}>Crear institución</Button>
-    </div>
-    {loading ? <p>Cargando instituciones…</p> : !rows.length && <p>Sin instituciones en esta selección.</p>}
-    {rows.map(s => <Card key={s.id}>
-      <div className="collect-row">
-        <div>
-          <h3>{s.name}</h3>
-          <small>{s.municipality} · {s.department} · {s.active ? 'Activa' : 'Inactiva'}</small>
-          <p>{s.campuses.map(c => c.name).join(' · ')}</p>
-        </div>
-        <Button onClick={() => setEdit(s)}>Editar institución</Button>
-      </div>
-    </Card>)}
-    {edit && <SchoolEditor school={edit === 'new' ? undefined : edit} onClose={() => setEdit(null)} />}</>
+  return <Directory title="Instituciones y sedes" loading={loading} headers={['Institución','Municipio','Sedes','Estado']} create="Crear institución"
+    rows={schools.map(s => ({id:s.id,search:[s.name,s.id,s.municipality,s.region,...s.campuses.map(c => c.name)].join(' '),
+      cells:[s.name,s.municipality,s.campuses.map(c => c.name).join(' · ') || 'Sin sedes',s.active ? 'Activa':'Inactiva']}))}
+    editor={(id,close) => <SchoolEditor key={id} school={schools.find(s => s.id===id)} onClose={close}/>}/>
 }
-function SchoolEditor({ school, onClose }: { school?: School; onClose: () => void }) {
+function SchoolEditor({ school, onClose }: { school?: School; onClose: (notice?:string) => void }) {
   const [form, setForm] = useState<School>(() => school ?? { id: crypto.randomUUID(), name: '', projectId: '', region: '', department: '', municipality: '', zone: 'urbana', active: true, campuses: [] })
   const action = useAction()
   const fields = [['name', 'Nombre de la institución'], ['projectId', 'Proyecto'], ['region', 'Región'], ['department', 'Departamento'], ['municipality', 'Municipio']] as const
-  return <Dialog title={school ? 'Editar institución' : 'Crear institución'} {...{ onClose }} busy={action.busy}>
+  return <section><h3>{school ? 'Editar institución' : 'Crear institución'}</h3>
     <form onSubmit={e => {
       e.preventDefault()
+      const removed = school?.campuses.filter(c => !form.campuses.some(v => v.id===c.id)) ?? []
+      if (school && ((school.active && !form.active) || removed.length) &&
+        !window.confirm('¿Guardar los cambios de '+school.name+'? '+(removed.length ? 'Se quitarán las sedes '+removed.map(c => c.name).join(', ')+'. ' : '')+(school.active && !form.active ? 'La institución quedará inactiva.' : ''))) return
       void action.run(async () => {
         if (fields.some(([key]) => !form[key].trim()) || form.campuses.some(c => !c.name.trim())) throw new Error('Completa los campos de la institución y sus sedes.')
-        await upsertSchool(form)
-        onClose()
+        const result = await upsertSchool(form)
+        onClose(savedNotice(result))
       })
     }}>
       <fieldset disabled={action.busy}>
@@ -64,55 +52,42 @@ function SchoolEditor({ school, onClose }: { school?: School; onClose: () => voi
         </fieldset>)}
         <div className="collect-actions">
           <Button onClick={() => setForm({ ...form, campuses: [...form.campuses, { id: crypto.randomUUID(), name: '', jornada: 'única' }] })}>Añadir sede</Button>
-          <Button type="submit" variant="primary">Guardar institución</Button>
+          <Button onClick={() => onClose()}>Cancelar</Button><Button type="submit" variant="primary">Guardar institución</Button>
         </div>
       </fieldset>{action.feedback}</form>
-  </Dialog>
+  </section>
 }
 export function Teachers() {
   const { users, loading, error } = useUsers('docente')
-  const { schools } = useSchools()
-  const [q, setQ] = useState('')
-  const [edit, setEdit] = useState<UserProfile | 'new' | null>(null)
-  const schoolNames = (u: UserProfile) => schools.filter(s => u.schoolIds.includes(s.id)).map(s => s.name).join(' · ')
-  const rows = users.filter(u => matches(q, u.fullName, u.email, u.username ?? '', schoolNames(u)))
-  if (error) return <p role="alert">{error}</p>
-  return <>
-    <div className="collect-toolbar">
-      <Search value={q} onChange={setQ} />
-      <Button variant="primary" onClick={() => setEdit('new')}>Crear docente</Button>
-    </div>
-    {loading ? <p>Cargando docentes…</p> : !rows.length && <p>Sin docentes en esta selección.</p>}
-    {rows.map(u => <Card key={u.uid}>
-      <div className="collect-row">
-        <div>
-          <h3>{u.fullName}</h3>
-          <small>{u.activo ? 'Activo' : 'Inactivo'} · {u.email}</small>
-          <p>{schoolNames(u)}</p>
-        </div>
-        <Button onClick={() => setEdit(u)}>Editar docente</Button>
-      </div>
-    </Card>)}
-    {edit && <TeacherEditor user={edit === 'new' ? undefined : edit} {...{ schools }} onClose={() => setEdit(null)} />}</>
+  const directory = useSchools(), schools = directory.schools
+  if (error || directory.error) return <p role="alert">{error || directory.error}</p>
+  return <Directory title="Directorio docente" loading={loading || directory.loading} headers={['Docente','Instituciones','Jornada','Estado']} create="Crear docente"
+    rows={users.map(u => {
+      const names = schools.filter(s => u.schoolIds?.includes(s.id)).map(s => s.name).join(' · ')
+      return {id:u.uid,search:[u.fullName,u.email,u.username,names].join(' '),cells:[u.fullName,names || 'Sin asignación',u.jornada,u.activo ? 'Activo':'Inactivo']}
+    })}
+    editor={(id,close) => <TeacherEditor key={id} user={users.find(u => u.uid===id)} schools={schools} onClose={close}/>}/>
 }
-function TeacherEditor({ user, schools, onClose }: { user?: UserProfile; schools: School[]; onClose: () => void }) {
+function TeacherEditor({ user, schools, onClose }: { user?: UserProfile; schools: School[]; onClose: (message?:string) => void }) {
   const [fullName, setName] = useState(user?.fullName ?? '')
   const [email, setEmail] = useState(user?.email ?? '')
   const [jornada, setShift] = useState<Jornada>(user?.jornada ?? 'única')
   const [active, setActive] = useState(user?.activo ?? true)
-  const [sites, setSites] = useState<Record<string, string[]>>(() => Object.fromEntries((user?.schoolIds ?? []).map(id => [id, user?.campusIds[id] ?? []])))
+  const [sites, setSites] = useState<Record<string, string[]>>(() => Object.fromEntries((user?.schoolIds ?? []).map(id => [id, user?.campusIds?.[id] ?? []])))
   const [credentials, setCredentials] = useState<{ username: string; password: string } | null>(null)
   const action = useAction()
-  return <Dialog title={user ? 'Editar docente' : 'Crear docente'} {...{ onClose }} busy={action.busy}>
-    {credentials ? <Credentials items={[credentials]} /> : <form onSubmit={e => {
+  return <section><h3>{user ? 'Editar docente' : 'Crear docente'}</h3>
+    {credentials ? <><p role="status">Cuenta creada.</p><Credentials items={[credentials]} /><Button onClick={() => onClose('Cuenta creada.')}>Cerrar</Button></> : <form onSubmit={e => {
       e.preventDefault()
+      if (user && ((user.activo && !active) || user.schoolIds.some(id => !sites[id] || (user.campusIds?.[id] ?? []).some(c => !sites[id].includes(c)))) &&
+        !window.confirm('¿Confirmas el cambio de acceso de '+user.fullName+'? Revisa las instituciones, sedes y el estado de la cuenta.')) return
       void action.run(async () => {
         const schoolIds = Object.keys(sites)
         if (!schoolIds.length || !fullName.trim()) throw new Error('Indica el nombre del docente y al menos una institución.')
         const fields = { fullName: fullName.trim(), jornada, schoolIds, campusIds: sites }
         if (user) {
-          await patchUser(user.uid, { ...fields, activo: active })
-          onClose()
+          const result = await patchUser(user.uid, { ...fields, activo: active })
+          onClose(savedNotice(result))
         }
         else setCredentials(await createTeacher({ ...fields, email: email.trim() }))
       }, '')
@@ -138,7 +113,7 @@ function TeacherEditor({ user, schools, onClose }: { user?: UserProfile; schools
               }} /> {s.name}</label>
             {s.id in sites && s.campuses.map(c => <label key={c.id} className="collect-indent">
               <input type="checkbox" checked={sites[s.id].includes(c.id)} onChange={e => setSites({ ...sites, [s.id]: e.target.checked ? [...sites[s.id], c.id] : sites[s.id].filter(id => id !== c.id) })} /> {c.name}</label>)}</div>)}</fieldset>
-        <Button type="submit" variant="primary">{user ? 'Guardar cambios' : 'Crear cuenta'}</Button>
+        <div className="admin-save"><Button onClick={() => onClose()}>Cancelar</Button><Button type="submit" variant="primary">{user ? 'Guardar cambios' : 'Crear cuenta'}</Button></div>
       </fieldset>
-    </form>}{action.feedback}</Dialog>
+    </form>}{action.feedback}</section>
 }

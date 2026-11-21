@@ -3,6 +3,7 @@ import type { ProgramConfig } from '../../domain/types'
 import { saveProgramConfig } from '../../data/admin'
 import { useProgramConfig } from '../../data/scope'
 import { Button, Card, DateInput, Dialog, Field, NumberInput, Table, TextInput } from '../../ui/components'
+import { savedNotice } from './admin/notice'
 import { useAction } from './useAction'
 import { matches } from './formValues'
 import { Search } from './common'
@@ -24,6 +25,7 @@ export function Program() {
   const [q, setQ] = useState('')
   const [form, setForm] = useState<ProgramConfig | null>(null)
   const [importing, setImporting] = useState(false)
+  const [notice,setNotice] = useState('')
   const action = useAction()
   const visible = config && matches(q, config.projectName, config.year, config.implementationStartDate, ...config.breaks.map(b => b.label))
   if (error) return <p role="alert">{error}</p>
@@ -38,16 +40,18 @@ export function Program() {
       {config.breaks.map((b, i) => <p key={i}>{b.label} · {b.from} al {b.to}</p>)}<Button onClick={() => setForm(config)}>Editar configuración</Button>
     </Card> :
       !config ? <Button onClick={() => setForm(blank())}>Crear configuración</Button> : <p>Sin coincidencias.</p>}
-    {importing && <ProgramImport onClose={() => setImporting(false)} />}
+    {notice && <p role="status">{notice}</p>}{importing && <ProgramImport onClose={message => {setImporting(false);setNotice(message || '')}} />}
     {form && <Dialog title="Configuración del programa" onClose={() => setForm(null)} busy={action.busy}>
       <form onSubmit={e => {
         e.preventDefault()
         void action.run(async () => {
           const problem = issue(form)
           if (problem) throw new Error(problem)
-          await saveProgramConfig(form)
+          if (config && !window.confirm('¿Actualizar el calendario del programa? La fecha de inicio y las pausas determinan las semanas de los informes.')) return
+          const result = await saveProgramConfig(form)
+          setNotice(savedNotice(result))
           setForm(null)
-        })
+        }, '')
       }}>
         <fieldset disabled={action.busy}>
           <Field label="Nombre del proyecto">
@@ -75,7 +79,7 @@ export function Program() {
     </Dialog>}</>
 }
 // The program is a singleton. Preview the whole calendar, then submit one saveProgramConfig.
-function ProgramImport({ onClose }: { onClose: () => void }) {
+function ProgramImport({ onClose }: { onClose: (message?:string) => void }) {
   const [rows, setRows] = useState<string[][]>([])
   const [page, setPage] = useState(0)
   const action = useAction()
@@ -94,7 +98,7 @@ function ProgramImport({ onClose }: { onClose: () => void }) {
     if (!grid.length) throw new Error('Añade al menos una fila a la plantilla.')
     setRows(grid.map(r => columns.map((_, i) => String(r[i] ?? '').trim())))
   }
-  return <Dialog title="Importar calendario del programa" {...{ onClose }} busy={action.busy}>
+  return <Dialog title="Importar calendario del programa" onClose={() => onClose()} busy={action.busy}>
     <fieldset disabled={action.busy}>
       <Button onClick={() => action.run(async () => {
         const x = await import('xlsx')
@@ -114,8 +118,9 @@ function ProgramImport({ onClose }: { onClose: () => void }) {
         <Table caption="Vista previa del calendario" headers={[...columns, 'Validación']} rows={rows.slice(page * 20, page * 20 + 20).map((r, i) => ({ key: String(i), cells: [...r, issues[page * 20 + i] || 'Válida'] }))} />
         <Pager {...{ page, setPage }} count={rows.length} />
         <Button variant="primary" disabled={issues.some(Boolean)} onClick={() => action.run(async () => {
-          await saveProgramConfig({ ...configs[0], breaks: configs.flatMap(c => c.breaks) })
-          onClose()
-        })}>Aplicar calendario</Button>
+          if (!window.confirm('¿Reemplazar el calendario completo con las fechas y pausas del archivo?')) return
+          const result = await saveProgramConfig({ ...configs[0], breaks: configs.flatMap(c => c.breaks) })
+          onClose(savedNotice(result))
+        }, '')}>Aplicar calendario</Button>
       </>}</fieldset>{action.feedback}</Dialog>
 }

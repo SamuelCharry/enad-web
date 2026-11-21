@@ -34,3 +34,31 @@
 }
 .rep { min-width: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .rep .ui-card { min-width: 0; margin-block: var(--space-4); }
+.rep td a,.rep td small { display:block; }
+.rep td a { min-height:44px; align-content:center; }
+.rep-check,.rep summary { min-height:44px; }
+@media print {
+  .rep-filters,.rep .ui-tabs,.rep button,.rep-actions,.rep-refresh,.rep .ui-field,.rep-check,
+  body:has(.rep) nav,body:has(.rep) .portal-header { display:none !important; }
+  .rep,.rep .ui-card,.rep .ui-table { overflow:visible; box-shadow:none; }
+  .rep table { width:100%; min-width:0; font-size:9pt; }
+  .rep tr,.rep figure,.rep h2,.rep h3 { break-inside:avoid; }
+  .rep .ui-table td,.rep .ui-table th { white-space:normal; min-width:0; }
+  .rep a { color:inherit; }
+  .rep h2,.rep h3 { break-after:avoid; }
+}
+.rep-table-export { display:flex;align-items:center;justify-content:flex-end;gap:var(--space-2);flex-wrap:wrap;margin-bottom:var(--space-4); }
+.rep-chart-switch { display:block;margin-left:auto; }
+@media print { .rep-table-export,.rep-chart-switch {display:none;} }
+@media screen and (max-width:44rem) {
+  .rep-table-block .ui-table table,.rep-table-block tbody,.rep-table-block tr,.rep-table-block td {display:block;width:100%;min-width:0;}
+  .rep-table-block thead {position:absolute;clip-path:inset(50%);width:1px;height:1px;overflow:hidden;}
+  .rep-table-block tr {padding-block:var(--space-3);border-bottom:1px solid var(--line);}
+  .rep-table-block td {padding:var(--space-1) 0;border:0;white-space:normal;}
+  .rep-table-block td > [data-label] {display:grid;grid-template-columns:minmax(6rem,38%) minmax(0,1fr);align-items:baseline;gap:var(--space-2);}
+  .rep-table-block td > [data-label]::before {content:attr(data-label);font-size:var(--text-sm);color:var(--soft-ink);}
+  .rep-table-block td a {grid-column:2;}
+  .rep-table-export button {text-align:start;white-space:normal;}
+}
+.rep a { min-height:44px; min-width:44px; display:inline-flex; align-items:center; }
+.rep td a { display:flex; }
