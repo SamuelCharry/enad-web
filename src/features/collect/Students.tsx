@@ -1,12 +1,12 @@
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import type { School, Student } from '../../domain/types'
-import { createStudent, patchStudent, useStudents } from './_pending'
-import { Button, Card, Dialog, Field, TextInput } from './_pendingUi'
+import { createStudent, patchStudent, useStudents } from '../../data/students'
+import { Button, Card, Dialog, Field, TextInput } from '../../ui/components'
 import { useAction } from './useAction'
 import { genders, matches, numbers } from './formValues'
 import { Choice, Search } from './common'
 import { FileImport } from './FileImport'
-import { Scanner } from './Scanner'
+const Scanner = lazy(() => import('./Scanner').then(m => ({ default: m.Scanner })))
 
 export function Students({ school, campus, admin }: { school: School; campus: string; admin: boolean }) {
   const { students, loading, error } = useStudents(school.id)
@@ -36,7 +36,9 @@ export function Students({ school, campus, admin }: { school: School; campus: st
       setEdit(null)
     }} />}
     {open === 'file' && <FileImport kind="students" schools={[school]} scope={{ schoolId: school.id, campus, students }} onClose={() => setOpen(null)} />}
-    {open === 'scan' && <Scanner schoolId={school.id} {...{ students, campus }} onClose={() => setOpen(null)} />}</>
+    {open === 'scan' && <Suspense fallback={<p role="status">Cargando escáner…</p>}>
+      <Scanner schoolId={school.id} {...{ students, campus }} onClose={() => setOpen(null)} />
+    </Suspense>}</>
 }
 function StudentEditor({ school, campus, admin, student, onClose }: { school: School; campus: string; admin: boolean; student?: Student; onClose: () => void }) {
   const [name, setName] = useState(student?.fullName ?? '')

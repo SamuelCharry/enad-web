@@ -33,11 +33,14 @@ export function Login() {
     const target = typeof from === 'string' && /^\/(?:portal|recoleccion|visualizacion)(?:[/?]|$)/.test(from) ? from : '/portal'
     return <Navigate to={target} replace />
   }
-  async function submit(event: FormEvent) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (busy) return
     const login = username.trim()
-    if (!password || !/^(?:[\w.-]+|[^\s@]+@[^\s@]+\.[^\s@]+)$/.test(login)) {
+    const validLogin = /^(?:[\w.-]+|[^\s@]+@[^\s@]+\.[^\s@]+)$/.test(login)
+    if (!validLogin || !password) {
+      const field = event.currentTarget.elements.namedItem(!validLogin ? 'usuario' : 'clave')
+      if (field instanceof HTMLInputElement) field.focus()
       setError('Escribe tu usuario o correo y tu contraseña.')
       return
     }
@@ -53,9 +56,9 @@ export function Login() {
       <img className="login-logo" src={import.meta.env.BASE_URL + 'branding/enad_logo.png'} alt="ENAd, Enseñar al nivel adecuado" />
       <h1>Ingresar al portal</h1><p>Usa la misma cuenta de ENAd Móvil.</p>
       <form onSubmit={submit} noValidate onChange={() => setError('')}>
-        <Field label="Usuario o correo electrónico"><TextInput autoComplete="username" autoCapitalize="none" spellCheck={false} required
+        <Field label="Usuario o correo electrónico"><TextInput name="usuario" autoComplete="username" autoCapitalize="none" spellCheck={false} required
           value={username} onChange={e => setUsername(e.target.value)} /></Field>
-        <Field label="Contraseña"><div className="password-control"><TextInput type={visible ? 'text' : 'password'} required
+        <Field label="Contraseña"><div className="password-control"><TextInput name="clave" type={visible ? 'text' : 'password'} required
           autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} />
           <button type="button" aria-label={visible ? 'Ocultar contraseña' : 'Mostrar contraseña'} onClick={() => setVisible(!visible)}>
             {visible ? 'Ocultar' : 'Mostrar'}</button></div></Field>

@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import type { Group, ReportFilters, Student } from '../../domain/types'
-import { getStudentHistory, levelLabel, momentLabel, SUBJECTS, subjectLabel, useStudents } from './_pending'
-import { Button, Card, EmptyState, LevelChip, Table } from './_pendingUi'
+import { getStudentHistory, useStudents } from '../../data/students'
+import { levelLabel, momentLabel, SUBJECTS, subjectLabel } from '../../domain/levels'
+import { Button, Card, EmptyState, LevelChip, Table } from '../../ui/components'
 import { number, percent, studentRate } from './model'
 import { LiveState, ReportRead } from './ReportState'
 

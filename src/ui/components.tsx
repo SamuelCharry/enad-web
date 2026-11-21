@@ -1,6 +1,6 @@
 import { useContext, createContext, useEffect, useId, useRef } from 'react'
 import type { ComponentProps, PropsWithChildren, ReactNode } from 'react'
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import type { Subject } from '../domain/types'
 import { Icon } from './Icon'
 import { levelScale } from './levels'
@@ -48,7 +48,8 @@ export function TextInput({ className, type = 'text', ...props }: ComponentProps
 export function DateInput(props: ComponentProps<'input'>) { return <TextInput {...props} type="date" /> }
 export function NumberInput(props: ComponentProps<'input'>) { return <TextInput {...props} type="number" /> }
 export function Select({ className, ...props }: ComponentProps<'select'>) {
-  return <select {...useControl()} {...props} className={classes('ui-control', className)} />
+  const control = useControl()
+  return <span className="ui-select"><select {...control} {...props} className={classes('ui-control', className)} /></span>
 }
 
 export function Segmented<T extends string>({ label, value, options, onChange, disabled }: {
@@ -106,8 +107,16 @@ export function Table({ caption, headers, rows }: {
 }
 
 export function Tabs({ items, label = 'Secciones' }: { items: readonly { to: string; label: string }[]; label?: string }) {
-  return <nav className="ui-tabs" aria-label={label}>{items.map(item =>
-    <NavLink key={item.to} end to={item.to}>{item.label}</NavLink>)}</nav>
+  const { pathname } = useLocation()
+  const navigate = useNavigate()
+  const active = items.find(item => item.to === pathname.replace(/\/$/, '')) ?? items[0]
+  return <nav className="ui-tabs" aria-label={label}>
+    <div className="ui-tab-links">{items.map(item =>
+      <NavLink key={item.to} end to={item.to}>{item.label}</NavLink>)}</div>
+    <div className="ui-tab-picker"><Field label="Sección"><Select value={active?.to ?? ''} onChange={e => navigate(e.target.value)}>
+      {items.map(item => <option key={item.to} value={item.to}>{item.label}</option>)}
+    </Select></Field></div>
+  </nav>
 }
 export function Badge({ children, className, ...props }: ComponentProps<'span'>) {
   return <span {...props} className={classes('ui-badge', className)}>{children}</span>

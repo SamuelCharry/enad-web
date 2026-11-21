@@ -23,3 +23,18 @@ it('conserva el color de un nivel cuando otros niveles se omiten', () => {
   expect(segments[2].getAttribute('x')).toBe('25')
   expect(segments[2].getAttribute('fill')).toBe('var(--level-5)')
 })
+
+it.each([LineChart, BarChart])('alinea la escala vertical con valores positivos, negativos y fraccionarios', Chart => {
+  const { container } = render(<Chart label="Horas" data={[
+    { label: 'Lunes', value: -0.5 }, { label: 'Martes', value: 0.5 },
+  ]} />)
+  expect(Array.from(container.querySelectorAll('.ui-y-ticks span'), el => el.textContent)).toEqual(['0,5', '0', '-0,5'])
+  const grid = Array.from(container.querySelectorAll('line[x2]'), line => Number(line.getAttribute('y1')))
+  expect(grid).toHaveLength(3)
+  expect(grid[1]).toBe((grid[0] + grid[2]) / 2)
+  if (Chart === LineChart) {
+    expect(Array.from(container.querySelectorAll('circle'), el => Number(el.getAttribute('cy')))).toEqual([grid[2], grid[0]])
+  } else {
+    expect(Array.from(container.querySelectorAll('rect'), el => Number(el.getAttribute('y')))).toEqual([grid[1], grid[0]])
+  }
+})

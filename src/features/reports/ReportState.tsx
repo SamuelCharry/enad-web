@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { PropsWithChildren, ReactNode } from 'react'
-import { Button } from './_pendingUi'
+import { Button } from '../../ui/components'
 
 export function Skeleton() {
   return <div className="rep-skeleton" role="status"><span className="rep-sr">Cargando datos…</span><i /><i /><i /></div>

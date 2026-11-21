@@ -1,7 +1,8 @@
 import { useState, type ReactNode } from 'react'
 import type { School, Subject, Moment, UserProfile } from '../../domain/types'
-import { MOMENTS, SUBJECTS, momentLabel, subjectLabel, useSchools } from './_pending'
-import { DateInput, Field, Select, TextInput } from './_pendingUi'
+import { useSchools } from '../../data/scope'
+import { MOMENTS, SUBJECTS, momentLabel, subjectLabel } from '../../domain/levels'
+import { DateInput, Field, Select, TextInput } from '../../ui/components'
 
 export function Search({ value, onChange }: { value: string; onChange: (s: string) => void }) {
   return <Field label="Buscar">

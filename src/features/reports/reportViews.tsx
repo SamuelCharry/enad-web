@@ -1,7 +1,12 @@
 import { useState } from 'react'
 import type { ReportFilters, Subject } from '../../domain/types'
-import { colombiaToday, getAttendanceReport, getHoursReport, getLevels, getSubmissions, getSummary, LEVELS, levelColor, levelLabel, MOMENTS, momentLabel, SUBJECTS, subjectLabel, useProgramConfig, weeksElapsed } from './_pending'
-import { Card, EmptyState, Field, Histogram, LineChart, Select, StackedBar, Table } from './_pendingUi'
+import { getAttendanceReport, getHoursReport, getLevels, getSubmissions, getSummary } from '../../data/reports'
+import { useProgramConfig } from '../../data/scope'
+import { levelColor } from '../../domain/levelPalette'
+import { LEVELS, levelLabel, MOMENTS, momentLabel, SUBJECTS, subjectLabel } from '../../domain/levels'
+import { colombiaToday, weeksElapsed } from '../../domain/weeks'
+import { Histogram, LineChart, StackedBar } from '../../ui/charts'
+import { Card, EmptyState, Field, Select, Table } from '../../ui/components'
 import { hoursRows, number, percent } from './model'
 import type { AttendanceReport, WeeklyHours } from './model'
 import { LiveState, ReportRead } from './ReportState'
@@ -17,7 +22,7 @@ export function SummaryView({ filters }: Props) {
     ]
     return <><dl className="rep-metrics">{metrics.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
       <Card><h3>Estudiantes que asistieron por semana de implementación</h3>
-        {r.studentsOverTime.length ? <LineChart label="Asistencia semanal de estudiantes" data={[...r.studentsOverTime].sort((a,b) => a.week - b.week).map(p => ({ label: 'Semana ' + number(p.week), value: p.count }))} />
+        {r.studentsOverTime.length ? <LineChart label="Estudiantes" data={[...r.studentsOverTime].sort((a,b) => a.week - b.week).map(p => ({ label: 'Semana ' + number(p.week), value: p.count }))} />
           : <EmptyState title="No hay registros de asistencia semanal en esta selección." />}
       </Card></>
   }}</ReportRead></>
@@ -56,9 +61,9 @@ export function WeeklyTable({ weeks }: { weeks: WeeklyHours[] }) {
 
 function AttendanceTable({ report }: { report: AttendanceReport }) {
   const [by, setBy] = useState('school')
-  const rows = by === 'school' ? report.bySchool.map(r => ({ key: r.schoolId, cells: [r.name, percent(r.rate), number(r.sessions)] }))
-    : by === 'group' ? report.byGroup.map(r => ({ key: r.groupId, cells: [r.name, r.teacherName, percent(r.rate), number(r.sessions)] }))
-    : report.byTeacher.map(r => ({ key: r.uid, cells: [r.fullName, percent(r.rate), number(r.sessions)] }))
+  const rows = by === 'school' ? report.bySchool.map(r => ({ key: r.schoolId, cells: [r.name, percent(r.sessions ? r.rate : null), number(r.sessions)] }))
+    : by === 'group' ? report.byGroup.map(r => ({ key: r.groupId, cells: [r.name, r.teacherName, percent(r.sessions ? r.rate : null), number(r.sessions)] }))
+    : report.byTeacher.map(r => ({ key: r.uid, cells: [r.fullName, percent(r.sessions ? r.rate : null), number(r.sessions)] }))
   return <Card><h3>Tasa de asistencia</h3><Field label="Agrupar por"><Select value={by} onChange={e => setBy(e.target.value)}>
     <option value="school">Institución</option><option value="group">Grupo</option><option value="teacher">Docente</option>
   </Select></Field>

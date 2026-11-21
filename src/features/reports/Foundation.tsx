@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import type { ReportFilters } from '../../domain/types'
-import { buildExcelExport, getExport, useFilterOptions } from './_pending'
-import { Button, DateInput, Field, PageHeader, Select, Tabs } from './_pendingUi'
+import { getExport, useFilterOptions } from '../../data/reports'
+import { Button, DateInput, Field, PageHeader, Select, Tabs } from '../../ui/components'
 import { geography, changeFilter, filterChoices } from './model'
 import type { Geography } from './model'
 import { SummaryView, SubmissionsView, HoursView, LevelsView } from './reportViews'
@@ -52,7 +52,7 @@ function ExportButton({ filters, disabled }: { filters: ReportFilters; disabled:
     setBusy(true)
     setError(false)
     try {
-      const data = await getExport(filters)
+      const [data, { buildExcelExport }] = await Promise.all([getExport(filters), import('../../domain/export/excel')])
       if (!active.current) return
       const url = URL.createObjectURL(buildExcelExport(data))
       const link = document.createElement('a')

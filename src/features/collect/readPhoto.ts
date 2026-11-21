@@ -1,7 +1,7 @@
 import { createWorker, OEM, type Worker } from 'tesseract.js'
 import workerPath from 'tesseract.js/dist/worker.min.js?url'
 import corePath from 'tesseract.js-core/tesseract-core-lstm.wasm.js?url'
-import { parseRows } from './_pending'
+import { parseRows } from '../../domain/ocr/rowParser'
 
 export class SpanishModelMissing extends Error { }
 

@@ -24,33 +24,56 @@ function extent(data: readonly Point[]) {
   return data.reduce(([min, max], { value }) => [Math.min(min, value), Math.max(max, value)], [0, 0])
 }
 
-export function LineChart({ label, data }: ChartProps) {
-  const values = data.filter(point => Number.isFinite(point.value))
+const plotHeight = 144
+const tickFormat = new Intl.NumberFormat('es-CO', { maximumSignificantDigits: 6 })
+
+function verticalScale(values: readonly Point[]) {
   const [min, max] = extent(values)
-  const y = (value: number) => 118 - (value - min) / (max - min || 1) * 104
-  const points = values.map((point, i) => ({
-    ...point, x: values.length === 1 ? 200 : 8 + 384 * i / (values.length - 1), y: y(point.value),
-  }))
-  return <ChartFrame label={label} data={values}><svg role="img" aria-label={label} viewBox="0 0 400 130">
-    <path d={'M8 ' + y(0) + 'h384'} stroke="var(--line)" />
-    <polyline points={points.map(p => p.x + ',' + p.y).join(' ')} fill="none" stroke="var(--red)" strokeWidth="2.5" />
-    {points.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r="3" fill="var(--error)"><title>{p.label} · {number.format(p.value)}</title></circle>)}
-  </svg><div className="ui-axis"><span>{values[0]?.label}</span>{values.length > 1 && <span>{values.at(-1)?.label}</span>}</div></ChartFrame>
+  // Round outwards to readable intervals, keeping whole counts on integer ticks.
+  const target = (max - min) / 4 || 1
+  const magnitude = 10 ** Math.floor(Math.log10(target))
+  const multiple = [1, 2, 5, 10].find(n => n * magnitude >= target) ?? 10
+  const step = Math.max(values.every(p => Number.isInteger(p.value)) ? 1 : 0, multiple * magnitude)
+  const first = Math.floor(min / step)
+  const last = Math.max(first + 1, Math.ceil(max / step))
+  const ticks = Array.from({ length: last - first + 1 }, (_, i) => (last - i) * step)
+  const y = (value: number) => (last - value / step) / (last - first) * plotHeight
+  return { ticks, y }
 }
 
-export function BarChart({ label, data }: ChartProps) {
+function ScaledChart({ label, data, bars }: ChartProps & { bars?: boolean }) {
   const values = data.filter(point => Number.isFinite(point.value))
-  const [min, max] = extent(values)
-  const span = max - min || 1
-  const y = (v: number) => 118 - 104 * (v - min) / span
-  const step = 384 / Math.max(values.length, 1)
-  return <ChartFrame label={label} data={values}><svg role="img" aria-label={label} viewBox="0 0 400 130">
-    <path d={'M8 ' + y(0) + 'h384'} stroke="var(--line)" />
-    {values.map((p, i) => <rect key={i} x={8 + (i + 0.15) * step} width={step * 0.7}
-      y={Math.min(y(0), y(p.value))} height={Math.abs(y(p.value) - y(0))} fill="var(--ink)">
-      <title>{p.label} · {number.format(p.value)}</title></rect>)}
-  </svg><div className="ui-axis"><span>{values[0]?.label}</span>{values.length > 1 && <span>{values.at(-1)?.label}</span>}</div></ChartFrame>
+  const { ticks, y } = verticalScale(values)
+  const column = 100 / Math.max(values.length, 1)
+  const x = (i: number) => values.length === 1 ? 50 : bars ? (i + 0.5) * column : i * 100 / (values.length - 1)
+  return <ChartFrame label={label} data={values}>
+    <div className="ui-plot">
+      <div className="ui-y-ticks" aria-hidden="true">
+        {ticks.map(tick => <span key={tick}>{tickFormat.format(tick)}</span>)}
+      </div>
+      <svg role="img" aria-label={label} height={plotHeight}>
+        {ticks.map(tick => <line key={tick} x2="100%" y1={y(tick)} y2={y(tick)}
+          stroke={tick === 0 ? 'var(--soft-ink)' : 'var(--line)'} />)}
+        <line y2={plotHeight} stroke="var(--soft-ink)" />
+        {!bars && <svg width="100%" height={plotHeight} viewBox={`0 0 100 ${plotHeight}`} preserveAspectRatio="none">
+          <polyline points={values.map((p, i) => x(i) + ',' + y(p.value)).join(' ')} fill="none"
+            vectorEffect="non-scaling-stroke" stroke="var(--red)" strokeWidth="2.5" />
+        </svg>}
+        {values.map((p, i) => {
+          const title = <title>{p.label} · {number.format(p.value)}</title>
+          return bars ? <rect key={i} x={(i + 0.15) * column + '%'} width={column * 0.7 + '%'}
+            y={Math.min(y(0), y(p.value))} height={Math.abs(y(p.value) - y(0))} fill="var(--ink)">{title}</rect>
+            : <circle key={i} cx={x(i) + '%'} cy={y(p.value)} r="3" fill="var(--error)">{title}</circle>
+        })}
+      </svg>
+      <div className="ui-axis" data-single={values.length === 1}><span>{values[0]?.label}</span>
+        {values.length > 1 && <span>{values.at(-1)?.label}</span>}</div>
+    </div>
+  </ChartFrame>
 }
+
+export function LineChart(props: ChartProps) { return <ScaledChart {...props} /> }
+export function BarChart(props: ChartProps) { return <ScaledChart {...props} bars /> }
 
 // Adjacent bins share a baseline; the caller supplies the ordered bin labels.
 export function Histogram({ label, data }: ChartProps) {

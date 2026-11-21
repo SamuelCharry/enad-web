@@ -1,8 +1,15 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import type { UserProfile } from '../../domain/types'
-import { colombiaToday, getTeacherMetrics, subjectLabel, updateMyName, useGroups, useMyHours, useProgramConfig, useSchools } from './_pending'
-import { Button, Card, EmptyState, Field, LineChart, PageHeader, Table, TextInput } from './_pendingUi'
+import { useGroups } from '../../data/groups'
+import { useMyHours } from '../../data/hours'
+import { updateMyName } from '../../data/profile'
+import { getTeacherMetrics } from '../../data/reports'
+import { useProgramConfig, useSchools } from '../../data/scope'
+import { subjectLabel } from '../../domain/levels'
+import { colombiaToday } from '../../domain/weeks'
+import { LineChart } from '../../ui/charts'
+import { Button, Card, EmptyState, Field, PageHeader, Table, TextInput } from '../../ui/components'
 import { number, percent, ratio, shiftDay } from './model'
 import { LiveState, ReportRead } from './ReportState'
 import { Roster } from './Roster'
@@ -53,7 +60,7 @@ function TeacherHours({ uid, schoolNames, schoolIds }: { uid: string; schoolName
   return <Card><h2>Cumplimiento de horas · últimos 30 días</h2><p>Del {from} al {to}</p>
     <LiveState loading={loading} error={error}>{rows.length ? <>
       <p><strong>{planned ? percent(ratio(worked, planned)) : 'Sin horas planeadas'}</strong> · {number(worked)} de {number(planned)} h</p>
-      {trend.length > 0 && <><h3>Cumplimiento diario (%)</h3><LineChart label="Porcentaje diario de horas ejecutadas sobre las planeadas" data={trend} /></>}
+      {trend.length > 0 && <><h3>Cumplimiento diario (%)</h3><LineChart label="Horas ejecutadas (% de las planeadas)" data={trend} /></>}
       <Table caption="Reportes de horas de los últimos 30 días" headers={['Fecha', 'Institución', 'Planeadas', 'Ejecutadas', 'Motivo']} rows={rows.map(h => ({
         key: JSON.stringify([h.schoolId, h.date]), cells: [h.date, schoolNames.get(h.schoolId) ?? h.schoolId, number(h.plannedHours), number(h.workedHours), h.reason ?? '—'],
       }))} />

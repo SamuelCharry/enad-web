@@ -1,7 +1,11 @@
 import { useState } from 'react'
 import type { School, Student } from '../../domain/types'
-import { addStudentsToGroup, adminImport, buildImportTemplate, importColumns, importStudents, parseImport, useGroups, type ImportKind, type ImportRow } from './_pending'
-import { Button, Dialog, Field, TextInput, Table } from './_pendingUi'
+import { adminImport } from '../../data/admin'
+import { addStudentsToGroup, useGroups } from '../../data/groups'
+import { importStudents } from '../../data/students'
+import type { ImportRow } from '../../domain/import/parser'
+import { importColumns, type ImportKind } from '../../domain/import/schema'
+import { Button, Dialog, Field, TextInput, Table } from '../../ui/components'
 import { useAction } from './useAction'
 
 import { download } from './formValues'
@@ -36,7 +40,8 @@ export function FileImport({ kind, schools, scope, onClose }: { kind: ImportKind
     setPage(0)
     setResult(null)
     setCreatedIds([])
-    const preview = await parseImport({ kind, schools, filename: file.name, bytes: new Uint8Array(await file.arrayBuffer()), existingStudents: scope?.students })
+    const { parseImport } = await import('../../domain/import/parser')
+    const preview = parseImport({ kind, schools, filename: file.name, bytes: new Uint8Array(await file.arrayBuffer()), existingStudents: scope?.students })
     setRows(preview.rows.map(r => scope && (r.data.schoolId !== scope.schoolId || (r.data.campus && r.data.campus !== scope.campus)) ?
       { ...r, errors: [...r.errors, 'La fila corresponde a otra institución o sede.'] } : r))
     if (!preview.rows.length) throw new Error('El archivo no contiene registros.')
@@ -56,7 +61,10 @@ export function FileImport({ kind, schools, scope, onClose }: { kind: ImportKind
   }
   return <Dialog title="Importar archivo" {...{ onClose }} busy={action.busy}>
     <fieldset disabled={action.busy}>
-      <Button onClick={() => action.run(async () => download(await buildImportTemplate(kind), 'Plantilla ENAd.xlsx'), 'Plantilla descargada')}>Descargar plantilla</Button>
+      <Button onClick={() => action.run(async () => {
+        const { buildImportTemplate } = await import('../../domain/import/templates')
+        download(buildImportTemplate(kind), 'Plantilla ENAd.xlsx')
+      }, 'Plantilla descargada')}>Descargar plantilla</Button>
       <Field label="Archivo de Excel o CSV">
         <TextInput type="file" accept=".xlsx,.csv" onChange={e => {
           const file = e.target.files?.[0]
