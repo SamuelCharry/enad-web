@@ -4,6 +4,7 @@ import type { UserProfile, Role } from '../domain/types'
 import { colombiaToday, weekOf } from '../domain/weeks'
 import { Badge, PageHeader } from '../ui/components'
 import { Icon } from '../ui/Icon'
+import { ManagerHome } from '../features/manage/ManagerHome'
 
 const descriptions: Record<Role, [string, string]> = {
   docente: ['Registra la asistencia, las evaluaciones y las horas de tus grupos.', 'Consulta tus indicadores y el historial de tus estudiantes.'],
@@ -44,7 +45,8 @@ function Coverage({ regional }: { regional: boolean }) {
   </section>
 }
 
-export function Home() {
+/** Home genérico (punto de partida). Team G lo reemplaza para docente; Team H para los demás roles vía ManagerHome. */
+export function LegacyHome() {
   const { rol } = useOutletContext<UserProfile>()
   const [collection, reports] = descriptions[rol]
   const teacher = rol === 'docente'
@@ -66,4 +68,9 @@ export function Home() {
       </nav>
     </div>
   </div>
+}
+
+export function Home() {
+  const profile = useOutletContext<UserProfile>()
+  return profile.rol === 'docente' ? <LegacyHome /> : <ManagerHome profile={profile} />
 }
