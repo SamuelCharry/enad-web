@@ -44,7 +44,7 @@ try {
   base.hash = '/login'
   await page.goto(base.href)
   const form = page.locator('form').filter({ has: page.locator('input[type="password"]') })
-  const userField = form.getByRole('textbox')
+  const userField = form.locator('input[autocomplete="username"]')
   const passwordField = form.locator('input[type="password"]')
   const submit = form.locator('button[type="submit"], button:not([type]), input[type="submit"]')
   await capture('ingreso', [userField, passwordField, submit])
