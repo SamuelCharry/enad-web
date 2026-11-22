@@ -1,12 +1,12 @@
 import { qualityIssues } from './quality'
 import { reportRange, submissionWindow } from './reportRange'
-import { collection, doc, documentId, getDoc, limit, orderBy, query, startAfter, where } from 'firebase/firestore'
+import { collection, doc, documentId, getDoc, getDocs, limit, orderBy, query, where } from 'firebase/firestore'
 import type { AttendanceMark, Evaluation, Group, HoursEntry, Moment, ReportFilters, School, Student, Subject, UserProfile } from '../domain/types'
 import { LEVELS, MOMENTS, SUBJECTS, subjectLabel } from '../domain/levels'
 import { colombiaToday, rangeOf, weekOf, weeksElapsed } from '../domain/weeks'
 import { api, caller, chunks, compare, configOf, fail, recordOf, reportCache, requireDate, requireSchool, schoolsOf } from './core'
 import { cachedResult } from './reportCache'
-import { attendanceTotals, distinctPresent, enrollment, dates, equal, hoursTotal, rows, scoped, sessions, total } from './reads'
+import { attendanceTotals, distinctPresent, distinctStudentRows, enrollment, dates, equal, hoursTotal, mapBatches, rows, scoped, sessions, total } from './reads'
 import { db } from './firebase'
 import { milestones, movement } from './managementMetrics'
 import { useSchools } from './scope'
@@ -38,6 +38,10 @@ function campusFilter(s: School, campus?: string) {
   const c = s.campuses.find(c => c.id === campus || c.name === campus)
   return [where('campus', 'in', [...new Set(c ? [c.id, c.name] : [campus])])]
 }
+async function studentIdsInOrder(school: School, campus?: string) {
+  const roster = scoped('students', school.id, ...campusFilter(school, campus), orderBy(documentId()))
+  return (await getDocs(roster)).docs.map(s => s.id)
+}
 async function directory(school: School) {
   return (await rows<{ uid?: string; fullName: string }>(collection(db, 'schools', school.id, 'teachers')))
     .map(t => ({ uid: t.uid || t.id, fullName: t.fullName || '' })).sort((a, b) => compare(a.fullName, b.fullName))
@@ -49,11 +53,12 @@ async function inputs(p: ReportCaller, f: ReportFilters, report: Report, signal?
     const need = (...kinds: Report[]) => kinds.includes(report)
     const [students, groups, teachers] = await Promise.all([
       need('export') || (f.campus && need('attendance')) ? rows<Student>(scoped('students', id, ...site)) : [],
-      need('attendance', 'export') || (f.campus) ? rows<Group>(scoped('groups', id, ...site)) : [],
+      need('attendance', 'export') || (f.campus) ? rows<Group>(scoped('groups', id, ...site, orderBy(documentId()))) : [],
       directory(school)
     ])
     const memberPages = f.campus ? chunks(students.map(s => s.id), 10).map(ids => [where('studentId', 'in', ids)]) : [[]]
-    const attendance = need('attendance') ? (await Promise.all(memberPages.map(page => sessions(scoped('attendance', id, ...page), data.from, data.to, signal)))).flat() :
+    const groupIds = groups.map(g => g.id)
+    const attendance = need('attendance') ? (await Promise.all(memberPages.map(page => sessions(scoped('attendance', id, ...page), data.from, data.to, groupIds, signal)))).flat() :
       need('export') ? (await Promise.all(memberPages.map(page => rows<AttendanceMark>(scoped('attendance', id, ...range, ...page))))).flat() : []
     const evaluations = need('export') ? (await Promise.all(memberPages.map(page => rows<Evaluation>(scoped('evaluations', id, ...page))))).flat() : []
     const hours = need('export') ? await rows<HoursEntry>(scoped('hours', id, ...range)) : []
@@ -88,34 +93,30 @@ export function getSummary(f: ReportFilters) {
     const groupsBySubject = { lectura: 0, matematicas: 0 }
     await Promise.all(visible.map(async school => {
       const id = school.id, site = campusFilter(school, f.campus)
-      const roster = f.campus ? await rows<Student>(scoped('students', id, ...site)) : []
-      const directoryRows = await directory(school)
-      const groups = f.campus ? await rows<Group>(scoped('groups', id, ...site)) : []
-      directoryRows.filter(t => !f.campus || groups.some(g => g.teacherId === t.uid)).forEach(t => teachers.add(t.uid))
-      const pages = f.campus ? chunks(roster.map(s => s.id), 30).map(ids => [where('studentId', 'in', ids)]) : [[]]
-      const [counts, h, groupCounts, enrolled] = await Promise.all([
+      let rosterRead: Promise<string[]> | undefined
+      const rosterIds = () => rosterRead ??= studentIdsInOrder(school, f.campus)
+      const pages = f.campus ? chunks(await rosterIds(), 30).map(ids => [where('studentId', 'in', ids)]) : [[]]
+      const enrolledStudents = enrollment(scoped('students', id, ...site))
+      const trend = mapBatches(weeks, 4, async w => {
+        const count = f.campus
+          ? (await mapBatches(await rosterIds(), 30, sid => total(scoped('attendance', id, equal('status', 'vino'),
+            equal('studentId', sid), ...dates(w.from, w.to), limit(1))), signal)).filter(Boolean).length
+          : await distinctPresent(id, w.from, w.to, rosterIds, enrolledStudents, signal)
+        weeksPresent.set(w.week, (weeksPresent.get(w.week) ?? 0) + count)
+      }, signal)
+      const [counts, h, groupCounts, enrolled, directoryRows, groups] = await Promise.all([
         Promise.all(pages.map(page => attendanceTotals(scoped('attendance', id, ...page, ...dates(from, to))))),
         hoursTotal(scoped('hours', id, ...dates(from, to))),
         Promise.all(SUBJECTS.map(s => total(scoped('groups', id, ...site, equal('subject', s))))),
-        enrollment(scoped('students', id, ...site))
+        enrolledStudents, directory(school),
+        f.campus ? rows<Group>(scoped('groups', id, ...site)) : [], trend
       ])
+      directoryRows.filter(t => !f.campus || groups.some(g => g.teacherId === t.uid)).forEach(t => teachers.add(t.uid))
       students += enrolled
       campuses += school.campuses.filter(c => !f.campus || c.id === f.campus || c.name === f.campus).length
       counts.forEach(c => { present += c.present; absent += c.absent })
       hoursPlanned += h.planned; hoursWorked += h.worked
       SUBJECTS.forEach((s, i) => { groupsBySubject[s] += groupCounts[i] })
-      for (const batch of chunks(weeks, 4)) {
-        await Promise.all(batch.map(async w => {
-          let count = 0
-          if (f.campus) {
-            for (const page of chunks(roster, 15)) {
-              const hits = await Promise.all(page.map(s => total(scoped('attendance', id, equal('status', 'vino'), equal('studentId', s.id), ...dates(w.from, w.to)))))
-              count += hits.filter(Boolean).length
-            }
-          } else count = await distinctPresent(id, w.from, w.to, signal)
-          weeksPresent.set(w.week, (weeksPresent.get(w.week) ?? 0) + count)
-        }))
-      }
     }))
     return {
       students, teachers: teachers.size, schools: visible.length, campuses, groupsBySubject, hoursPlanned, hoursWorked, attendanceRate: percent(present, present + absent),
@@ -137,7 +138,7 @@ export function getSubmissions(f: ReportFilters, week?: number) {
       return Promise.all((await directory(school)).filter(t => !f.campus || groups.some(g => g.teacherId === t.uid)).map(async t => {
         const q = [equal('teacherId', t.uid), ...dates(from, to)]
         const pages = f.campus ? chunks(roster.map(s => s.id), 30).map(ids => [where('studentId', 'in', ids)]) : [[]]
-        const [attendance, hours] = await Promise.all([Promise.all(pages.map(page => total(scoped('attendance', school.id, ...q, ...page)))), total(scoped('hours', school.id, ...q))])
+        const [attendance, hours] = await Promise.all([Promise.all(pages.map(page => total(scoped('attendance', school.id, ...q, ...page, limit(1))))), total(scoped('hours', school.id, ...q, limit(1)))])
         return { ...t, schoolId: school.id, schoolName: school.name, attendanceSent: attendance.some(Boolean), hoursSent: hours > 0 }
       }))
     }))).flat()
@@ -193,23 +194,12 @@ export function getMovement(f: ReportFilters, subject: Subject, from: Moment = m
     const scope = await context(p, f)
     const schools = await Promise.all(scope.visible.map(async school => {
       const base = scoped('evaluations', school.id, equal('subject', subject), where('moment', 'in', [from, to]), ...dates(scope.from, scope.to))
-      const roster = f.campus ? await rows<Student>(scoped('students', school.id, ...campusFilter(school, f.campus))) : []
-      const pages = f.campus ? chunks(roster.map(s => s.id), 15).map(ids => [where('studentId', 'in', ids)]) : [[]]
-      return (await Promise.all(pages.map(async page => {
-        const q = query(base, ...page)
+      const pages = f.campus ? chunks(await studentIdsInOrder(school, f.campus), 15) : [undefined]
+      return (await Promise.all(pages.map(async ids => {
+        const q = ids ? query(base, where('studentId', 'in', ids)) : base
         if (await total(q) <= 150) return rows<Evaluation>(q)
-        // Dense correction histories: skip the rest of each student/moment after
-        // its most recently saved event. Deleted students still have history.
         const ordered = query(q, where('studentId', '>=', ''), orderBy('studentId'), orderBy('moment'), orderBy('savedAt', 'desc'), orderBy('date'), limit(1))
-        const latest: Evaluation[] = []
-        let cursor = ordered
-        for (; ;) {
-          signal.throwIfAborted()
-          const [event] = await rows<Evaluation>(cursor)
-          if (!event) return latest
-          latest.push(event)
-          cursor = query(ordered, startAfter(event.studentId, event.moment))
-        }
+        return distinctStudentRows<Evaluation>(ordered, ids ?? await studentIdsInOrder(school), e => [e.studentId, e.moment], signal)
       }))).flat()
     }))
     return [{ from, to, ...movement(schools.flat(), subject, from, to) }]
@@ -279,7 +269,7 @@ export function useFilterOptions(filters: ReportFilters) {
 }
 
 export function getComparison(f: ReportFilters, sites: boolean) {
-  return cached('comparison', { ...f, sites }, async p => {
+  return cached('comparison', { ...f, sites }, async (p, signal) => {
     if (p.rol === 'docente') fail(403, 'Necesitas un perfil de gestión.')
     const { visible, from, to } = await context(p, f)
     return (await Promise.all(visible.map(async school => {
@@ -288,11 +278,9 @@ export function getComparison(f: ReportFilters, sites: boolean) {
         const site = campusFilter(school, campus?.id)
         const [students, groups, enrolled, groupCount] = await Promise.all([rows<Student>(scoped('students', school.id, ...site)),
         campus ? rows<Group>(scoped('groups', school.id, ...site)) : [], enrollment(scoped('students', school.id, ...site)), total(scoped('groups', school.id, ...site))])
-        let evaluated = 0
-        for (const page of chunks(students, 20)) {
-          const hits = await Promise.all(page.map(s => total(scoped('evaluations', school.id, equal('studentId', s.id), ...dates(from, to)))))
-          evaluated += hits.filter(Boolean).length
-        }
+        const hits = await mapBatches(students, 30, s =>
+          total(scoped('evaluations', school.id, equal('studentId', s.id), ...dates(from, to), limit(1))), signal)
+        const evaluated = hits.filter(Boolean).length
         const pages = campus ? chunks(groups.map(g => g.id), 30).map(ids => [where('groupId', 'in', ids)]) : [[]]
         const counts = await Promise.all(pages.map(page => attendanceTotals(scoped('attendance', school.id, ...page, ...dates(from, to)))))
         const present = counts.reduce((n, c) => n + c.present, 0), absent = counts.reduce((n, c) => n + c.absent, 0)
@@ -305,16 +293,16 @@ export function getComparison(f: ReportFilters, sites: boolean) {
   })
 }
 
-async function coverageEvents(school: School, groups: Group[], students: Student[], moment: Moment, from: string, to: string) {
+async function coverageEvents(school: School, groups: Group[], students: Student[], moment: Moment, from: string, to: string, signal: AbortSignal) {
   const result = new Set<string>(), active = new Set(students.filter(s => s.active !== false && !s.retired).map(s => s.id))
   const key = (g: Group, id: string) => JSON.stringify([g.teacherId, g.subject, id])
-  for (const subject of SUBJECTS) {
+  await Promise.all(SUBJECTS.map(async subject => {
     const local = groups.filter(g => g.subject === subject), members = [...new Set(local.flatMap(g => g.studentIds))].filter(id => active.has(id))
-    for (const ids of chunks(members, 30)) {
+    await mapBatches(chunks(members, 30), 4, async ids => {
       const base = scoped('evaluations', school.id, equal('subject', subject), equal('moment', moment), ...dates(from, to))
       const q = query(base, where('studentId', 'in', ids))
       const count = await total(q)
-      if (!count) continue
+      if (!count) return
       if (count <= ids.length) {
         for (const e of await rows<Evaluation>(q)) for (const g of local) {
           if (g.studentIds.includes(e.studentId) && (!e.groupId || e.groupId === g.id)) result.add(key(g, e.studentId))
@@ -325,22 +313,25 @@ async function coverageEvents(school: School, groups: Group[], students: Student
           const member = query(base, equal('studentId', id))
           const [first] = await rows<Evaluation>(query(member, limit(1)))
           if (!first) return
-          let historical: boolean | undefined
-          for (const g of local.filter(g => g.studentIds.includes(id))) {
-            if (!first.groupId || first.groupId === g.id || await total(query(member, equal('groupId', g.id)))) result.add(key(g, id))
-            else {
-              if (historical === undefined) historical = (await total(member)) > await total(query(member, orderBy('date'), orderBy('groupId')))
-              if (historical) result.add(key(g, id))
+          let historical: Promise<boolean> | undefined
+          await Promise.all(local.filter(g => g.studentIds.includes(id)).map(async g => {
+            if (!first.groupId || first.groupId === g.id || await total(query(member, equal('groupId', g.id), limit(1)))) {
+              result.add(key(g, id))
+              return
             }
-          }
+            // Older evaluations omit groupId and apply to every matching group.
+            historical ??= Promise.all([total(member), total(query(member, orderBy('date'), orderBy('groupId')))])
+              .then(([all, withGroup]) => all > withGroup)
+            if (await historical) result.add(key(g, id))
+          }))
         }))
       }
-    }
-  }
+    }, signal)
+  }))
   return result
 }
 export function getFollowup(f: ReportFilters, selected?: Moment, uid?: string) {
-  return cached('followup', { ...f, selected, uid }, async p => {
+  return cached('followup', { ...f, selected, uid }, async (p, signal) => {
     if (p.rol === 'docente') fail(403, 'Necesitas un perfil de gestión.')
     const { visible, config, from, to } = await context(p, f)
     const directories = await Promise.all(visible.map(async school => {
@@ -360,12 +351,12 @@ export function getFollowup(f: ReportFilters, selected?: Moment, uid?: string) {
     }
     const weeks = weeksIn(config, from, to)
     const teachers = (await Promise.all(directories.map(async ({ school, allGroups, students, directoryRows, memberPages }) => {
-      const evaluated = await coverageEvents(school, allGroups, students, moment, from, to)
+      const evaluated = await coverageEvents(school, allGroups, students, moment, from, to, signal)
       const active = new Set(students.filter(s => s.active !== false && !s.retired).map(s => s.id))
       return Promise.all(directoryRows.filter(t => (!uid || t.uid === uid) && (!f.campus || allGroups.some(g => g.teacherId === t.uid))).map(async t => {
         const groups = allGroups.filter(g => g.teacherId === t.uid), teacher = equal('teacherId', t.uid)
         const pages = f.campus ? chunks(allGroups.map(g => g.id), 30).map(ids => [where('groupId', 'in', ids)]) : [[]]
-        const hits = await Promise.all(weeks.map(async w => (await Promise.all(pages.map(page => total(scoped('attendance', school.id, teacher, ...page, ...dates(w.from, w.to)))))).some(Boolean)))
+        const hits = await Promise.all(weeks.map(async w => (await Promise.all(pages.map(page => total(scoped('attendance', school.id, teacher, ...page, ...dates(w.from, w.to), limit(1)))))).some(Boolean)))
         const h = await hoursTotal(scoped('hours', school.id, teacher, ...dates(from, to)))
         const recent = (path: string, extra: ReturnType<typeof equal>[]) => rows<{ savedAt: string }>(scoped(path, school.id, teacher, ...extra, ...dates(from, to),
           where('savedAt', '>=', ''), orderBy('savedAt', 'desc'), orderBy('date'), limit(1)))

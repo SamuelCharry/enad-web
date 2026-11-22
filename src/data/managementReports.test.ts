@@ -1,7 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest'
 import { readCounter } from './testing/readCounter'
 import type { School, UserProfile } from '../domain/types'
-import { getLevels, getComparison, getMovement, refreshReports } from './reports'
+import { getAttendanceReport, getLevels, getComparison, getMovement, getSummary, refreshReports } from './reports'
 const source = vi.hoisted(() => ({
   profile: { uid: 'p', rol: 'coordinador', activo: true, regions: ['Centro'], schoolIds: [], campusIds: {}, fullName: 'Sol', email: 's@example.test', jornada: 'única' } as UserProfile,
  }))
@@ -42,4 +42,34 @@ it('bloquea la comparación fuera del ámbito y las cuentas docentes', async () 
   await expect(getComparison({schoolId:'otra'},false)).rejects.toMatchObject({status:403})
   source.profile.rol='docente'
   await expect(getComparison({},false)).rejects.toMatchObject({status:403})
+})
+
+it('cuenta una sesión por grupo y día y conserva al suplente y al grupo eliminado', async () => {
+  const date = '2026-04-02'
+  for (const groupId of ['g2', 'g1']) store.put('groups/' + groupId, { schoolId: school.id, name: groupId })
+  const marks = [['g1', 'a', 'vino'], ['g1', 'b', 'no_vino'], ['g2', 'a', 'vino'], ['eliminado', 'b', 'vino']]
+  marks.forEach(([groupId, teacherId, status], i) => store.put(`students/s${i}/attendance/m`, {
+    schoolId: school.id, date, groupId, teacherId, status, savedAt: date
+  }))
+  const report = await getAttendanceReport({ schoolId: school.id, from: date, to: date })
+  expect(report.bySchool[0]).toMatchObject({ sessions: 3, present: 3, absent: 1 })
+  expect(report.byTeacher).toEqual(expect.arrayContaining([
+    expect.objectContaining({ uid: 'a', sessions: 2, rate: 100 }),
+    expect.objectContaining({ uid: 'b', sessions: 2, rate: 50 })
+  ]))
+  expect(report.byGroup.find(g => g.groupId === 'eliminado')).toMatchObject({ sessions: 1, name: 'Grupo eliminado' })
+})
+
+it('respeta las fechas parciales y el padrón de la sede al contar estudiantes distintos', async () => {
+  const filters = { schoolId: school.id, from: '2026-04-02', to: '2026-04-03' }
+  for (const [id, campus, date, status] of [
+    ['s', 'Central', '2026-04-02', 'vino'], ['s', 'Central', '2026-04-03', 'vino'],
+    ['otra', 'Sur', '2026-04-02', 'vino'], ['antes', 'Central', '2026-04-01', 'vino'],
+    ['ausente', 'Central', '2026-04-02', 'no_vino']
+  ]) {
+    if (id !== 's') store.put('students/' + id, { schoolId: school.id, campus })
+    store.put(`students/${id}/attendance/${date}`, { schoolId: school.id, studentId: id, date, status })
+  }
+  expect((await getSummary(filters)).studentsOverTime).toEqual([{ week: 1, count: 2 }])
+  expect((await getSummary({ ...filters, campus: 'c' })).studentsOverTime).toEqual([{ week: 1, count: 1 }])
 })

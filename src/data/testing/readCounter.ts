@@ -27,6 +27,7 @@ export function readCounter() {
     reads.requests.push(q)
     const constraints = q.constraints ?? [], orders = constraints.filter(f => f.op === 'order')
     const after = constraints.find(f => f.op === 'cursor')?.value as unknown[] | undefined
+    const end = constraints.find(f => f.op === 'endAt')?.value as unknown[] | undefined
     const take = constraints.find(f => f.op === 'limit')?.value as number | undefined
     let list = (collections.get(q.path) ?? []).filter(row => constraints.every(({ field: name, op, value }) => {
       const v = field(row, name)
@@ -36,7 +37,7 @@ export function readCounter() {
         case '>=': return v !== undefined && compare(v, value) >= 0
         case '<=': return v !== undefined && compare(v, value) <= 0
         case 'order': return v !== undefined
-        case 'limit': case 'cursor': return true
+        case 'limit': case 'cursor': case 'endAt': return true
         default: throw Error('Unsupported fixture query ' + op)
       }
     }))
@@ -49,6 +50,7 @@ export function readCounter() {
         return 0
       }
       if (after) list = list.filter(r => order(r, after) > 0)
+      if (end) list = list.filter(r => order(r, end) <= 0)
       list.sort((a, b) => order(a, orders.map(o => field(b, o.field))))
     }
     return take === undefined ? list : list.slice(0, take)
@@ -66,6 +68,7 @@ export function readCounter() {
   const sdk = {
     where, doc: child, collection: child, collectionGroup: (_db: Ref, path: string) => ({ path, group: true }), documentId: () => '__name__',
     orderBy: (field: string, dir = 'asc') => where(field, 'order', dir), limit: (n: number) => where('', 'limit', n), startAfter: (...values: unknown[]) => where('', 'cursor', values),
+    endAt: (...values: unknown[]) => where('', 'endAt', values),
     query: (q: Ref, ...extra: Filter[]) => ({ ...q, constraints: [...(q.constraints ?? []), ...extra] }),
     getDocsFromCache: async () => ({ docs: [] }),
     getDocs: async (q: Ref) => page(q), getDoc: async (q: Ref) => { reads.documents++; return snap(q.path) },

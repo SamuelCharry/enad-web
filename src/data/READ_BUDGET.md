@@ -20,10 +20,10 @@ Se ejecutaron las pantallas anteriores y las actuales sobre los mismos datos de 
 | Docente · Horas | 125 | 65 | — |
 | Docente · Grupos | 69 | 69 | — |
 | Docente · Estudiantes | 64 | 64 | — |
-| Informe · Resumen | 16.363 | 999 | 8 |
+| Informe · Resumen | 16.363 | 1.375 | 8 |
 | Informe · Seguimiento | 16.039 | 89 | 8 |
 | Informe · Instituciones | 11 | 7 | 7 |
-| Informe · Horas y asistencia | 16.095 | 629 | 9 |
+| Informe · Horas y asistencia | 16.095 | 754 | 9 |
 | Informe · Niveles | 1.274 | 149 | 8 |
 | Informe · Seguimiento docente | 18.363 | 819 | 8 |
 | Informe · Comparación | 18.363 | 644 | 8 |
@@ -35,6 +35,8 @@ Se ejecutaron las pantallas anteriores y las actuales sobre los mismos datos de 
 | Administración · Configuración | 2 | 2 | — |
 | Administración · Calidad | 354 | 345 | — |
 | Administración · Importaciones | 15 | 15 | — |
+
+En Resumen, una semana con pocas marcas de asistencia se resuelve con una consulta de documentos. Para las semanas con muchas marcas, el informe lee el padrón de la institución una sola vez y usa sus identificadores para dividir la búsqueda en hasta 30 rangos simultáneos. Los rangos también cubren a estudiantes que ya salieron del padrón. La prueba de latencia usa un reloj simulado, con 250 ms por consulta de documentos y 7 s para la suma de horas. Comprueba que el informe completo está disponible a los 8 s.
 
 ## Índices para el despliegue
 

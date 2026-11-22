@@ -1,6 +1,6 @@
-import { collection, collectionGroup, getAggregateFromServer, getCountFromServer, getDocs, limit, orderBy, query, startAfter, sum, where, type Query, type QueryConstraint } from 'firebase/firestore'
+import { collection, collectionGroup, endAt, getAggregateFromServer, getCountFromServer, getDocs, limit, orderBy, query, startAfter, sum, where, type Query, type QueryConstraint } from 'firebase/firestore'
 import { db } from './firebase'
-import { recordOf } from './core'
+import { chunks, recordOf } from './core'
 import type { AttendanceMark } from '../domain/types'
 
 export const equal = (field: string, value: unknown) => where(field, '==', value)
@@ -24,21 +24,65 @@ export async function attendanceTotals(q: Query) {
   const [present, absent] = await Promise.all(['vino', 'no_vino'].map(status => total(query(q, equal('status', status)))))
   return { present, absent }
 }
-export type SessionMark = AttendanceMark & { present: number; absent: number }
-/** Seek past all marks of each group/teacher/day. A deleted group or a substitute
- * teacher still appears. Only one actual mark is downloaded per session. */
-export async function sessions(base: Query, from: string, to: string, signal?: AbortSignal) {
-  const ordered = query(base, ...dates(from, to), orderBy('date'), orderBy('groupId'), orderBy('teacherId'), orderBy('savedAt', 'desc'), limit(1))
-  const result: SessionMark[] = []
-  let page = ordered
-  for (; ;) {
+export async function mapBatches<T, R>(items: T[], size: number, read: (item: T) => Promise<R>, signal?: AbortSignal) {
+  const result: R[] = []
+  for (const batch of chunks(items, size)) {
     signal?.throwIfAborted()
-    const [mark] = await rows<AttendanceMark>(page)
-    if (!mark) return result
-    const totals = await attendanceTotals(query(base, equal('date', mark.date), equal('groupId', mark.groupId), equal('teacherId', mark.teacherId)))
-    result.push({ ...mark, ...totals })
-    page = query(ordered, startAfter(mark.date, mark.groupId, mark.teacherId))
+    result.push(...await Promise.all(batch.map(read)))
   }
+  return result
+}
+
+export type SessionMark = AttendanceMark & { present: number; absent: number }
+/** Split an ordered index at known keys. The open ends also cover historical
+ * records whose student or group no longer appears in the directory. */
+function splitKeys(size: number, keyAt: (i: number) => string[], minSize: number) {
+  const stride = Math.max(minSize, Math.ceil(size / 30))
+  const keys: string[][] = []
+  for (let i = stride; i < size; i += stride) keys.push(keyAt(i - 1))
+  return keys
+}
+
+async function distinctRows<T>(ordered: Query, splits: string[][], key: (row: T) => string[], signal?: AbortSignal) {
+  const ranges = await Promise.all([...splits, undefined].map(async (end, i) => {
+    const range = end ? query(ordered, endAt(...end)) : ordered
+    let page = i ? query(range, startAfter(...splits[i - 1])) : range
+    const result: T[] = []
+    for (;;) {
+      signal?.throwIfAborted()
+      const [row] = await rows<T>(page)
+      if (!row) return result
+      result.push(row)
+      const cursor = key(row)
+      if (end?.length === cursor.length && end.every((v, i) => v === cursor[i])) return result
+      page = query(range, startAfter(...cursor))
+    }
+  }))
+  return ranges.flat()
+}
+
+/** IDs are in Firestore document ID order, which matches the indexed string field. */
+export function distinctStudentRows<T>(ordered: Query, studentIds: string[], key: (row: T) => string[], signal: AbortSignal) {
+  return distinctRows(ordered, splitKeys(studentIds.length, i => [studentIds[i]], 8), key, signal)
+}
+
+export async function sessions(base: Query, from: string, to: string, groupIds: string[], signal?: AbortSignal): Promise<SessionMark[]> {
+  const ordered = query(base, ...dates(from, to), orderBy('date'), orderBy('groupId'), orderBy('teacherId'), orderBy('savedAt', 'desc'))
+  signal?.throwIfAborted()
+  const maxRanges = await total(query(ordered, limit(30)))
+  if (!maxRanges) return []
+  const start = Date.parse(from), day = 86_400_000
+  const days = 1 + (Date.parse(to) - start) / day
+  const groupsPerDay = Math.max(1, groupIds.length)
+  const slots = days * groupsPerDay
+  const splits = splitKeys(slots, i => {
+    const date = new Date(start + Math.floor(i / groupsPerDay) * day).toISOString().slice(0, 10)
+    return groupIds.length ? [date, groupIds[i % groupsPerDay]] : [date]
+  }, Math.ceil(slots / maxRanges))
+  const marks = await distinctRows<AttendanceMark>(query(ordered, limit(1)), splits, m => [m.date, m.groupId, m.teacherId], signal)
+  return mapBatches(marks, 30, async mark => ({
+    ...mark, ...await attendanceTotals(query(base, equal('date', mark.date), equal('groupId', mark.groupId), equal('teacherId', mark.teacherId)))
+  }), signal)
 }
 
 /** Older roster records may omit the flags. Only explicit retirement or
@@ -51,18 +95,18 @@ export async function enrollment(q: Query) {
   return all - retired - inactive + both
 }
 
-/** Firestore has no COUNT DISTINCT. An inclusive week fits one IN query.
- * Seek past each studentId, including students removed from the current roster. */
-export async function distinctPresent(schoolId: string, from: string, to: string, signal: AbortSignal) {
+/** Read a sparse week in one request when it costs at most a roster read.
+ * For dense weeks, seek past duplicate marks
+ * in parallel using the same school roster for every week. */
+export async function distinctPresent(schoolId: string, from: string, to: string, rosterIds: () => Promise<string[]>, enrolled: Promise<number>, signal: AbortSignal) {
   const days: string[] = []
   for (let ms = Date.parse(from); ms <= Date.parse(to); ms += 86_400_000) days.push(new Date(ms).toISOString().slice(0, 10))
-  const base = scoped('attendance', schoolId, equal('status', 'vino'), where('date', 'in', days), orderBy('studentId'), limit(1))
-  let page = base, count = 0
-  for (; ;) {
-    signal.throwIfAborted()
-    const [mark] = await rows<AttendanceMark>(page)
-    if (!mark) return count
-    count++
-    page = query(base, startAfter(mark.studentId))
-  }
+  const week = scoped('attendance', schoolId, equal('status', 'vino'), where('date', 'in', days), orderBy('studentId'))
+  signal.throwIfAborted()
+  const [count, students] = await Promise.all([total(week), enrolled])
+  if (!count) return 0
+  signal.throwIfAborted()
+  if (count <= Math.max(30, students)) return new Set((await rows<AttendanceMark>(week)).map(m => m.studentId)).size
+  const ordered = query(week, limit(1))
+  return (await distinctStudentRows<AttendanceMark>(ordered, await rosterIds(), m => [m.studentId], signal)).length
 }

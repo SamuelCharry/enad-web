@@ -71,10 +71,52 @@ it('calcula sesiones compartidas una sola vez y usa únicamente los momentos sel
   expect(attendance.bySchool.reduce((n, s) => n + s.present, 0)).toBe(1125)
   expect(summary.studentsOverTime).toEqual([7, 8, 9, 10].map(week => ({ week, count: 225 })))
   expect(summary.hoursWorked).toBe(1500)
+  for (const [id, moment, level, savedAt] of [
+    ['base', 'linea_base', 'letra', '2026-09-15'], ['early', 'linea_media_1', 'cuento', '2026-11-16'],
+    ['correction', 'linea_media_1', 'principiante', '2026-11-17']
+  ]) {
+    store.put('students/antiguo/evaluations/' + id, { studentId: 'antiguo', schoolId: 'ie0', subject: 'lectura', moment, level, date: savedAt, savedAt })
+  }
   const moves = await getMovement({ from: '2026-09-14', to: '2026-11-20', schoolId: 'ie0' }, 'lectura', 'linea_base', 'linea_media_1')
-  expect(moves[0].up).toBe(24)
+  expect(moves[0]).toMatchObject({ up: 24, down: 1 })
   const evaluationQueries = store.reads.requests.filter(q => q.path === 'evaluations')
   expect(evaluationQueries.every(q => q.constraints?.some(f => f.field === 'moment' && f.op === 'in'))).toBe(true)
+})
+
+it('resuelve el resumen de fundación con sondas simultáneas dentro de una misma semana e institución', async () => {
+  auth.currentUser.uid = semester(store, 'fundacion').uid
+  // Historical IDs on both open ends of the roster still count once per week.
+  for (const studentId of ['antiguo', 'z-retirado']) {
+    for (const date of ['2026-11-16', '2026-11-17']) {
+      store.put(`students/${studentId}/attendance/${date}`, { schoolId: 'ie0', studentId, date, status: 'vino' })
+    }
+  }
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+  try {
+    const delay = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms))
+    const { getDocs, getAggregateFromServer } = store.sdk
+    let inFlight = 0, peak = 0
+    vi.spyOn(store.sdk, 'getDocs').mockImplementation(async q => {
+      const oneWeek = q.path === 'attendance' && q.constraints?.some(f => f.field === 'schoolId' && f.value === 'ie0') &&
+        q.constraints.some(f => f.field === 'date' && f.op === 'in' && (f.value as string[]).includes('2026-11-16'))
+      if (oneWeek) peak = Math.max(peak, ++inFlight)
+      await delay(250)
+      if (oneWeek) inFlight--
+      return getDocs(q)
+    })
+    vi.spyOn(store.sdk, 'getAggregateFromServer').mockImplementation(async (q, fields) => {
+      await delay(7000)
+      return getAggregateFromServer(q, fields)
+    })
+    const completed = vi.fn()
+    const pending = getSummary({}).then(completed)
+    await vi.advanceTimersByTimeAsync(8000)
+    expect(peak).toBeGreaterThan(1)
+    expect(completed).toHaveBeenCalledWith(expect.objectContaining({
+      studentsOverTime: [{ week: 7, count: 225 }, { week: 8, count: 225 }, { week: 9, count: 225 }, { week: 10, count: 227 }]
+    }))
+    await pending
+  } finally { vi.useRealTimers() }
 })
 
 const tabs = [
