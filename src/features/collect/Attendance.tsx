@@ -105,7 +105,7 @@ function AttendanceSheet({ date, group, students, draft, setDraft, setSaving, sc
     }}>Marcar a todos presentes</Button>}
     {roster.map(s => <div className="collect-row" key={s.id}>
       <div><Button variant="ghost" disabled={action.busy} aria-label={'Alternar asistencia de ' + s.fullName} onClick={() => mark(s.id, status(s.id) === 'vino' ? 'no_vino' : 'vino')}>{s.fullName}</Button><small>{s.code} · Grado {s.grade}°</small>
-        {changes[s.id] ? <small>Por guardar</small> : baseline[s.id] ? <SyncStatus pending={pending.has(s.id)} /> : <small>Sin registrar</small>}
+        {changes[s.id] ? <small>Sin guardar</small> : baseline[s.id] ? <SyncStatus pending={pending.has(s.id)} /> : <small>Sin registrar</small>}
         {school && <Link to={collectLink('estudiantes', { school: s.schoolId, campus: s.campus, student: s.id })}>Ver perfil</Link>}</div>
       <div className="collect-actions" role="group" aria-label={'Asistencia de ' + s.fullName}>
         {(['vino', 'no_vino', 'retirado'] as const).map((id,i) => <Button key={id} aria-pressed={status(s.id) === id} disabled={action.busy} onClick={() =>

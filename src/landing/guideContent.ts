@@ -31,37 +31,40 @@ export const stepsByRole: Record<GuideRole, GuideStep[]> = {
     {
       title: 'Empezar desde Hoy',
       actions: [
-        'En Hoy, toca Reportar asistencia para abrir la lista de tu grupo, o Evaluación formativa para registrar un nivel.',
-        'Usa la barra inferior para pasar a Grupos, Horas o Mis datos. Toca Hoy para volver a los accesos de clase.',
+        'Revisa la fecha y la semana de implementación. Toca el botón principal para abrir la siguiente tarea pendiente. Verás Registrar asistencia o Evaluar junto al nombre del grupo.',
+        'Elige el Momento de evaluación. En la fila de cada grupo, consulta cuántos estudiantes tienen marca en Asistencia de hoy y cuántos tienen nivel en Evaluación.',
+        'Usa los accesos Evaluación formativa, Reportar horas o Escanear lista según la tarea. Toca Ayuda para abrir una guía paso a paso.',
       ],
-      portal: 'Desde Inicio, abre Recolección de datos para registrar tu clase. En Visualización de datos encuentras Mis datos.',
-      image: { file: '02_docente_hoy', alt: 'Pantalla Hoy con los grupos del docente y los accesos a Evaluación formativa y Reportar asistencia.' },
+      portal: 'En Hoy, busca tu grupo o elige una tarea en Registro de clase.',
+      image: { file: '02_docente_hoy', alt: 'Hoy muestra el botón Registrar asistencia · Abejitas, el momento de evaluación y los conteos de asistencia y evaluación de cada grupo.' },
     },
     {
       title: 'Guardar la asistencia',
       actions: [
         'Abre Asistencia, elige uno de tus grupos y revisa la fecha de la clase.',
-        'Marca Asistió o No asistió junto a cada nombre. Usa Retirado solo si el estudiante se retiró y confirma la decisión. Al guardar, también quedará retirado en su ficha.',
-        'Cuando todos tengan una marca, toca Guardar asistencia. Por guardar indica que aún falta ese toque. Pendiente de envío indica que la marca ya quedó en el dispositivo. Guardado indica que el servidor la confirmó.',
+        'Marca Asistió o No asistió junto a cada nombre. Si el estudiante se retiró, toca Retirado y confirma. El retiro quedará en su ficha al guardar.',
+        'Revisa el porcentaje de estudiantes que asistieron y cuántos quedan por marcar. Las filas que cambiaste dicen Sin guardar hasta que guardes la lista.',
+        'Cuando todos tengan una marca, toca Guardar asistencia. Pendiente de envío indica que la marca ya quedó en tu dispositivo. Guardado confirma que el servidor la recibió.',
       ],
       portal: 'En Recolección de datos, elige Asistencia. Revisa la institución, el grupo y la fecha antes de marcar la lista.',
-      image: { file: '05_docente_asistencia_guardada', alt: 'Lista de asistencia con Asistió seleccionado y el estado Guardado junto a los estudiantes.' },
+      image: { file: '05_docente_asistencia_guardada', alt: 'Asistencia de Abejitas. El encabezado indica «Asistió el 100 % de los estudiantes» y «0 por marcar · 0 sin guardar». Las filas muestran Guardado.' },
     },
     {
       title: 'Evaluar por nivel',
       actions: [
-        'Desde Hoy, abre Evaluación formativa y elige Lectura o Matemáticas. Selecciona el momento de evaluación, por ejemplo, Línea base.',
-        'Revisa la sede. Elige un grupo o consulta todos los estudiantes de la sede. Toca el nombre de quien vas a evaluar.',
-        'Revisa el sexo, la edad y la muestra. Marca el nivel que alcanzó en esa materia y toca Guardar evaluación antes de pasar al siguiente estudiante.',
+        'Desde Hoy, abre Evaluación formativa y elige Lectura o Matemáticas. Selecciona el momento de evaluación y revisa la sede. Elige un grupo o deja Todos mis estudiantes de la sede.',
+        'Consulta la leyenda al pie de la lista. En la fila de cada estudiante, toca el nivel que alcanzó, del 1 al 6. Cada cambio queda Sin guardar.',
+        'Si aparece Completar datos del perfil, toca el ícono de persona. Completa solo lo que falte de sexo, edad o muestra y toca Guardar datos. En ese perfil también encontrarás Retirar estudiante.',
+        'Toca Guardar al pie de la pantalla para guardar todas las filas marcadas. El número entre paréntesis indica cuántas son. Para deshacer esos cambios, toca Descartar.',
       ],
       portal: 'En Recolección de datos, abre Evaluación formativa. Selecciona la materia y el momento para ver la lista.',
-      image: { file: '09_docente_evaluado', alt: 'Ficha de Lectura con sexo, edad, muestra y el nivel Párrafo seleccionado para un estudiante evaluado.' },
+      image: { file: '09_docente_evaluado', alt: 'Lista de Lectura con un nivel marcado por estudiante. La leyenda identifica el 4 como Párrafo y el 3 como Palabra. Al pie aparece Guardar (0).' },
     },
     {
       title: 'Organizar tus grupos',
       actions: [
         'En Grupos, elige la institución, la sede y la materia. Toca Crear grupo, escribe el nombre y confirma.',
-        'Abre tu grupo y toca Añadir al grupo para escoger estudiantes. Para quitar a alguien, usa la opción junto a su nombre y confirma. Los grupos de otros docentes son de solo lectura.',
+        'Abre tu grupo y toca Añadir al grupo para escoger estudiantes. Para quitar a alguien, abre el menú junto a su nombre, toca Quitar del grupo y confirma. Los grupos de otros docentes son de solo lectura.',
         'Para agrupar por nivel, toca Sugerir grupos. Indica cuántos docentes participarán y toca Ver propuesta. Elige el grupo que acompañarás, revisa sus integrantes y toca Aceptar mi grupo.',
       ],
       portal: 'Abre Grupos en Recolección de datos. Selecciona la sede y la materia antes de crear tu grupo o pedir una propuesta.',
@@ -70,8 +73,8 @@ export const stepsByRole: Record<GuideRole, GuideStep[]> = {
     {
       title: 'Registrar tus horas',
       actions: [
-        'En Horas, revisa la semana de implementación y toca el día que vas a reportar. Si trabajas en varias instituciones, elige la correspondiente.',
-        'Escribe las horas programadas y las realizadas ese día. Si realizaste menos de las programadas, elige un motivo y escribe el detalle.',
+        'En Horas, revisa la semana y toca el día que vas a reportar. Usa Cambiar semana si necesitas otra fecha. Si trabajas en varias instituciones, elige la correspondiente.',
+        'Completa Horas programadas y Horas realizadas. Si trabajaste menos horas de las programadas, selecciona el Motivo de horas no realizadas y escribe el detalle.',
         'Toca Guardar. Si ya existe un reporte para esa institución y ese día, revisa los valores antes de confirmar el reemplazo.',
       ],
       portal: 'En Recolección de datos, abre Horas y selecciona la institución y la fecha del reporte.',
@@ -80,11 +83,12 @@ export const stepsByRole: Record<GuideRole, GuideStep[]> = {
     {
       title: 'Revisar Mis datos',
       actions: [
-        'Abre Mis datos para comprobar tu institución, sede y jornada. Si necesitas corregir tu nombre, toca Editar nombre y guarda el cambio.',
-        'Despliega Mis grupos y toca un grupo para revisar sus integrantes. Más abajo, consulta tus indicadores y el historial de horas de los últimos 30 días.',
+        'Abre Mis datos y revisa tu institución, sede y jornada. Para corregir tu nombre, toca Editar nombre, escríbelo y toca Guardar nombre.',
+        'Despliega Mis grupos y toca un grupo para ver sus integrantes. Para abrir la lista de estudiantes, toca Gestionar estudiantes.',
+        'Abre Reportes de horas para consultar lo que registraste en los últimos 30 días.',
       ],
       portal: 'Desde Inicio, entra en Visualización de datos. En Mis grupos puedes abrir un grupo y consultar el historial de un estudiante.',
-      image: { file: '15_docente_mis_datos', alt: 'Mis datos muestra el perfil docente, la institución, la sede y el apartado Mis grupos.' },
+      image: { file: '15_docente_mis_datos', alt: 'Mis datos muestra el perfil docente con Editar nombre, la sección Mis grupos y el botón Gestionar estudiantes.' },
     },
   ],
   seguimiento: [
@@ -92,10 +96,11 @@ export const stepsByRole: Record<GuideRole, GuideStep[]> = {
       title: 'Consultar el resumen',
       actions: [
         'Ingresa con tu cuenta de Coordinación o Fundación y abre Resumen. En el portal, empieza por Visualización de datos.',
-        'Revisa estudiantes, docentes, instituciones y sedes. Coordinación consulta sus regiones asignadas y Fundación consulta todo el programa. Ambos perfiles son de solo lectura.',
+        'En Por revisar, elige el momento de evaluación. Consulta los grupos sin evaluación, los docentes sin asistencia esta semana y las sedes con baja asistencia.',
+        'Consulta los totales en Alcance del informe. Coordinación puede consultar sus regiones asignadas y Fundación, todo el programa. Ambos perfiles son de solo lectura.',
         'Para acotar la consulta, abre Filtros. Elige proyecto, departamento o municipio según lo que necesites. Selecciona una institución para poder escoger su sede.',
       ],
-      image: { file: '20_fundacion_resumen', alt: 'Resumen del portal de fundación con Filtros y los totales de estudiantes, docentes, instituciones, sedes y grupos.' },
+      image: { file: '20_fundacion_resumen', alt: 'Resumen de Fundación con el selector de momento y las tres alertas de Por revisar. Debajo se ven los totales de estudiantes y docentes.' },
     },
     {
       title: 'Identificar envíos pendientes',
@@ -134,7 +139,7 @@ export const stepsByRole: Record<GuideRole, GuideStep[]> = {
     {
       title: 'Exportar a Excel',
       actions: [
-        'Comprueba los filtros del informe. Si necesitas una sola sede, selecciona primero su institución.',
+        'En ENAd Móvil, abre Resumen o Instituciones y revisa los filtros. Para exportar una sola sede, elige primero su institución.',
         'Toca Exportar Excel. En ENAd Móvil, elige dónde guardar o compartir el archivo. En el portal, búscalo en las descargas del navegador.',
       ],
     },
@@ -169,7 +174,7 @@ export const stepsByRole: Record<GuideRole, GuideStep[]> = {
       title: 'Configurar el programa',
       actions: [
         'Desde Carga de datos, abre Configuración del programa. Revisa el nombre del proyecto, el año y la fecha de inicio de implementación.',
-        'En Pausas y vacaciones, registra el nombre y las fechas de cada pausa. Revisa el calendario y toca Guardar configuración.',
+        'En Pausas y vacaciones, toca Añadir pausa. Escribe el nombre y elige las fechas en Desde y Hasta. Toca Guardar configuración.',
       ],
     },
     {
