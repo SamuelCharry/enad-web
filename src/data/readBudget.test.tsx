@@ -81,7 +81,7 @@ it('calcula sesiones compartidas una sola vez y usa únicamente los momentos sel
   expect(moves[0]).toMatchObject({ up: 24, down: 1 })
   const evaluationQueries = store.reads.requests.filter(q => q.path === 'evaluations')
   expect(evaluationQueries.every(q => q.constraints?.some(f => f.field === 'moment' && f.op === 'in'))).toBe(true)
-})
+}, 30_000) // Simulates a full semester in memory; shared CI runners need more than the 5 s default.
 
 it('resuelve el resumen de fundación con sondas simultáneas dentro de una misma semana e institución', async () => {
   auth.currentUser.uid = semester(store, 'fundacion').uid
