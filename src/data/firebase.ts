@@ -13,7 +13,7 @@ export const firebaseConfig = {
 }
 
 export const emulatorHost = import.meta.env.VITE_USE_EMULATORS === 'true' ? import.meta.env.VITE_EMULATOR_HOST || 'localhost' : undefined
-export const app = initializeApp(emulatorHost ? { ...firebaseConfig, projectId: 'demo-enad', authDomain: 'demo-enad.firebaseapp.com' } : firebaseConfig)
+export const app = initializeApp(emulatorHost ? { ...firebaseConfig, projectId: import.meta.env.VITE_EMULATOR_PROJECT_ID || 'demo-enad', authDomain: (import.meta.env.VITE_EMULATOR_PROJECT_ID || 'demo-enad') + '.firebaseapp.com' } : firebaseConfig)
 export const auth = getAuth(app)
 export const db = initializeFirestore(app, {
   localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
