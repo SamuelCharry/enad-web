@@ -1,4 +1,5 @@
 import type { Student } from '../domain/types'
+import { cleanName, validateName } from '../domain/text/studentNameRules'
 import { nameKey } from '../domain/nameKey'
 import { fail, str } from './core'
 
@@ -13,7 +14,7 @@ export interface StudentFields {
   campus?: unknown
 }
 /** Validates and whitelists student demographics and provisional identity fields. */
-export function studentFields(b: StudentFields) {
+export function studentFields(b: StudentFields, provisional = false) {
   const out: Partial<Student> = {}
   if ('gender' in b) {
     const gender = str(b.gender).toUpperCase()
@@ -38,8 +39,8 @@ export function studentFields(b: StudentFields) {
     out[key] = n
   }
   if ('fullName' in b) {
-    out.fullName = str(b.fullName).replace(/\s+/g, ' ')
-    if (!out.fullName) fail(400, 'Escribe el nombre del estudiante.')
+    out.fullName = cleanName(str(b.fullName))
+    if (out.fullName.length < 3 || out.fullName.length > 80 || (!provisional && validateName(out.fullName).includes('formato_nombre'))) fail(400, 'Escribe el nombre y los apellidos completos.')
     out.nameKey = nameKey(out.fullName)
   }
   if ('campus' in b) out.campus = str(b.campus)
@@ -47,8 +48,8 @@ export function studentFields(b: StudentFields) {
   return out
 }
 /** Builds a complete new Firestore student document. */
-export function newStudent(input: StudentFields, code: string, schoolId: string, uid: string, provisional: boolean, timestamp: string) {
-  const fields = studentFields({ ...input, fullName: input.fullName, grade: input.grade })
+export function newStudent(input: StudentFields, code: string, schoolId: string, uid: string, provisional: boolean, timestamp: string, allowFlaggedName = false) {
+  const fields = studentFields({ ...input, fullName: input.fullName, grade: input.grade }, allowFlaggedName)
   return {
     fullName: '',
     nameKey: '',

@@ -15,7 +15,7 @@ function Editor({activity,close}:{activity?:Activity; close:()=>void}) {
   const [form,set] = useState<ActivityFields>(activity || {title:'',subject:'lectura',levels:[],minutes:20,description:'',link:null,active:true})
   const action = useAction()
   return <Dialog title={activity ? 'Editar actividad' : 'Crear actividad'} onClose={close} busy={action.busy}>
-    <form onSubmit={e => { e.preventDefault(); void action.run(async () => {
+    <form noValidate onSubmit={e => { e.preventDefault(); void action.run(async () => {
       const {title,subject,levels,minutes,description,link,active} = form
       await saveActivity({title,subject,levels,minutes,description,link,active},activity?.id); close()
     }) }}><fieldset disabled={action.busy}>
@@ -28,9 +28,9 @@ function Editor({activity,close}:{activity?:Activity; close:()=>void}) {
       <Field label="Enlace opcional"><TextInput type="url" value={form.link || ''} onChange={e => set({...form,link:e.target.value})}/></Field>
       <label><input type="checkbox" checked={form.active} onChange={e => set({...form,active:e.target.checked})}/>Disponible para docentes</label>
       <Button variant="primary" type="submit">Guardar actividad</Button>
-      {activity && <Button variant="danger" onClick={() => {
-        if (window.confirm('¿Eliminar «'+activity.title+'» del catálogo?')) void action.run(async () => { await removeActivity(activity.id); close() })
-      }}>Eliminar actividad</Button>}</fieldset></form>{action.feedback}</Dialog>
+      {activity?.active && <Button variant="danger" onClick={() => {
+        if (window.confirm('¿Desactivar «'+activity.title+'» del catálogo?')) void action.run(async () => { await removeActivity(activity.id); close() })
+      }}>Desactivar actividad</Button>}</fieldset></form>{action.feedback}</Dialog>
 }
 function ActivityList({activities,edit,group,levels=[],current}:{activities:Activity[]; edit?:(a:Activity)=>void; group?:Group; levels?:string[]; current?:string}) {
   const [search,setSearch] = useState('')
@@ -44,7 +44,7 @@ function ActivityList({activities,edit,group,levels=[],current}:{activities:Acti
     {a.description && <p>{a.description}</p>}{a.link?.startsWith('https://') && <a href={a.link} target="_blank" rel="noreferrer">Abrir material</a>}
     {edit && <Button onClick={() => edit(a)}>Editar actividad</Button>}
     {group && <Button disabled={action.busy || current === a.id} onClick={() => {
-      if (!current || window.confirm('¿Cambiar la actividad de hoy por «'+a.title+'»?')) void action.run(() => planToday(group.id,a.id))
+      if (!current || window.confirm('¿Cambiar la actividad de hoy por «'+a.title+'»?')) void action.run(() => planToday(group.id,a.id),'')
     }}>{current === a.id ? 'En el plan de hoy' : 'Usar hoy'}</Button>}</article>)}
     {!visible.length && <p>{search ? 'No hay actividades con ese nombre o nivel.' : 'Todavía no hay actividades disponibles.'}</p>}{action.feedback}</>
 }

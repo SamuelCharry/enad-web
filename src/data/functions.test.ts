@@ -24,3 +24,8 @@ it('validates usernames locally and preserves callable errors in Spanish',async 
   mocks.call.mockRejectedValueOnce({code:'functions/permission-denied',message:'Solo puedes gestionar tu colegio.'})
   await expect(deleteAccount('otro')).rejects.toMatchObject({status:403,message:'Solo puedes gestionar tu colegio.'})
 })
+
+it('presenta el nombre de usuario duplicado sin el código del servicio',async () => {
+  mocks.call.mockRejectedValueOnce({code:'functions/invalid-argument',message:'Ese usuario ya existe. [400]'})
+  await expect(createAccount({username:'ana.paz',fullName:'Ana Paz',rol:'docente',schoolIds:['s']})).rejects.toMatchObject({status:409,message:'Ese usuario ya está en uso. Elige otro.'})
+})

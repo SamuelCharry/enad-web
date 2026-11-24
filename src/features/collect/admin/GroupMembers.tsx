@@ -18,10 +18,10 @@ export function GroupMembers({ group, students }: { group: Group; students: Stud
   return <section><h4>Integrantes de {group.name}</h4>
     <label><input type="checkbox" checked={membersOnly} onChange={e => setMembersOnly(e.target.checked)} /> Solo integrantes actuales</label>
     {!roster.length ? <p>Desmarca «Solo integrantes actuales» para buscar estudiantes de la institución.</p> :
-      <Directory title="Asignación al grupo" headers={['Estudiante', 'Código', 'Pertenencia']} rows={roster.map(s => {
+      <Directory showExport={false} title="Asignación al grupo" headers={['Estudiante', 'Código', 'Pertenencia']} rows={roster.map(s => {
         const member = members.has(s.id)
         return {
-          id: s.id, search: s.fullName + ' ' + s.code, cells: [member ? <label key="select"><input type="checkbox" checked={selected.includes(s.id)} onChange={e => setSelected(e.target.checked ? [...selected,s.id] : selected.filter(id => id !== s.id))}/>{s.fullName}</label> : s.fullName, s.code,
+          id: s.id, search: s.fullName + ' ' + s.code, cells: [member ? <label key="select"><input type="checkbox" aria-label={'Seleccionar a '+s.fullName+' para mover'} checked={selected.includes(s.id)} onChange={e => setSelected(e.target.checked ? [...selected,s.id] : selected.filter(id => id !== s.id))}/>{s.fullName}</label> : s.fullName, <span key="code">{s.code}{teams.groups.filter(g => g.subject === group.subject && g.studentIds.includes(s.id)).length > 1 && <small> · Pertenece a varios grupos de esta área</small>}</span>,
           <Button key="pertenencia" disabled={action.busy} onClick={() => {
             if (member && !window.confirm('¿Quitar a ' + s.fullName + ' del grupo ' + group.name + '?')) return
             void action.run(() => member ? removeStudentFromGroup(group.id, s.id) : addStudentsToGroup(group.id, [s.id]),
@@ -30,11 +30,11 @@ export function GroupMembers({ group, students }: { group: Group; students: Stud
         }
       })} />}
     {teams.error && <p role="alert">{teams.error}</p>}
-    {selected.length > 0 && <><Choice label="Mover a…" options={destinations} placeholder="Selecciona el grupo" value={into} onChange={setInto}/>
-      <Button disabled={!into || action.busy} onClick={() => {
-        if (window.confirm('¿Mover '+selected.length+' estudiantes a '+destinations.find(g => g.id === into)?.name+'?'))
+    <Choice label="Mover a…" options={destinations} placeholder="Selecciona el grupo" value={into} onChange={setInto}/>
+      <Button disabled={!selected.length || !into || action.busy} onClick={() => {
+        if (window.confirm('¿Mover '+selected.length+(selected.length === 1 ? ' estudiante a ' : ' estudiantes a ')+destinations.find(g => g.id === into)?.name+'?'))
           void action.run(async () => { const revert = await moveMembers(group.id,into,selected); setUndo(() => revert); setSelected([]) },'')
-      }}>Mover estudiantes</Button></>}
+      }}>Mover estudiantes</Button>
     {undo && <div className="ui-toast"><span role="status">Estudiantes trasladados.</span><Button disabled={action.busy} onClick={() => action.run(async () => {
       await undo(); setUndo(undefined)
     },'Traslado deshecho.')}>Deshacer traslado</Button></div>}{action.feedback}

@@ -1,7 +1,8 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
-import type { Group, Student } from '../../domain/types'
+import { MemoryRouter } from 'react-router-dom'
+import type { Group, School, Student } from '../../domain/types'
 import { saveGroupAttendance, useSchoolAttendance } from '../../data/attendance'
 import { useGroups } from '../../data/groups'
 import { saveHours, useMyHours } from '../../data/hours'
@@ -155,6 +156,23 @@ it('uses one searchable group control for a teacher with many groups',() => {
   render(<Attendance schoolId="s"/>)
   const field = screen.getByRole('combobox',{name:'Grupo'})
   expect(field.tagName).toBe('INPUT')
-  fireEvent.change(field,{target:{value:'Lectura 11 · c'}})
+  fireEvent.change(field,{target:{value:'ra 11'}})
   expect(screen.getByRole('heading',{name:'Lectura 11'})).toBeVisible()
+})
+
+it('busca una parte del nombre en diez grupos y recuerda la selección solo para ese docente', () => {
+  const groups = Array.from({length:10},(_,i) => ({...group,id:'interno-'+i,name:i===7 ? 'Las Garzas' : 'Grupo '+i}))
+  vi.mocked(useGroups).mockReturnValue({groups,loading:false,error:undefined})
+  const schools = [{id:'s',name:'Institución José',campuses:[{id:'c',name:'Sede Principal'}]}] as School[]
+  const show = (uid:string) => render(<MemoryRouter><Attendance schools={schools} uid={uid}/></MemoryRouter>)
+  const page = show('maestra-a')
+  fill('Grupo','garz')
+  expect(screen.getByRole('group',{name:'Asistencia de Alba'})).toBeVisible()
+  expect(screen.queryByText('Asistió el 0 %')).toBeNull()
+  page.unmount()
+  const restored = show('maestra-a')
+  expect(screen.getByLabelText('Grupo')).toHaveValue('Las Garzas · Sede Principal')
+  restored.unmount()
+  show('maestra-b')
+  expect(screen.getByLabelText('Grupo')).toHaveValue('')
 })

@@ -1,6 +1,7 @@
 const paths = {
   home: 'm3 10 9-7 9 7v11h-6v-7H9v7H3z',
   groups: 'M2 20v-2a5 5 0 0 1 10 0v2M7 4a3 3 0 1 0 .01 0M15 4a3 3 0 1 1 0 6m0 3a6 6 0 0 1 7 6',
+  student: 'm2 9 10-5 10 5-10 5L2 9zm4 3v5c4 3 8 3 12 0v-5m4-3v7',
   person: 'M12 3a4 4 0 1 0 .01 0M4 21v-2a8 8 0 0 1 16 0v2',
   upload: 'M12 17V3m-6 6 6-6 6 6M3 17v4h18v-4',
   download: 'M12 3v14m-6-6 6 6 6-6M3 17v4h18v-4',

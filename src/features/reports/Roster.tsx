@@ -1,3 +1,4 @@
+import { classDate } from '../../domain/weeks'
 import { getGroupRoster } from '../../data/reports'
 import { useGroups } from '../../data/groups'
 import { useState } from 'react'
@@ -26,12 +27,12 @@ export function StudentDetail({ student, onBack, backLabel = 'Volver al grupo' }
     <Card><h3>Historial de evaluaciones</h3>{h.evaluations.length ? [...h.evaluations]
       .sort((a,b) => b.date.localeCompare(a.date) || b.savedAt.localeCompare(a.savedAt))
       .map(e => <div className="teacher-record" key={e.id}><strong>{subjectLabel(e.subject)} · {momentLabel(e.moment)}</strong>
-        <p><time>{e.date}</time> · <LevelChip subject={e.subject} level={e.level} /></p></div>) :
+        <p><time>{classDate(e.date)}</time> · <LevelChip subject={e.subject} level={e.level} /></p></div>) :
       <EmptyState title="Registra el primer nivel desde Evaluación formativa." />}</Card>
     <Card><h3>Historial de asistencia</h3>
       {h.attendance.some(m => m.status !== 'retirado') && <p>{h.attendance.filter(m => m.status === 'vino').length} de {h.attendance.filter(m => m.status !== 'retirado').length} sesiones con asistencia</p>}
       {h.attendance.length ? [...h.attendance].sort((a,b) => b.date.localeCompare(a.date)).map(a =>
-        <div className="teacher-record" key={JSON.stringify([a.groupId,a.date])}><strong>{a.date} · {groups.find(g => g.id === a.groupId)?.name || a.groupId}</strong>
+        <div className="teacher-record" key={JSON.stringify([a.groupId,a.date])}><strong>{classDate(a.date)} · {groups.find(g => g.id === a.groupId)?.name || a.groupId}</strong>
           <p>{statusLabels[a.status]}</p></div>) : <EmptyState title="Toma asistencia desde el grupo del estudiante." />}</Card>
   </>}</ReportRead></>
 }

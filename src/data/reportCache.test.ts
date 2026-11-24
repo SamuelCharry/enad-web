@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { cachedResult, reportCache, reportTtl } from './reportCache'
+import { cachedResult, reportCache, reportTtl, reportWidgets } from './reportCache'
 
 beforeEach(() => reportCache.clear())
 afterEach(() => vi.restoreAllMocks())
@@ -26,4 +26,16 @@ it('una invalidación impide que una consulta anterior repueble sessionStorage',
   await pending
   expect(Object.keys(sessionStorage).filter(k => k.startsWith('enad:report:'))).toEqual([])
   expect(await cachedResult('old', async () => 2)).toBe(2)
+})
+
+it('entrega los indicadores disponibles antes del vencimiento de la página',async () => {
+  vi.useFakeTimers()
+  try {
+    const {widget,unavailable}=reportWidgets()
+    const slow=widget('Horas',new Promise<number>(()=>{}),0)
+    expect(await widget('Asistencia',Promise.resolve(9),0)).toBe(9)
+    await vi.advanceTimersByTimeAsync(15_000)
+    expect(await slow).toBe(0)
+    expect([...unavailable]).toEqual(['Horas'])
+  } finally { vi.useRealTimers() }
 })

@@ -20,6 +20,7 @@ async function invoke<T>(name: string, payload: object): Promise<T> {
       'functions/permission-denied':403, 'functions/unauthenticated':401, 'functions/not-found':404,
       'functions/invalid-argument':400, 'functions/already-exists':409, 'functions/failed-precondition':409,
     }
+    if (name === 'createAccount' && (code === 'functions/already-exists' || /already.in.use|already.exists|ya existe|ya está en uso|email-already/i.test((error as Error).message))) throw new ApiError(409,'Ese usuario ya está en uso. Elige otro.')
     if (code && statuses[code]) throw new ApiError(statuses[code], (error as Error).message)
     throw new ApiError(503, 'No se pudo completar la solicitud. Revisa tu conexión e intenta de nuevo.')
   }

@@ -4,7 +4,7 @@ import type { HoursEntry, ProgramConfig } from '../../domain/types'
 import { saveHours, useMyHours } from '../../data/hours'
 import { useProgramConfig } from '../../data/scope'
 import { cleanDetail, formatReason, parseReason, REASON_CATEGORIES, validateHours } from '../../domain/hoursReason'
-import { colombiaToday, rangeOf, weekOf } from '../../domain/weeks'
+import { classDate, colombiaToday, rangeOf, weekOf } from '../../domain/weeks'
 import { Button, Card, Dialog, SyncStatus, Field, NumberInput, TextInput } from '../../ui/components'
 import { useAction } from './useAction'
 import { validDay } from './formValues'
@@ -47,7 +47,7 @@ function WeeklyHours({ date, schoolId, week, from, to, today, setDate, config }:
       <p>Total semanal: <strong>{total('workedHours')} h realizadas</strong> de {total('plannedHours')} h planeadas.</p>
       <HoursForm key={date} {...{ date, schoolId }} entry={entries.find(h => h.date === date)} />
       <h3>Historial de horas</h3>
-      {hours.filter(h => h.schoolId === schoolId).map(h => <p key={h.date}>{h.date} · {h.workedHours} h realizadas de {h.plannedHours} h planeadas</p>)}
+      {hours.filter(h => h.schoolId === schoolId).map(h => <p key={h.date}>{classDate(h.date)} · {h.workedHours.toLocaleString('es-CO')} h realizadas de {h.plannedHours.toLocaleString('es-CO')} h planeadas</p>)}
       {!hours.some(h => h.schoolId === schoolId) && <p>Todavía no has registrado horas en estas semanas.</p>}
       <BarChart label="Horas realizadas por día" data={series.days} />
       <BarChart label="Horas acumuladas por semana de implementación" data={series.weeks} />
@@ -65,9 +65,10 @@ function HoursForm({ date, schoolId, entry }: { date: string; schoolId: string; 
   const category = draft.category ?? stored.category ?? ''
   const detail = draft.detail ?? stored.detail
   const short = worked !== '' && planned !== '' && +worked < +planned
+  const maxDetail = 600 - (category ? category.length + 2 : 0)
   const reason = short ? formatReason(category, detail) : null
   const invalid = planned === '' || worked === '' ? 'Indica las horas planeadas y realizadas.' :
-    +planned === 0 && +worked === 0 ? 'Las horas planeadas y realizadas no pueden ser ambas cero.' : short && (!category || !detail.trim()) ? 'Selecciona un motivo y escribe el detalle.' :
+    +planned === 0 && +worked === 0 ? 'Las horas planeadas y realizadas no pueden ser ambas cero.' :
       validateHours({ planned: +planned, worked: +worked, reason })
   function change(key: keyof typeof draft, value: string) { setDraft(d => ({ ...d, [key]: value })) }
   const [confirm, setConfirm] = useState(false)
@@ -80,7 +81,7 @@ function HoursForm({ date, schoolId, entry }: { date: string; schoolId: string; 
       guideSaved?.(receipt.syncState === 'pending')
     }, '')
   }
-  return <form onSubmit={e => {
+  return <form noValidate onSubmit={e => {
     e.preventDefault()
     if (!invalid) { if (current) setConfirm(true); else save() }
   }}>
@@ -93,10 +94,10 @@ function HoursForm({ date, schoolId, entry }: { date: string; schoolId: string; 
         <Field label="Horas realizadas">
           <NumberInput data-guide="worked" required min="0" max="24" step="0.5" value={worked} onChange={e => change('worked', e.target.value)} />
         </Field>
-        {short && <>
+        {short && +worked >= 0 && +planned <= 24 && <>
           <Choice label="Motivo" value={category} placeholder="Selecciona un motivo" options={REASON_CATEGORIES.map(id => ({ id, name: id }))} onChange={v => change('category', v)} />
-          <Field label="Detalle del motivo" hint={detail.length + " de 200 caracteres"}>
-            <TextInput data-guide="reason" data-complete={!!category && !!detail.trim()} required maxLength={200} value={detail} onChange={e => change('detail', cleanDetail(e.target.value))} />
+          <Field label="Detalle del motivo" hint={detail.length + ' de '+maxDetail+' caracteres'}>
+            <TextInput data-guide="reason" data-complete={!!category && !!detail.trim()} required maxLength={maxDetail} value={detail} onChange={e => change('detail', cleanDetail(e.target.value))} />
           </Field>
         </>}</div>
       {invalid && <p>{invalid}</p>}<div className="teacher-save"><Button data-guide="save" type="submit" variant="primary" disabled={Boolean(invalid)}>Guardar horas</Button></div>

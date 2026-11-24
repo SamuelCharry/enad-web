@@ -23,7 +23,7 @@ export interface Student { id: string; schoolId: string; campus: string; code: s
   grade: number; gender: 'F' | 'M' | ''; age: number | null; sample: number | null; retired: boolean; active: boolean;
   provisional: boolean; needsReview?: boolean; reviewReasons?: string[]; source?: 'manual'|'ocr'|'import'; mergedInto?: string|null; ocrConfidence?: number|null; levels: Partial<Record<Subject, LevelMark>> }
 /** Teaching group and student membership. */
-export interface Group { id: string; name: string; subject: Subject; teacherId: string | null; teacherName: string; schoolId: string;
+export interface Group { syncState?: 'pending'|'synced'; id: string; name: string; subject: Subject; teacherId: string | null; teacherName: string; schoolId: string;
   campus: string; studentIds: string[] }
 /** Student attendance event for one group and date. */
 export interface AttendanceMark { groupId: string; date: string; status: AttendanceStatus; teacherId: string; schoolId: string; studentId: string; savedAt: string }

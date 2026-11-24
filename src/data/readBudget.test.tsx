@@ -7,7 +7,7 @@ import { RequireSession } from '../app/RequireSession'
 import { LegacyRedirect, PortalLayout } from '../app/PortalLayout'
 import { ReportRoutes } from '../features/reports'
 import { CollectRoutes } from '../features/collect'
-import { getAttendanceReport, getMovement, getSummary, refreshReports } from './reports'
+import { getAttendanceReport, getFollowup, getMovement, getSummary, refreshReports } from './reports'
 import { ReportRead } from '../features/reports/ReportState'
 
 let store: ReturnType<typeof readCounter>
@@ -60,11 +60,14 @@ for (const [path, label] of [
   page(path)
   await settled(new RegExp(label))
   expect(store.cost()).toBeLessThanOrEqual(400)
+  for (const q of store.reads.requests.filter(q => q.path === 'hours')) {
+    expect(q.constraints).toContainEqual(expect.objectContaining({field:'teacherId',op:'==',value:auth.currentUser.uid}))
+  }
   console.info('Presupuesto docente', path, store.cost())
 })
 it('calcula sesiones compartidas una sola vez y usa únicamente los momentos seleccionados', async () => {
   auth.currentUser.uid = semester(store, 'fundacion').uid
-  const [attendance, summary] = await Promise.all([getAttendanceReport({}), getSummary({})])
+  const [attendance, summary] = await Promise.all([getAttendanceReport({}), getSummary({from:'2026-10-26',to:'2026-11-20'})])
   expect(attendance.bySchool.reduce((n, s) => n + s.sessions, 0)).toBe(125)
   expect(attendance.bySchool.reduce((n, s) => n + s.present, 0)).toBe(1125)
   expect(summary.studentsOverTime).toEqual([7, 8, 9, 10].map(week => ({ week, count: 225 })))
@@ -78,43 +81,19 @@ it('calcula sesiones compartidas una sola vez y usa únicamente los momentos sel
   const moves = await getMovement({ from: '2026-09-14', to: '2026-11-20', schoolId: 'ie0' }, 'lectura', 'linea_base', 'linea_media_1')
   expect(moves[0]).toMatchObject({ up: 24, down: 1 })
   const evaluationQueries = store.reads.requests.filter(q => q.path === 'evaluations')
-  expect(evaluationQueries.every(q => q.constraints?.some(f => f.field === 'moment' && f.op === 'in'))).toBe(true)
+  expect(evaluationQueries.every(q => q.constraints?.some(f => f.field === 'moment' && f.op === '=='))).toBe(true)
 }, 30_000) // Simulates a full semester in memory; shared CI runners need more than the 5 s default.
 
-it('resuelve el resumen de fundación con sondas simultáneas dentro de una misma semana e institución', async () => {
-  auth.currentUser.uid = semester(store, 'fundacion').uid
-  // Historical IDs on both open ends of the roster still count once per week.
-  for (const studentId of ['antiguo', 'z-retirado']) {
-    for (const date of ['2026-11-16', '2026-11-17']) {
-      store.put(`students/${studentId}/attendance/${date}`, { schoolId: 'ie0', studentId, date, status: 'vino' })
-    }
+it('lee la asistencia una vez por colegio sin abrir consultas por estudiante', async () => {
+  auth.currentUser.uid = semester(store,'fundacion').uid
+  for (const studentId of ['antiguo','z-retirado']) {
+    for (const date of ['2026-11-16','2026-11-17']) store.put('students/'+studentId+'/attendance/'+date,
+      {schoolId:'ie0',studentId,date,status:'vino'})
   }
-  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
-  try {
-    const delay = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms))
-    const { getDocs, getAggregateFromServer } = store.sdk
-    let inFlight = 0, peak = 0
-    vi.spyOn(store.sdk, 'getDocs').mockImplementation(async q => {
-      const oneWeek = q.path === 'attendance' && q.constraints?.some(f => f.field === 'schoolId' && f.value === 'ie0') &&
-        q.constraints.some(f => f.field === 'date' && f.op === 'in' && (f.value as string[]).includes('2026-11-16'))
-      if (oneWeek) peak = Math.max(peak, ++inFlight)
-      await delay(250)
-      if (oneWeek) inFlight--
-      return getDocs(q)
-    })
-    vi.spyOn(store.sdk, 'getAggregateFromServer').mockImplementation(async (q, fields) => {
-      await delay(7000)
-      return getAggregateFromServer(q, fields)
-    })
-    const completed = vi.fn()
-    const pending = getSummary({}).then(completed)
-    await vi.advanceTimersByTimeAsync(8000)
-    expect(peak).toBeGreaterThan(1)
-    expect(completed).toHaveBeenCalledWith(expect.objectContaining({
-      studentsOverTime: [{ week: 7, count: 225 }, { week: 8, count: 225 }, { week: 9, count: 225 }, { week: 10, count: 227 }]
-    }))
-    await pending
-  } finally { vi.useRealTimers() }
+  const result = await getSummary({})
+  expect(result.studentsOverTime).toEqual([{week:10,count:227}])
+  expect(store.reads.requests.filter(q => q.path === 'attendance')).toHaveLength(10)
+  expect(store.reads.requests.filter(q => q.constraints?.some(f => f.field === 'studentId'))).toEqual([])
 })
 
 const tabs = [
@@ -160,7 +139,7 @@ for (const [path, role, ready] of [
   const reject = path.endsWith('calidad') ? vi.spyOn(store.sdk, 'getDocs').mockRejectedValue(failure) :
     vi.spyOn(store.sdk, 'getCountFromServer').mockRejectedValue(failure)
   page(path)
-  expect((await screen.findByRole('alert')).textContent).toMatch(/No pudimos cargar/)
+  expect((await screen.findByRole('alert')).textContent).toMatch(/No pudimos cargar|No disponible/)
   const attempts = reject.mock.calls.length
   fireEvent.focus(window)
   expect(reject).toHaveBeenCalledTimes(attempts)
@@ -180,4 +159,22 @@ for (const [section, label] of [
   console.info('Presupuesto administración', section, store.cost())
   expect(store.cost()).toBeLessThanOrEqual(400)
   expect(store.reads.requests.some(q => q.path === 'attendance' || q.path === 'evaluations')).toBe(false)
+})
+
+it('mantiene el resumen de asistencia disponible si falla la agregación de horas', async () => {
+  auth.currentUser.uid=semester(store,'fundacion').uid
+  vi.spyOn(store.sdk,'getAggregateFromServer').mockRejectedValue({code:'unavailable'})
+  const result=await getSummary({})
+  expect(result.unavailable).toEqual(['Horas'])
+  expect(result.studentsOverTime).toEqual([{week:10,count:225}])
+  expect(result.students).toBeGreaterThan(0)
+})
+
+it('mantiene la cobertura y asistencia de seguimiento al fallar el total de horas',async () => {
+  auth.currentUser.uid=semester(store,'fundacion').uid
+  vi.spyOn(store.sdk,'getAggregateFromServer').mockRejectedValue({code:'unavailable'})
+  const data=await getFollowup({schoolId:'ie0'},'linea_media_2')
+  expect(data.unavailable).toEqual(['Horas'])
+  expect(data.teachers.length).toBeGreaterThan(0)
+  expect(data.teachers.some(t => t.members > 0)).toBe(true)
 })

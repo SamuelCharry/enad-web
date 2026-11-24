@@ -12,7 +12,7 @@ const steps: Record<string, Step[]> = {
     { instruction: 'Guarda la lista y confirma las marcas.', target: 'save' },
   ],
   horas: [
-    { instruction: 'Elige la institución donde trabajaste.', target: 'school' },
+    { instruction: 'Elige la institución donde trabajaste.', target: 'school', optional: true },
     { instruction: 'Selecciona el día que vas a reportar.', target: 'date' },
     { instruction: 'Escribe las horas planeadas para ese día.', target: 'planned' },
     { instruction: 'Escribe cuántas horas realizaste.', target: 'worked' },

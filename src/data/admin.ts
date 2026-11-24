@@ -11,6 +11,7 @@ export function saveProgramConfig(input: ProgramConfig) {
   return api(async () => {
     await caller('fundacion')
     const start = requireDate(input.implementationStartDate, 'fecha de inicio')
+    if (input.year !== Number(start.slice(0,4))) fail(400,'El año debe coincidir con la fecha de inicio.')
     const breaks = (input.breaks ?? []).map(b => {
       const from = requireDate(b.from, 'fecha de inicio del receso'), to = requireDate(b.to, 'fecha final del receso')
       if (to < from) fail(400, 'Cada receso debe terminar después de empezar.')
@@ -37,6 +38,7 @@ export function upsertSchool(input: Partial<School>) {
     const ref = doc(db, 'schools', id), before = await getDoc(ref)
     if (p.rol === 'coordinador' && !before.exists()) fail(403, 'El colegio debe existir.')
     if (!input.id && before.exists()) fail(409, 'Ya existe una institución con ese identificador.')
+    if ((!before.exists() || input.campuses) && !input.campuses?.length) fail(400,'Añade al menos una sede.')
     const fields = schoolFields({ ...input }, id, !before.exists(), p.projectId)
     if (!Object.keys(fields).length) fail(400, 'No hay cambios para guardar.')
     const syncState = await commit(setDoc(ref, fields, { merge: before.exists() }))
@@ -79,6 +81,7 @@ export function patchUser(uid: string, fields: Partial<UserProfile>) {
       !before.schoolIds.every((id:string) => p.schoolIds.includes(id)) ||
       Object.keys(fields).some(k => !['fullName','campusIds','jornada','activo'].includes(k)) ||
       Object.keys(fields.campusIds ?? {}).some(id => !before.schoolIds.includes(id)))) fail(403, 'Solo puedes editar docentes de tu colegio.')
+    if (p.uid === uid && fields.activo === false) fail(400,'Tu cuenta debe permanecer activa.')
     const changes: Partial<UserProfile> = {}
     if ('activo' in fields) changes.activo = fields.activo === true
     if ('rol' in fields) {

@@ -23,14 +23,14 @@ vi.mock('../../data/session', () => ({ useSession: vi.fn() }))
 vi.mock('../../data/groups', () => ({ useGroups: vi.fn() }))
 vi.mock('../../data/hours', () => ({ useMyHours: vi.fn() }))
 vi.mock('../../data/profile', () => ({ updateMyName: vi.fn() }))
-vi.mock('../../data/reports', () => ({ refreshReports: vi.fn(), getStudentReport:vi.fn(),getGroupRoster:vi.fn(), getFollowup:vi.fn(), getComparison:vi.fn(), getMovement: vi.fn().mockResolvedValue([]), getAttendanceReport: vi.fn(), getExport: vi.fn(), getHoursReport: vi.fn(), getLevels: vi.fn(), getSubmissions: vi.fn(), getSummary: vi.fn(), getTeacherMetrics: vi.fn(), useFilterOptions: vi.fn() }))
+vi.mock('../../data/reports', () => ({ refreshReports: vi.fn(), getEvaluationRows:vi.fn(), getStudentReport:vi.fn(),getGroupRoster:vi.fn(), getFollowup:vi.fn(), getComparison:vi.fn(), getMovement: vi.fn().mockResolvedValue([]), getAttendanceReport: vi.fn(), getExport: vi.fn(), getHoursReport: vi.fn(), getLevels: vi.fn(), getSubmissions: vi.fn(), getSummary: vi.fn(), getTeacherMetrics: vi.fn(), useFilterOptions: vi.fn() }))
 vi.mock('../../data/scope', () => ({ useProgramConfig: vi.fn(), useSchools: vi.fn() }))
 vi.mock('../../data/students', () => ({ getStudentHistory: vi.fn(), useStudents: vi.fn() }))
 vi.mock('../../domain/export/excel', () => ({ buildExcelExport: vi.fn() }))
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(scopeApi.useProgramConfig).mockReturnValue({loading:false,config:null,error:undefined})
-  vi.spyOn(reportsApi, 'useFilterOptions').mockReturnValue({ projects: [], departments: [], municipalities: [], schools: [], campuses: [], error: undefined, loading: false })
+  vi.spyOn(reportsApi, 'useFilterOptions').mockReturnValue({ projectNames:{}, projects: [], departments: [], municipalities: [], schools: [], campuses: [], error: undefined, loading: false })
 })
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals() })
@@ -39,7 +39,7 @@ const profile: UserProfile = { uid: 'd1', rol: 'fundacion', activo: true, fullNa
 const school: School = { id: 'ie1', projectId: 'proyecto', name: 'Institución de prueba', zone: 'rural', active: true, department: 'Caldas', municipality: 'Neira', region: 'Centro', campuses: [{ id: 's1', name: 'Sede Uno', jornada: 'mañana' }] }
 const group: Group & { studentCount: number;teacherId:string } = { studentCount: 1, id: 'g1', teacherId: 'd1', teacherName: 'Docente de prueba', subject: 'lectura', name: 'Grupo Uno', campus: 's1', schoolId: 'ie1', studentIds: ['e1'] }
 const student: Student = { id: 'e1', fullName: 'Estudiante Uno', nameKey: 'estudiante uno', code: '001', schoolId: 'ie1', campus: 's1', grade: 4, gender: 'F', age: 9, sample: null, active: true, retired: false, provisional: false, levels: { lectura: { level: 'parrafo', date: '2026-04-01', moment: 'linea_base' } } }
-const summary = { range: { from: '2026-04-01', to: '2026-04-23' }, students: 12540, teachers: 8, schools: 1, campuses: 3, groupsBySubject: { lectura: 2, matematicas: 4 }, hoursWorked: 42.5, hoursPlanned: 50, attendanceRate: 85, studentsOverTime: [{ week: 1, count: 5 }] }
+const summary = { unavailable:[], range: { from: '2026-04-01', to: '2026-04-23' }, students: 12540, teachers: 8, schools: 1, campuses: 3, groupsBySubject: { lectura: 2, matematicas: 4 }, hoursWorked: 42.5, hoursPlanned: 50, attendanceRate: 85, studentsOverTime: [{ week: 1, count: 5 }] }
 const mark: AttendanceMark & { id: string; syncState: 'synced' } = { id: 'g1_2026-04-01', syncState: 'synced', groupId: 'g1', studentId: 'e1', schoolId: 'ie1', teacherId: 'd1', date: '2026-04-01', status: 'vino', savedAt: '' }
 
 function open(path: string, p = profile) {
@@ -72,11 +72,12 @@ describe('Presentación de informes', () => {
   it('aplica el alcance visible a la consulta sin repetir lecturas al enfocar la ventana', async () => {
     const get = vi.spyOn(reportsApi, 'getSummary').mockResolvedValue(summary)
     vi.spyOn(reportsApi, 'useFilterOptions').mockImplementation(f => ({
-      projects: ['p'], departments: f.projectId ? ['Caldas'] : [], municipalities: [], schools: [], campuses: [], error: undefined, loading: false,
+      projectNames:{p:'ENAd Caldas'}, projects: ['p'], departments: f.projectId ? ['Caldas'] : [], municipalities: [], schools: [], campuses: [], error: undefined, loading: false,
     }))
     open('/portal/reportes')
     expect(await screen.findByText('12.540')).toBeTruthy()
     fireEvent.click(screen.getByText('Filtros', { selector: 'summary' }))
+    expect(within(screen.getByLabelText('Proyecto')).getByRole('option',{name:'ENAd Caldas'})).toBeTruthy()
     fireEvent.change(screen.getByLabelText('Proyecto'), { target: { value: 'p' } })
     fireEvent.change(screen.getByLabelText('Departamento'), { target: { value: 'Caldas' } })
     await waitFor(() => expect(get).toHaveBeenLastCalledWith({ projectId: 'p', department: 'Caldas' }))
@@ -111,7 +112,7 @@ describe('Presentación de informes', () => {
     vi.spyOn(reportsApi, 'getAttendanceReport').mockResolvedValue({ bySchool: [], byTeacher: [], byGroup: [{ schoolId: 'ie1', subject: 'lectura', teacherId: 'd1', groupId: 'g1', name: 'Grupo Uno', teacherName: 'D', rate: 82, sessions: 6 }] })
     vi.spyOn(studentsApi, 'getStudentHistory').mockResolvedValue({ attendance: [mark, { ...mark, date: '2026-04-02', status: 'no_vino' }], evaluations: [] })
     vi.mocked(reportsApi.getGroupRoster).mockResolvedValue([{student:{...student,syncState:'synced'},level:undefined,rate:50}])
-    vi.mocked(reportsApi.useFilterOptions).mockReturnValue({projects:[],departments:[],municipalities:[],schools:[school],campuses:school.campuses,loading:false,error:undefined})
+    vi.mocked(reportsApi.useFilterOptions).mockReturnValue({projectNames:{}, projects:[],departments:[],municipalities:[],schools:[school],campuses:school.campuses,loading:false,error:undefined})
     open('/portal/reportes/instituciones')
     expect(groups).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: school.name }))
@@ -251,7 +252,7 @@ it('muestra la tabla semanal y permite consultar las tres agrupaciones de asiste
 
 it('abre la comparación de una sede desde un enlace compartido y enlaza el grupo de la docente', async () => {
   vi.mocked(reportsApi.getComparison).mockResolvedValue([{school,campus:school.campuses[0],students:1,groups:1,evaluated:0,attendance:100}])
-  vi.mocked(reportsApi.getFollowup).mockResolvedValue({from:'2026-04-06',to:'2026-04-12',moment:'linea_base',teachers:[{
+  vi.mocked(reportsApi.getFollowup).mockResolvedValue({unavailable:[],from:'2026-04-06',to:'2026-04-12',moment:'linea_base',teachers:[{
     uid:group.teacherId,fullName:group.teacherName,school,groups:[{...group,syncState:'synced'}],last:'',weeks:1,expected:1,attendanceRate:100,worked:0,planned:0,evaluated:0,members:1,coverage:0}]})
   const view = open('/portal/reportes/comparacion?schoolId=ie1&campus=s1')
   expect(await screen.findByRole('row',{name:/Institución de prueba · Sede Uno 1 1 0 100 %/})).toBeTruthy()
@@ -268,4 +269,22 @@ it('abre directamente la ficha de un estudiante y conserva el período al regres
   expect(await screen.findByText('Asistió')).toBeTruthy()
   expect(screen.queryByText('2025-01-01')).toBeNull()
   expect(screen.getByRole('link',{name:'Volver al grupo'}).getAttribute('href')).toContain('from=2026-01-01')
+})
+
+it('combina los filtros de área, momento y nivel con búsqueda por apellidos sin repetir lecturas',async () => {
+  const common={syncState:'synced' as const,id:'1',school:'Escuela',student:'Ana María Pérez',studentId:'a',date:'2026-11-17',teacherId:'t',schoolId:'s',savedAt:'',sample:null}
+  const read=vi.mocked(reportsApi.getEvaluationRows).mockResolvedValue([
+    {...common,subject:'lectura',moment:'linea_media_2',level:'parrafo'},
+    {...common,id:'2',student:'Sara Gómez',subject:'matematicas',moment:'linea_base',level:'un_digito'}
+  ])
+  open('/portal/reportes/evaluaciones')
+  await screen.findByText('Sara Gómez')
+  const choose=(label:string,value:string) => fireEvent.change(screen.getByLabelText(label),{target:{value}})
+  choose('Área','lectura')
+  choose('Momento','linea_media_2')
+  choose('Nivel','parrafo')
+  choose('Buscar','perez ana')
+  expect(screen.queryByText('Sara Gómez')).toBeNull()
+  expect(screen.getByText('Ana María Pérez')).toBeTruthy()
+  expect(read).toHaveBeenCalledOnce()
 })

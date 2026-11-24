@@ -21,7 +21,7 @@ export function GroupDetail({ group, students, owner }: { group: Group; students
   const available = students.filter(s => !members.has(s.id) && s.active && !s.retired && (!group.campus || s.campus === group.campus) && matches(search, s.fullName, s.code))
   const back = collectLink('grupos', { school: group.schoolId, campus: group.campus })
   return <><Link className="ui-link-button" to={back}>Volver a grupos</Link>
-    <Card><h3>{group.name}</h3>{'syncState' in group && <SyncStatus pending={group.syncState === 'pending'} />}<p>{subjectLabel(group.subject)} · {group.teacherName}{!owner && ' · Solo lectura'}</p>
+    <Card><h3>{group.name}</h3>{'syncState' in group && <SyncStatus pending={group.syncState === 'pending'} />}<p>{subjectLabel(group.subject)} · {group.teacherName || 'Sin docente'}{!owner && ' · Solo lectura'}</p>
       {owner && <div className="teacher-tools"><Link className="ui-link-button primary" to={groupLink('asistencia', group)}>Tomar asistencia</Link>
         <Link className="ui-link-button" to={groupLink('evaluacion', group)}>Evaluar grupo</Link>
         <Button onClick={() => { setName(group.name); setDialog('rename') }}>Cambiar nombre</Button></div>}</Card>
@@ -29,7 +29,7 @@ export function GroupDetail({ group, students, owner }: { group: Group; students
       {students.filter(s => members.has(s.id)).map(s => <div className="teacher-member" key={s.id}>
         <Link className="teacher-group-link" to={collectLink('estudiantes', { school: s.schoolId, campus: s.campus, student: s.id })}>{s.fullName}</Link>
         <p>Grado {s.grade}° · <LevelChip subject={group.subject} level={s.levels[group.subject]?.level} />{s.retired && ' · Retirado'}</p>
-        {owner && <div className="teacher-tools">{!s.retired && <Link className="ui-link-button" to={groupLink('evaluacion', group, { student: s.id })}>Evaluar a {s.fullName}</Link>}
+        {owner && <div className="teacher-tools">{!s.retired && <Link className="ui-link-button" to={groupLink('evaluacion', group, { student: s.id })} aria-label={'Evaluar a '+s.fullName}>Evaluar</Link>}
           <Button onClick={() => setRemove(s)}>Quitar del grupo</Button></div>}</div>)}
       {owner && <Button onClick={() => { setSearch(''); setDialog('add') }}>Añadir al grupo</Button>}
       {undo && !members.has(undo.id) && <p>Se quitó a {undo.fullName}. <Button loading={action.busy} onClick={() => action.run(async () => {
@@ -44,13 +44,13 @@ export function GroupDetail({ group, students, owner }: { group: Group; students
           await removeStudentFromGroup(group.id, remove.id); setUndo(remove); setRemove(undefined)
         }, '')}>Confirmar retiro del grupo</Button> : dialog === 'delete' ? <><p>Los estudiantes conservarán sus registros.</p>
           <Button variant="danger" onClick={() => action.run(async () => { await deleteGroup(group.id); navigate(back, { replace: true }) })}>Confirmar eliminación</Button></> :
-          dialog === 'rename' ? <form onSubmit={e => { e.preventDefault(); void action.run(async () => {
+          dialog === 'rename' ? <form noValidate onSubmit={e => { e.preventDefault(); void action.run(async () => {
             await patchGroup(group.id, { name: name.trim() }); setDialog(null)
-          }, '') }}><Field label="Nombre del grupo"><TextInput value={name} required onChange={e => setName(e.target.value)} /></Field>
+          }, '') }}><Field label="Nombre del grupo"><TextInput maxLength={60} value={name} required onChange={e => setName(e.target.value)} /></Field>
             <Button type="submit" variant="primary" disabled={!name.trim() || name.trim() === group.name}>Guardar nombre</Button></form> :
             <><Search value={search} onChange={setSearch} />{available.length ? available.map(s => <div className="collect-row" key={s.id}>{s.fullName}
               <Button aria-label={'Añadir a ' + s.fullName} onClick={() => action.run(async () => {
-                await addStudentsToGroup(group.id, [s.id]); setDialog(null)
+                await addStudentsToGroup(group.id, [s.id])
               }, '')}>Añadir</Button></div>) : <p>Revisa la búsqueda o registra un estudiante en esta sede.</p>}</>}
       </fieldset>{action.feedback}</Dialog>}
   </>

@@ -40,7 +40,7 @@ export function TeacherFollowUp({ filters }: Props) {
       if (sort === 'nombre') return a.fullName.localeCompare(b.fullName, 'es')
       return (value(a) ?? Infinity) - (value(b) ?? Infinity)
     })
-    return <><p>{data.from} al {data.to}. La toma de asistencia cuenta semanas de implementación con registro. La cobertura cuenta estudiantes de cada área asignada.</p>
+    return <>{data.unavailable.length > 0 && <p role="alert">No disponible · {data.unavailable.join(', ')}</p>}<p>{data.from} al {data.to}. La toma de asistencia cuenta semanas de implementación con registro. La cobertura cuenta estudiantes de cada área asignada.</p>
       <div className="rep-filter-grid"><Field label="Ordenar por"><Select value={sort} onChange={e => update({ orden: e.target.value })}>
         <option value="nombre">Nombre</option><option value="actividad">Actividad más reciente</option><option value="asistencia">Menor toma de asistencia</option>
         <option value="horas">Menor cumplimiento de horas</option><option value="cobertura">Menor cobertura de evaluación</option></Select></Field>
@@ -49,9 +49,9 @@ export function TeacherFollowUp({ filters }: Props) {
       {filters.campus && <p>Las horas corresponden a toda la institución.</p>}
       {rows.length ? <Table caption="Seguimiento por docente e institución" headers={['Docente e institución', 'Último guardado', 'Semanas con asistencia', 'Horas ejecutadas / planeadas', 'Evaluaciones cubiertas', 'Grupos']}
         rows={rows.map(t => ({
-          key: JSON.stringify([t.school.id, t.uid]), cells: [<>{t.fullName}<small>{t.school.name}</small></>, savedTime(t.last),
-          t.weeks + ' / ' + t.expected + ' · ' + percent(t.attendanceRate), number(t.worked) + ' / ' + number(t.planned) + ' · ' + percent(ratio(t.worked, t.planned)),
-          t.evaluated + ' / ' + t.members + ' · ' + percent(t.coverage), t.groups.length ? t.groups.map(g => <Link key={g.id} to={reportLink('instituciones', filters, { schoolId: t.school.id, campus: t.school.campuses.find(c => c.name === g.campus)?.id ?? g.campus, group: g.id })}>{g.name}</Link>) : 'Sin grupos asignados']
+          key: JSON.stringify([t.school.id, t.uid]), cells: [<>{t.fullName}<small>{t.school.name}</small></>, data.unavailable.includes('Último guardado') ? 'No disponible' : savedTime(t.last),
+          data.unavailable.includes('Asistencia') ? 'No disponible' : t.weeks + ' / ' + t.expected + ' · ' + percent(t.attendanceRate), data.unavailable.includes('Horas') ? 'No disponible' : number(t.worked) + ' / ' + number(t.planned) + ' · ' + percent(ratio(t.worked, t.planned)),
+          data.unavailable.includes('Evaluaciones') ? 'No disponible' : t.evaluated + ' / ' + t.members + ' · ' + percent(t.coverage), t.groups.length ? t.groups.map(g => <Link key={g.id} to={reportLink('instituciones', filters, { schoolId: t.school.id, campus: t.school.campuses.find(c => c.name === g.campus)?.id ?? g.campus, group: g.id })}>{g.name}</Link>) : 'Sin grupos asignados']
         }))} /> :
         <EmptyState title="No hay docentes en esta selección." description="Amplía los filtros o revisa las asignaciones en Carga de datos." />}</>
   }}</ReportRead></>

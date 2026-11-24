@@ -1,3 +1,4 @@
+import { validCalendarDay } from '../domain/weeks'
 import { reportCache } from './reportCache'
 import { collection, doc, documentId, getDoc, getDocs, query, where, type DocumentSnapshot, type Query } from 'firebase/firestore'
 import { ApiError, type ProgramConfig, type School, type UserProfile } from '../domain/types'
@@ -17,8 +18,7 @@ export const slug = (value: string) => value.normalize('NFD').replace(/\p{M}/gu,
 /** Checks a calendar date supplied by a form. */
 export function requireDate(date: string, field = 'fecha') {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) fail(400, 'La ' + field + ' debe tener el formato AAAA-MM-DD.')
-  const ms = Date.parse(date)
-  if (!Number.isFinite(ms) || new Date(ms).toISOString().slice(0, 10) !== date) fail(400, 'La ' + field + ' no es válida.')
+  if (!validCalendarDay(date)) fail(400, 'La ' + field + ' no es válida.')
   return date
 }
 /** Whether a remote transaction can fall back to an offline batch. */

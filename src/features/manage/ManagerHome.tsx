@@ -7,7 +7,7 @@ import { milestones } from '../../data/managementMetrics'
 import { useSchools, useProgramConfig } from '../../data/scope'
 import { momentLabel, SUBJECTS, subjectLabel } from '../../domain/levels'
 import type { Moment, ProgramConfig, School, Subject, UserProfile } from '../../domain/types'
-import { colombiaToday, weekOf } from '../../domain/weeks'
+import { classDate, colombiaToday, weekOf } from '../../domain/weeks'
 import { Button, Field, Select } from '../../ui/components'
 import { getMovement } from '../../data/reports'
 import { percent } from '../reports/model'
@@ -38,14 +38,17 @@ function FollowUp({ profile, config, today, schools }: { profile: UserProfile; c
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   return <ReportRead query={JSON.stringify([schools, config, today, selected])} load={() => readDashboard(profile, schools, config, today, selected)}>{data => {
     const { alerts, moment, feed } = data
+    const missing = (key:string) => data.unavailable.includes(key)
     return <>
-      <dl className="coverage-counts"><div><dt>Docentes</dt><dd>{data.teachers}</dd></div>
-        <div><dt>Estudiantes activos</dt><dd>{data.students}</dd></div></dl>
+      {data.unavailable.length > 0 && <p role="alert">No disponible · {data.unavailable.join(', ')}</p>}
+      <dl className="coverage-counts"><div><dt>Instituciones</dt><dd>{schools.length}</dd></div><div><dt>Sedes</dt><dd>{schools.reduce((n,s) => n+s.campuses.length,0)}</dd></div></dl>
+      <dl className="coverage-counts"><div><dt>Docentes</dt><dd>{missing('Docentes') ? 'No disponible' : data.teachers}</dd></div>
+        <div><dt>Estudiantes activos</dt><dd>{missing('Estudiantes activos') ? 'No disponible' : data.students}</dd></div></dl>
       <h2>Esta semana</h2>
-      <dl className="coverage-counts"><div><dt>Asistencia hasta hoy</dt><dd>{percent(data.insights.attendance[0])}</dd></div>
-        <div><dt>Mismos días de la semana pasada</dt><dd>{percent(data.insights.attendance[1])}</dd></div>
-        <div><dt>Horas realizadas / planeadas</dt><dd>{data.insights.planned || data.insights.worked ? data.insights.worked+' / '+data.insights.planned : 'Sin registros'}</dd></div>
-        <div><dt>Docentes que enviaron asistencia</dt><dd>{percent(config && weekOf(today,config) && data.teachers ? 100*data.insights.reporters/data.teachers : null)}</dd></div></dl>
+      <dl className="coverage-counts"><div><dt>Asistencia hasta hoy</dt><dd>{missing('Asistencia') ? 'No disponible' : percent(data.insights.attendance[0])}</dd></div>
+        <div><dt>Mismos días de la semana pasada</dt><dd>{missing('Asistencia') ? 'No disponible' : percent(data.insights.attendance[1])}</dd></div>
+        <div><dt>Horas realizadas / planeadas</dt><dd>{missing('Horas') ? 'No disponible' : data.insights.planned || data.insights.worked ? data.insights.worked.toLocaleString('es-CO')+' / '+data.insights.planned.toLocaleString('es-CO') : 'Sin registros'}</dd></div>
+        <div><dt>Docentes que enviaron asistencia</dt><dd>{missing('Envíos') || missing('Docentes') ? 'No disponible' : percent(config && weekOf(today,config) && data.teachers ? 100*data.insights.reporters/data.teachers : null)}</dd></div></dl>
       {config && moment !== 'linea_base' && <details onToggle={e => {const open=e.currentTarget.open;setExpanded(v => ({...v,movement:open}))}}>
         <summary>Cambios de nivel · {momentLabel(moment)}</summary>{expanded.movement && SUBJECTS.map(subject => {
           const prior = milestones[milestones.indexOf(moment)-1]
@@ -59,17 +62,17 @@ function FollowUp({ profile, config, today, schools }: { profile: UserProfile; c
             const matches = alerts.filter(a => a.category === category)
             return <details key={category} onToggle={e => { const open = e.currentTarget.open; setExpanded(v => ({ ...v, [category]: open })) }}>
               <summary>{category} <strong>{matches.reduce((n, a) => n + a.count, 0)}</strong></summary>
-              {expanded[category] && <ul>{matches.map(a => <li key={a.path + (a.subject ?? '')}>{a.subject
+              {expanded[category] && <ul>{matches.map(a => <li key={a.schoolId + a.path + (a.subject ?? '')}>{a.subject
                 ? <StudentAlerts school={schools.find(s => s.id === a.schoolId)!} subject={a.subject} moment={moment} from={config.implementationStartDate} to={today} />
                 : <Link to={a.path}>{a.label}</Link>}</li>)}</ul>}</details>
           })}
-          {!alerts.length && <p>Sin alertas en esta selección. Consulta los envíos para revisar el detalle semanal.</p>}
+          {!alerts.length && !data.unavailable.length && <p>Sin alertas en esta selección. Consulta los envíos para revisar el detalle semanal.</p>}
           {moment !== 'linea_base' && <details onToggle={e => { const open = e.currentTarget.open; setExpanded(v => ({ ...v, declines: open })) }}>
             <summary>Consultar descensos de nivel</summary>{expanded.declines && <Declines schools={schools} moment={moment} from={config.implementationStartDate} to={today} />}</details>}
         </> : <p>Configura la fecha de inicio y las pausas para calcular las alertas del programa.</p>}
-      </section><section><h2>Actividad reciente</h2>{feed.length ? <ol className="manage-feed">{feed.map(e => <li key={e.key}><strong>{e.kind} · {e.detail}</strong>
+      </section><section><h2>Actividad reciente</h2>{missing('Actividad reciente') && <p>No se pudo cargar toda la actividad.</p>}{feed.length ? <ol className="manage-feed">{feed.map(e => <li key={e.key}><strong>{e.kind} · {e.detail}</strong>
         <span>{e.author} · {e.school}</span><time dateTime={e.savedAt}>{savedTime(e.savedAt)}</time></li>)}</ol>
-        : <p>Los registros aparecerán aquí cuando se guarden asistencias, evaluaciones u horas.</p>}</section></div>
+        : !missing('Actividad reciente') && <p>Los registros aparecerán aquí cuando se guarden asistencias, evaluaciones u horas.</p>}</section></div>
     </>
   }}</ReportRead>
 }
@@ -79,11 +82,11 @@ export function ManagerHome({ profile }: { profile: UserProfile }) {
   const [showActivity, setShowActivity] = useState(false)
   const today = colombiaToday(), config = calendar.config, week = config && weekOf(today, config)
   return <div className="manage"><section className="manage-scope">
-      {calendar.error ? <LoadError message={calendar.error} /> : config ? <p><time dateTime={today}>{today}</time> · {week ? 'Semana ' + week + ' de implementación' : today < config.implementationStartDate ? 'Inicio el ' + config.implementationStartDate : 'Semana de receso'}</p>
+      {calendar.error ? <LoadError message={calendar.error} /> : config ? <p><time dateTime={today}>{classDate(today)}</time> · {week ? 'Semana ' + week + ' de implementación' : today < config.implementationStartDate ? 'Inicio el ' + config.implementationStartDate : 'Semana de receso'}</p>
         : !calendar.loading && <p>Aún falta el calendario del programa.</p>}
       {error ? <LoadError message={error} /> : loading ? <p role="status">Cargando instituciones y sedes…</p> : !schools.length ?
         <p>Aún no hay instituciones en tu ámbito de consulta. Consulta la asignación con la fundación.</p> :
-        <><dl className="coverage-counts"><div><dt>Instituciones</dt><dd>{schools.length}</dd></div><div><dt>Sedes</dt><dd>{schools.reduce((n, s) => n + s.campuses.length, 0)}</dd></div></dl>
+        <>
           {(config || showActivity) ? <FollowUp key={JSON.stringify([profile.uid, profile.schoolIds, schools.map(s => s.id)])} profile={profile} config={config} today={today} schools={schools} /> : !calendar.loading && <Button onClick={() => setShowActivity(true)}>Consultar docentes, estudiantes y actividad</Button>}</>}
     </section>
     <nav className="shortcut-list" aria-label="Informes"><Link to="/portal/reportes/seguimiento">Seguimiento de envíos</Link>

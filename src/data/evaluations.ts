@@ -7,6 +7,7 @@ import type { Evaluation, Moment, Subject } from '../domain/types'
 import { api, caller, fail, now, reportCache, isOffline } from './core'
 import { db } from './firebase'
 import { trackSubmission } from './pending'
+import { groupDoc } from './groups'
 import { studentDoc } from './students'
 
 type Input = {
@@ -31,6 +32,11 @@ export function saveEvaluation(input: Input) {
     const student = await studentDoc(p, studentId)
     const date = colombiaToday(), savedAt = now(), ref = doc(student.ref, 'evaluations', id)
     const schoolId = student.data().schoolId
+    if (p.rol === 'docente') {
+      if (!groupId) fail(400, 'Selecciona tu grupo antes de guardar.')
+      const group = (await groupDoc(p, groupId, true)).data()
+      if (group.schoolId !== schoolId || group.subject !== subject || !group.studentIds?.includes(studentId)) fail(400,'El estudiante debe pertenecer a tu grupo del área.')
+    }
     const event = {
       subject,
       moment,

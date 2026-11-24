@@ -1,8 +1,9 @@
 import { doc, runTransaction, type DocumentData } from 'firebase/firestore'
-import { api, caller, fail, now, reportCache, requireSchool } from './core'
+import { api, caller, fail, now, requireDate, reportCache, requireSchool } from './core'
 import { db } from './firebase'
 import { LEVELS, shouldOverwriteLevel } from '../domain/levels'
 import type { AttendanceMark, AttendanceStatus, Evaluation, HoursEntry } from '../domain/types'
+import { colombiaToday } from '../domain/weeks'
 import { validateHours } from '../domain/hoursReason'
 
 export type Correction =
@@ -25,6 +26,7 @@ export function correctRecord(input:Correction) {
       let patch:DocumentData
       switch (input.kind) {
         case 'hours': {
+          if (requireDate(record.date) > colombiaToday()) fail(400,'Elige una fecha hasta hoy.')
           const reason = input.worked < input.planned ? input.reason : null
           const issue = validateHours({planned:input.planned,worked:input.worked,reason})
           if (issue) fail(400,issue)

@@ -1,8 +1,10 @@
 const special: Record<string, string> = { đ: 'd', ħ: 'h', ı: 'i', ł: 'l', ø: 'o', ŧ: 't' }
 /** Accent-insensitive name tokens in their original order. */
+export function fold(value: string) {
+  return value.toLowerCase().normalize("NFD").replace(/[đħıłøŧ]/g, c => special[c]).replace(/\p{M}/gu, "")
+}
 export function tokens(value: string) {
-  const normalized = value.toLowerCase().normalize('NFD').replace(/[đħıłøŧ]/g, c => special[c])
-    .replace(/\p{M}/gu, '').replace(/[^\p{L}\s]/gu, '').trim()
+  const normalized = fold(value).replace(/[^\p{L}\s]/gu, '').trim()
   return normalized ? normalized.split(/\s+/) : []
 }
 /** Canonical identity key shared by rosters, OCR and imports. */

@@ -12,9 +12,9 @@ vi.mock('firebase/firestore',async original => ({...await original<typeof import
 beforeEach(() => {data.student={schoolId:'s',fullName:'ANA PAZ',nameKey:'ana paz',active:true,needsReview:true,provisional:true,reviewReasons:['mayusculas']}})
 it('approves and audits the same student, with guarded undo',async () => {
   const undo = await resolveReview('id','aprobar')
-  expect(data.student).toMatchObject({needsReview:false,provisional:false,reviewedBy:'c',active:true})
+  expect(data.student).toMatchObject({fullName:'Ana Paz',nameKey:'ana paz',needsReview:false,provisional:false,reviewedBy:'c',active:true})
   await undo()
-  expect(data.student).toMatchObject({needsReview:true,provisional:true,reviewReasons:['mayusculas']})
+  expect(data.student).toMatchObject({fullName:'ANA PAZ',needsReview:true,provisional:true,reviewReasons:['mayusculas']})
 })
 it('corrects the name and search key together, and does not undo a subsequent edit',async () => {
   await expect(resolveReview('id','corregir','A.')).rejects.toMatchObject({status:400})

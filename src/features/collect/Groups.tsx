@@ -9,7 +9,7 @@ import { addStudentsToGroup, createGroup, deleteGroup, patchGroup, removeStudent
 import { useStudents } from '../../data/students'
 import { suggestGroups } from '../../domain/groupSuggester'
 import {levelColor} from '../../domain/levelPalette'
-import { LEVELS, subjectLabel } from '../../domain/levels'
+import { MOMENTS, LEVELS, subjectLabel } from '../../domain/levels'
 import { Button, Card, Dialog, Field, NumberInput, TextInput } from '../../ui/components'
 import { useAction } from './useAction'
 import { matches } from './formValues'
@@ -32,6 +32,7 @@ export function Groups({ schoolId, campus, profile, initialGroup, campuses = [] 
   const allSites = !admin && !campus
   const roster = students.filter(s => s.schoolId === schoolId && (allSites || s.campus === campus) && s.active && !s.retired)
   const directory = groups.filter(g => g.schoolId === schoolId && (allSites || g.campus === campus) && (!area || g.subject === area) && matches(search, g.name, g.teacherName, subjectLabel(g.subject)))
+  directory.sort((a,b) => Number(b.teacherId === profile.uid) - Number(a.teacherId === profile.uid))
   const assigned = new Set(groups.filter(g => g.subject === area).flatMap(g => g.studentIds))
   const unassigned = roster.filter(s => !assigned.has(s.id)).length
   const group = groups.find(g => g.id === edit)
@@ -51,16 +52,17 @@ export function Groups({ schoolId, campus, profile, initialGroup, campuses = [] 
       <Search value={search} onChange={setSearch} />
       <Button variant="primary" onClick={() => setEdit('')}>Crear grupo</Button>
       {!admin && <Button disabled={loadingStudents} onClick={() => setSuggest(true)}>Sugerir grupos</Button>}</div>
-    {loading ? <p>Cargando grupos…</p> : !directory.length ? <p>Cambia la búsqueda o crea un grupo en esta sede.</p> : directory.map(g =>
+    {loading ? <p>Cargando grupos…</p> : !directory.length ? <p>Cambia la búsqueda o crea un grupo en esta sede.</p> : directory.map((g,i) =>
       <Card key={g.id}>
+         {(!i || (directory[i-1].teacherId === profile.uid) !== (g.teacherId === profile.uid)) && !admin && <h2>{g.teacherId === profile.uid ? 'Mis grupos' : 'Otros grupos'}</h2>}
         <div className="collect-row">
           <div>
             <h3>{admin ? g.name : <Link to={groupLink('grupos', g)}>{g.name}</Link>}</h3>
-            <small>{subjectLabel(g.subject)} · {g.teacherName} · {g.studentIds.length} integrantes</small>
+            <small>{subjectLabel(g.subject)} · {g.teacherId ? g.teacherName || 'Docente asignado' : 'Sin docente'} · {g.studentIds.length} {g.studentIds.length === 1 ? 'integrante' : 'integrantes'}</small>
           </div>
           {admin && <Button onClick={() => setEdit(g.id)}>Administrar grupo</Button>}</div>
       </Card>)}
-    {area && !loading && !loadingStudents && <p>{unassigned} estudiantes sin grupo de {subjectLabel(area)} en esta selección</p>}
+    {area && !loading && !loadingStudents && <p>{unassigned} {unassigned === 1 ? 'estudiante' : 'estudiantes'} sin grupo de {subjectLabel(area)} en esta selección</p>}
     {(suggest || edit === '') && chooseCampus && <Dialog title="Selecciona una sede" onClose={() => { setEdit(null); setSuggest(false) }}>
       {campuses.map(c => <Button key={c.id} onClick={() => setSelectedCampus(c.id)}>{c.name}</Button>)}</Dialog>}
     {edit !== null && !chooseCampus && (!edit || (group && (admin || group.teacherId === profile.uid))) &&
@@ -85,7 +87,7 @@ function GroupEditor({ group, schoolId, campus, admin, roster, onClose, initialS
   const action = useAction()
   return <Dialog title={group ? 'Administrar grupo' : 'Crear grupo'} onClose={onClose} busy={action.busy}>
     <fieldset disabled={action.busy}>
-      <form onSubmit={e => {
+      <form noValidate onSubmit={e => {
         e.preventDefault()
         if (!name.trim() || (admin && !teacherId)) return
         void action.run(async () => {
@@ -99,7 +101,7 @@ function GroupEditor({ group, schoolId, campus, admin, roster, onClose, initialS
         })
       }}>
         <Field label="Nombre del grupo">
-          <TextInput required value={name} onChange={e => setName(e.target.value)} />
+          <TextInput maxLength={60} required value={name} onChange={e => setName(e.target.value)} />
         </Field>
         <SubjectField value={subject} onChange={setSubject} disabled={!!group} />
         {admin && <TeacherPicker {...{ schoolId }} value={teacherId} onChange={setTeacher} />}
@@ -129,8 +131,10 @@ function GroupEditor({ group, schoolId, campus, admin, roster, onClose, initialS
 
 function Suggestions({ schoolId, campus, roster, initialSubject, onClose }: Site & { initialSubject: Subject; roster: Student[]; onClose: () => void }) {
   const [subject, setSubject] = useState<Subject>(initialSubject)
-  const [moment, setMoment] = useState<Moment>('linea_base')
+  const latest = (area:Subject) => [...MOMENTS].reverse().find(m => roster.some(s => s.levels[area]?.moment === m)) || 'linea_base'
+  const [moment, setMoment] = useState<Moment>(() => latest(initialSubject))
   const [count, setCount] = useState('1')
+  const [problem,setProblem] = useState('')
   const [preview, setPreview] = useState<Proposal[] | null>(null)
   const [selected, setSelected] = useState<number | null>(null)
   const [members, setMembers] = useState<string[]>([])
@@ -138,7 +142,9 @@ function Suggestions({ schoolId, campus, roster, initialSubject, onClose }: Site
   const [created, setCreated] = useState<string | null>(null)
   const action = useAction()
   const step = preview === null ? 1 : selected === null ? 2 : 3
+  const excluded = preview ? roster.length - preview.reduce((n,p) => n+p.studentIds.length,0) : 0
   function reset() {
+    setProblem('')
     setPreview(null)
     setSelected(null)
   }
@@ -148,6 +154,7 @@ function Suggestions({ schoolId, campus, roster, initialSubject, onClose }: Site
     <fieldset disabled={action.busy || !!created}>
       {step === 1 && <><SubjectField value={subject} onChange={s => {
         setSubject(s)
+        setMoment(latest(s))
         reset()
       }} />
       <MomentField value={moment} onChange={m => {
@@ -160,11 +167,12 @@ function Suggestions({ schoolId, campus, roster, initialSubject, onClose }: Site
           reset()
         }} />
       </Field>
+      {(!Number.isSafeInteger(+count) || +count < 1) && <p role="alert">Indica al menos un docente.</p>}
       <Button disabled={!Number.isSafeInteger(+count) || +count < 1} onClick={() => {
         setSelected(null)
-        setPreview(suggestGroups(roster, subject, moment, +count))
-      }}>Ver propuesta</Button></>}
-      {step === 2 && preview && <p>{roster.length - preview.reduce((n,p) => n+p.studentIds.length,0)} estudiantes quedaron fuera por no tener nivel en este momento y área.</p>}
+        try { setPreview(suggestGroups(roster,subject,moment,+count)); setProblem('') } catch (e) { setProblem((e as Error).message) }
+      }}>Ver propuesta</Button>{problem && <p role="alert">{problem}</p>}</>}
+      {step === 2 && excluded > 0 && <p>{excluded} {excluded === 1 ? 'estudiante quedó' : 'estudiantes quedaron'} fuera por no tener nivel en este momento y área.</p>}
       {step === 2 && preview && (preview.length ? <>
 
         {preview.map((p, i) => {
@@ -174,11 +182,11 @@ function Suggestions({ schoolId, campus, roster, initialSubject, onClose }: Site
           setSelected(i)
           setMembers(p.studentIds)
           setName(proposalName(p, i))
-        }}>{proposalName(p, i)} · {p.studentIds.length} estudiantes</Button>
+        }}>{proposalName(p, i)} · {p.studentIds.length} {p.studentIds.length === 1 ? 'estudiante' : 'estudiantes'}</Button>
         })}</> : <p>Evalúa estudiantes de esta sede en el área y momento elegidos para generar una propuesta.</p>)}
       {selected !== null && preview && <>
         <Field label="Nombre de mi grupo">
-          <TextInput value={name} onChange={e => setName(e.target.value)} />
+          <TextInput maxLength={60} value={name} onChange={e => setName(e.target.value)} />
         </Field>
         {preview[selected].studentIds.map(id => <label key={id}>
           <input type="checkbox" checked={members.includes(id)} onChange={e => setMembers(e.target.checked ? [...members, id] : members.filter(v => v !== id))} />{roster.find(s => s.id === id)?.fullName ?? id}</label>)}</>}

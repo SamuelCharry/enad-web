@@ -28,3 +28,10 @@ it('conserva las advertencias sin impedir el envío y exige resolver homónimos'
   expect(reviewName(changed, rosterMatches(changed.input, roster))).toMatchObject({ id: 'new', problem: '', flags: ['ocr_baja_confianza'] })
   expect(reviewName(row, [])).toMatchObject({ id: 'new', problem: '', flags: expect.arrayContaining(['ocr_baja_confianza', 'mayusculas', 'formato_nombre']) })
 })
+
+it('descarta coincidencias de nombres de pila con apellidos distintos', () => {
+  const rows = [{id:'r',fullName:'Camila Rendón Hernández'},{id:'s',fullName:'Ana Sofía Salazar Marín'},{id:'h',fullName:'Camila Gómez Henao'}]
+  expect(rosterMatches('camila gomez henao',rows).map(m => m.student.id)).toEqual(['h'])
+  expect(rosterMatches('Ana Mar1a',rows)).toEqual([])
+  expect(rosterMatches('Henao Camila Gómez',rows)[0]?.student.id).toBe('h')
+})

@@ -33,6 +33,7 @@ export function saveStudentAssignment(student: Student, fields: StudentFields, b
         for (const g of groups) {
           const data = g.data() as Group | undefined
           if (!data || data.schoolId !== student.schoolId) fail(400, 'El grupo ya no pertenece a esta institución.')
+          if (added.has(g.id) && !data.studentIds?.includes(student.id) && (data.studentIds?.length ?? 0) >= 60) fail(400,'El grupo admite hasta 60 estudiantes.')
           const campus = campuses.find(c => c.id === site || c.name === site)
           if (added.has(g.id) && data.campus !== site && (!campus || (data.campus !== campus.name && data.campus !== campus.id))) fail(400, 'El grupo pertenece a otra sede.')
         }

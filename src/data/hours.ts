@@ -1,7 +1,7 @@
 import { doc, getDoc, setDoc, where } from 'firebase/firestore'
 import { trackSubmission } from './pending'
 import { validateHours, cleanDetail } from '../domain/hoursReason'
-import { weekOf } from '../domain/weeks'
+import { colombiaToday, weekOf } from '../domain/weeks'
 import type { HoursEntry } from '../domain/types'
 import { api, caller, compare, configOf, fail, now, requireDate, requireSchool, str } from './core'
 import { db } from './firebase'
@@ -28,6 +28,7 @@ export function saveHours(input: {
   return api(async () => {
     const p = await caller('writer'), { date, schoolId, plannedHours, workedHours } = input
     requireDate(date)
+    if (date > colombiaToday()) fail(400, 'Elige una fecha hasta hoy.')
     if (!schoolId) fail(400, 'Selecciona la institución.')
     await requireSchool(p, schoolId)
     if (![plannedHours, workedHours].every(n => Number.isFinite(n) && n >= 0 && n <= 24)) fail(400, 'Escribe horas entre 0 y 24.')

@@ -24,12 +24,11 @@ export const importColumns: Record<ImportKind, ImportColumn[]> = {
     col('id', 'ID institución', true, ['Código institución', 'schoolId']),
     col('name', 'Nombre de la institución', true, ['nombre', 'Institución', 'IE']),
     col('projectId', 'Proyecto', true),
-    col('region', 'Región', true),
     col('department', 'Departamento', true),
     col('municipality', 'Municipio', true),
     col('zone', 'Zona', true),
-    col('campusId', 'ID sede'),
-    col('campusName', 'Nombre de la sede', false, ['sede']),
+    col('campusId', 'ID sede',true),
+    col('campusName', 'Nombre de la sede', true, ['sede']),
     shift
   ],
   evaluations: [

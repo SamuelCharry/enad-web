@@ -56,3 +56,6 @@ export function useScopedRows<T>(path: string, schoolId?: string, mine = false) 
   const source = useMemo(() => scopedRows<T>(path, schoolId, p => mine ? [where('teacherId', '==', p.uid)] : []), [path, schoolId, mine])
   return useLive(source, [])
 }
+
+const projectStream = withSession<{id:string;name:string}[]>([], (_p,next,error) => listenMany([collection(db,'projects')],next,error))
+export const useProjects = () => useLive(projectStream,[])

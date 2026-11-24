@@ -1,4 +1,5 @@
-import { colombiaToday } from '../domain/weeks'
+import { preference, remember } from '../domain/preferences'
+import { classDate, colombiaToday } from '../domain/weeks'
 import { Link, NavLink, Navigate, Outlet, useLocation, useOutletContext } from 'react-router-dom'
 import { Suspense, useEffect, useRef, useState } from 'react'
 import type { UserProfile } from '../domain/types'
@@ -22,7 +23,7 @@ export function PortalLayout() {
   const entries = roleNav(profile.rol)
   const section = pathname.split('/')[2]
   const title = entries.find(([slug]) => slug === section)?.[1] || ({historicas:'Evaluaciones históricas', calidad:'Calidad de datos', importaciones:'Importaciones'} as Record<string,string>)[section] || entries[0][1]
-  const [collapsed,setCollapsed] = useState(false)
+  const [collapsed,setCollapsed] = useState(() => preference('sidebar') === 'collapsed')
   const [drawer,setDrawer] = useState(false)
   const dialog = useRef<HTMLDialogElement>(null)
   const toggle = useRef<HTMLButtonElement>(null)
@@ -41,7 +42,7 @@ export function PortalLayout() {
     <div className="side-brand"><Link to={homePath(profile.rol)} onClick={mobile ? close : undefined} aria-label="ENAd, inicio">
       <img src={import.meta.env.BASE_URL + 'branding/enad_logo.png'} alt="ENAd" /></Link>
       <button type="button" className="shell-icon" aria-label={mobile ? 'Cerrar menú' : collapsed ? 'Ampliar barra lateral' : 'Contraer barra lateral'}
-        onClick={mobile ? close : () => setCollapsed(!collapsed)}><Icon name={collapsed && !mobile ? 'arrow' : 'back'} /></button></div>
+        onClick={mobile ? close : () => { remember('sidebar',collapsed ? 'open' : 'collapsed'); setCollapsed(!collapsed) }}><Icon name={collapsed && !mobile ? 'arrow' : 'back'} /></button></div>
     <nav aria-label="Menú principal">{entries.map(([slug,label,icon]) => <NavLink key={slug} aria-label={label} title={label} to={'/portal/' + slug} onClick={mobile ? close : undefined}>
       <Icon name={icon} size={20}/><span>{label}</span>{slug === 'revision' && <ReviewCount/>}</NavLink>)}</nav>
     <footer><strong>{profile.fullName}</strong><span>{{ docente:'Docente',coordinador:'Coordinación',fundacion:'Fundación' }[profile.rol]}</span><SwitchUser /></footer>
@@ -59,7 +60,7 @@ export function PortalLayout() {
       }} onClick={e => { if (e.target === dialog.current) close() }}><div>{sidebar(true)}</div></dialog>}
     <div className="workspace-body"><header className="workspace-top">
       <button ref={toggle} className="shell-icon menu-toggle" aria-label="Abrir menú" aria-expanded={drawer} onClick={() => setDrawer(true)}><Icon name="menu"/></button>
-      <h1>{title}</h1>{section === 'hoy' && <time>{new Intl.DateTimeFormat('es-CO',{timeZone:'America/Bogota',day:'numeric',month:'long'}).format(new Date(colombiaToday()+'T12:00:00Z'))}</time>}
+      <h1>{title}</h1>{section === 'hoy' && <time>{classDate(colombiaToday())}</time>}
       {profile.rol !== 'docente' && section === 'reportes' && <Link to="/portal/descargas">Descargas</Link>}
     </header><main id="portal-main" tabIndex={-1} key={JSON.stringify([profile.uid,profile.rol,profile.schoolIds,section])}>
       <Suspense fallback={<p role="status">Cargando sección…</p>}><Outlet context={profile}/></Suspense></main></div>

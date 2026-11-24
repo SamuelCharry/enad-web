@@ -16,9 +16,9 @@ El presupuesto se mide con las rutas antiguas para cubrir también sus redirecci
 | Directorios, datos históricos e importaciones | 400 | — |
 | Reportes de resumen, seguimiento, instituciones, horas, niveles, docentes y comparación | 1.500 | 15 |
 
-En los datos de prueba, Hoy cuesta una lectura. El número de pendientes proviene del dispositivo. Al reabrir con escrituras pendientes se observan únicamente los documentos sin acuse. En Asistencia se carga la lista del grupo elegido. Inicio consulta por colegio las marcas presentes y ausentes de ambas semanas y el total de horas. El historial de movimiento de niveles se consulta al abrir ese detalle. La barra lateral escucha la cola de nombres del perfil. Las descargas completas leen las entidades solicitadas cuando la persona pulsa descargar.
+Hoy consulta los planes de la fecha por colegio y docente. El número de pendientes proviene del dispositivo. Al reabrir con escrituras pendientes se observan únicamente los documentos sin acuse. En Asistencia se carga la lista del grupo elegido. Inicio consulta por colegio las marcas presentes y ausentes de ambas semanas y el total de horas. El historial de movimiento de niveles se consulta al abrir ese detalle. La barra lateral escucha la cola de nombres del perfil. Las descargas completas leen las entidades solicitadas cuando la persona pulsa descargar.
 
-En Resumen, una semana con pocas marcas de asistencia se resuelve con una consulta de documentos. Para las semanas con muchas marcas, el informe lee el padrón de la institución una sola vez y usa sus identificadores para dividir la búsqueda en hasta 30 rangos simultáneos. Los rangos también cubren a estudiantes que ya salieron del padrón. La prueba de latencia usa un reloj simulado, con 250 ms por consulta de documentos y 7 s para la suma de horas. Comprueba que el informe completo está disponible a los 8 s.
+Resumen muestra la misma semana inicial que los demás informes. Para cada colegio consulta una vez las marcas presentes del período y cuenta las ausencias mediante una agregación. Al elegir sede, lee sus estudiantes y filtra las marcas del colegio en memoria. Los conteos semanales conservan cada estudiante una sola vez. Con cinco colegios la prueba exige diez consultas de asistencia y cero consultas por estudiante, aunque haya marcas repetidas o estudiantes fuera del padrón.
 
 ## Índices para el despliegue
 
@@ -26,6 +26,7 @@ La tabla recoge los índices base de los informes. Para v2, la cola de nombres u
 
 | Colección | Ámbito | Campos y dirección |
 | --- | --- | --- |
+| `plan` | `COLLECTION_GROUP` | `schoolId ASC, teacherId ASC, date ASC` |
 | `attendance` | `COLLECTION_GROUP` | `schoolId ASC, date ASC` |
 | `attendance` | `COLLECTION_GROUP` | `schoolId ASC, savedAt DESC` |
 | `attendance` | `COLLECTION_GROUP` | `schoolId ASC, teacherId ASC, savedAt DESC` |

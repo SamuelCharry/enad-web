@@ -61,11 +61,6 @@ async function distinctRows<T>(ordered: Query, splits: string[][], key: (row: T)
   return ranges.flat()
 }
 
-/** IDs are in Firestore document ID order, which matches the indexed string field. */
-export function distinctStudentRows<T>(ordered: Query, studentIds: string[], key: (row: T) => string[], signal: AbortSignal) {
-  return distinctRows(ordered, splitKeys(studentIds.length, i => [studentIds[i]], 8), key, signal)
-}
-
 export async function sessions(base: Query, from: string, to: string, groupIds: string[], signal?: AbortSignal): Promise<SessionMark[]> {
   const ordered = query(base, ...dates(from, to), orderBy('date'), orderBy('groupId'), orderBy('teacherId'), orderBy('savedAt', 'desc'))
   signal?.throwIfAborted()
@@ -93,20 +88,4 @@ export async function enrollment(q: Query) {
   ])
   const both = retired && inactive ? await total(query(q, equal('retired', true), equal('active', false))) : 0
   return all - retired - inactive + both
-}
-
-/** Read a sparse week in one request when it costs at most a roster read.
- * For dense weeks, seek past duplicate marks
- * in parallel using the same school roster for every week. */
-export async function distinctPresent(schoolId: string, from: string, to: string, rosterIds: () => Promise<string[]>, enrolled: Promise<number>, signal: AbortSignal) {
-  const days: string[] = []
-  for (let ms = Date.parse(from); ms <= Date.parse(to); ms += 86_400_000) days.push(new Date(ms).toISOString().slice(0, 10))
-  const week = scoped('attendance', schoolId, equal('status', 'vino'), where('date', 'in', days), orderBy('studentId'))
-  signal.throwIfAborted()
-  const [count, students] = await Promise.all([total(week), enrolled])
-  if (!count) return 0
-  signal.throwIfAborted()
-  if (count <= Math.max(30, students)) return new Set((await rows<AttendanceMark>(week)).map(m => m.studentId)).size
-  const ordered = query(week, limit(1))
-  return (await distinctStudentRows<AttendanceMark>(ordered, await rosterIds(), m => [m.studentId], signal)).length
 }

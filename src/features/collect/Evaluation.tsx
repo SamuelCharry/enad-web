@@ -3,10 +3,10 @@ import { useState } from 'react'
 import type { Evaluation, Moment, School, Student, Subject } from '../../domain/types'
 import { saveEvaluation, useSchoolEvaluations } from '../../data/evaluations'
 import { addStudentsToGroup, useGroups } from '../../data/groups'
-import { patchStudent, useStudents } from '../../data/students'
+import { useStudents } from '../../data/students'
 import { levelColor } from '../../domain/levelPalette'
 import { levelLabel, LEVELS, MOMENTS, shouldOverwriteLevel } from '../../domain/levels'
-import { Button, Card, Dialog, LevelChip, SyncStatus } from '../../ui/components'
+import { Button, Card, LevelChip, SyncStatus } from '../../ui/components'
 import { useAction } from './useAction'
 import { Choice, MomentField, SubjectField } from './common'
 
@@ -24,11 +24,12 @@ export function Evaluations({ schoolId, campus, initialGroup = '', initialSubjec
   const [adding, setAdding] = useState(false)
   const { groups, loading: loadingGroups, error: groupError } = useGroups(schoolId, { mine: true })
   const { students, loading, error } = useStudents(schoolId)
-  const localGroups = groups.filter(g => !g.campus || g.campus === campus)
-  const subject = chosenSubject || localGroups.find(g => g.id === groupId)?.subject || localGroups[0]?.subject || 'lectura'
-  const options = groups.filter(g => g.subject === subject && (!g.campus || g.campus === campus))
-  const group = options.find(g => g.id === groupId) || (groupId !== 'all' ? options[0] : undefined)
-  const roster = students.filter(s => s.schoolId === schoolId && (s.campus === campus || group?.campus === '') && !s.retired && s.active && (!group || group.studentIds.includes(s.id)))
+  const campusName = school?.campuses.find(c => c.id === campus)?.name
+  const localGroups = groups.filter(g => !g.campus || g.campus === campus || g.campus === campusName || g.id === initialGroup)
+  const subject = localGroups.find(g => g.id === groupId)?.subject || chosenSubject || localGroups[0]?.subject || 'lectura'
+  const options = localGroups.filter(g => g.subject === subject)
+  const group = groupId ? options.find(g => g.id === groupId) : options[0]
+  const roster = students.filter(s => s.schoolId === schoolId && !s.retired && s.active && group?.studentIds.includes(s.id))
   const events = useSchoolEvaluations(schoolId, subject, moment, roster.map(s => s.id))
   const latest = new Map<string, Evaluation>()
   for (const event of events.data) {
@@ -43,10 +44,10 @@ export function Evaluations({ schoolId, campus, initialGroup = '', initialSubjec
         setGroup('')
       }} />
       <MomentField value={moment} onChange={setMoment} />
-      <Choice label="Grupo" value={group?.id ?? ''} options={options} placeholder="Todos los estudiantes de la sede" onChange={id => setGroup(id || 'all')} />
+      <Choice label="Grupo" value={group?.id ?? ''} options={options} placeholder={options.length ? undefined : "Sin grupos en esta sede"} onChange={setGroup} />
     </div>
-    {school && moment && <Button onClick={() => setAdding(true)}>Añadir estudiante</Button>}
-    {school && adding && <StudentEditor classRegistration school={school} campus={campus} admin={false} onClose={() => setAdding(false)} onSaved={async id => { if (group) await addStudentsToGroup(group.id,[id]) }} />}
+    {school && group && moment && <Button onClick={() => setAdding(true)}>Añadir estudiante</Button>}
+    {school && adding && <StudentEditor classRegistration school={school} campus={group?.campus || campus} admin={false} onClose={() => setAdding(false)} onSaved={async id => { if (group) await addStudentsToGroup(group.id,[id]) }} />}
     {!moment ? <p>Selecciona el momento para ver a los estudiantes.</p> : loading || loadingGroups || events.loading ? <p>Cargando estudiantes…</p> :
       roster.length ? roster.map(s => <StudentEvaluation key={JSON.stringify([s.id, subject, moment, group?.id])} student={s} event={latest.get(s.id)} initiallyOpen={s.id === studentId} {...{ subject, moment }} groupId={group?.id} />) : <p>Añade un estudiante o elige otro grupo para evaluar.</p>}</>
 }
@@ -58,7 +59,6 @@ function StudentEvaluation({ student, subject, moment, groupId, event, initially
   const savedLevel = event?.level ?? (current?.moment === moment ? current.level : '')
   const level = draft ?? savedLevel
   const [expanded, setExpanded] = useState(initiallyOpen)
-  const [retiring, setRetiring] = useState(false)
   const ready = draft !== undefined && LEVELS[subject].includes(level)
   return <Card>
     <h3><Button data-guide="student" variant="ghost" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>{student.fullName}</Button></h3>
@@ -75,7 +75,6 @@ function StudentEvaluation({ student, subject, moment, groupId, event, initially
         })}</div>
       </fieldset>
       {!shouldOverwriteLevel(current?.moment, moment) && <p>Esta evaluación quedará en el historial y conservará el nivel actual.</p>}
-      <Button variant="danger" onClick={() => setRetiring(true)}>Retirar estudiante</Button>
       <div className="teacher-save"><Button variant="primary" disabled={!ready} onClick={() => ready && action.run(async () => {
         const receipt = await saveEvaluation({
           studentId: student.id, subject, moment, level, ...(groupId ? { groupId } : {})
@@ -84,7 +83,5 @@ function StudentEvaluation({ student, subject, moment, groupId, event, initially
         setDraft(undefined)
       }, '')}>Guardar evaluación</Button></div>
     </fieldset>}
-    {retiring && <Dialog title={'¿Retirar a ' + student.fullName + '?'} busy={action.busy} onClose={() => setRetiring(false)}><p>El historial permanecerá disponible.</p>
-      <Button variant="danger" loading={action.busy} onClick={() => action.run(async () => { const result = await patchStudent(student.id,{ retired: true }); setRetiring(false); return result })}>Confirmar retiro</Button>
-      {action.feedback}</Dialog>}{!retiring && action.feedback}</Card>
+    {action.feedback}</Card>
 }

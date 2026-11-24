@@ -13,8 +13,8 @@ import { PageCrop } from './crop/PageCrop'
 interface Page { id: string; url: string; engine: string; omitted: number }
 interface Entry { existing?: string; row: ReviewName; grade: number; flags: string[] }
 interface Submission { entries: Entry[]; group?: Group; ids: string[]; pending: boolean }
-export function Scanner({ schoolId, campus, students, onClose, onSaved }: {
-  onSaved?: (group?: Group) => void; schoolId: string; campus: string; students: Student[]; onClose: () => void
+export function Scanner({ schoolId, campus, campusName, students, onClose, onSaved }: {
+  campusName?:string; onSaved?: (group?: Group) => void; schoolId: string; campus: string; students: Student[]; onClose: () => void
 }) {
   const [rows, setRows] = useState<ReviewName[]>([])
   const [pages, setPages] = useState<Page[]>([])
@@ -30,7 +30,8 @@ export function Scanner({ schoolId, campus, students, onClose, onSaved }: {
   const urls = useRef(new Set<string>())
   useEffect(() => { const all = urls.current; return () => all.forEach(url => URL.revokeObjectURL(url)) }, [])
   const { groups, loading, error } = useGroups(schoolId, { mine: true })
-  const group = groups.find(g => g.id === groupId && g.schoolId === schoolId && g.campus === campus)
+  const inCampus = (value:string) => value === campus || value === campusName
+  const group = groups.find(g => g.id === groupId && g.schoolId === schoolId && inCampus(g.campus))
   const roster = useMemo(() => students.filter(s => s.schoolId === schoolId), [students, schoolId])
   const members = new Set(group?.studentIds)
   const counts = [0, 0, 0, 0, 0, 0]
@@ -45,7 +46,13 @@ export function Scanner({ schoolId, campus, students, onClose, onSaved }: {
     if (identities.has(r.identity)) repeated.add(r.identity)
     identities.add(r.identity)
   }
-  const ready = rows.length > 0 && rows.length <= 200 && !repeated.size && review.every(r => !r.problem) && (!groupId || !!group)
+  const outside = group ? review.flatMap(r => {
+    const student = roster.find(s => s.id === r.id)
+    return student && !inCampus(student.campus) ? [student.fullName] : []
+  }) : []
+  const projectedSize = new Set([...(group?.studentIds || []),...review.map(r => r.id === 'new' ? r.identity : r.id)]).size
+  const overCapacity = !!group && projectedSize > 60
+  const ready = !outside.length && !overCapacity && rows.length > 0 && rows.length <= 200 && !repeated.size && review.every(r => !r.problem) && (!groupId || !!group)
   function patch(id: string, changes: Partial<ReviewName>) {
     setRows(prev => prev.map(r => r.id === id ? { ...r, ...changes } : r))
   }
@@ -97,7 +104,6 @@ export function Scanner({ schoolId, campus, students, onClose, onSaved }: {
           existing: review[i].id === 'new' ? undefined : review[i].id, flags: review[i].flags
         }))
       }
-      setSubmission(draft)
     }
     for (const { row, grade, existing, flags } of draft.entries.slice(draft.ids.length)) {
       if (existing) { draft.ids.push(existing); continue }
@@ -106,24 +112,26 @@ export function Scanner({ schoolId, campus, students, onClose, onSaved }: {
         clientId: row.id, source: 'ocr', ocrConfidence: row.confidence, reviewReasons: flags
       })
       draft.ids.push(s.id)
+      setSubmission(draft)
       draft.pending ||= 'syncState' in s && s.syncState === 'pending'
     }
     if (draft.group) {
+      if (draft.entries.some(e => !e.existing)) setSubmission(draft)
       const result = await addStudentsToGroup(draft.group.id, draft.ids)
       draft.pending ||= result?.syncState === 'pending'
     }
     const matched = draft.entries.filter(e => e.existing).length
-    setReceipt(scanReceipt(matched, draft.entries.length - matched, draft.pending))
+    setReceipt(scanReceipt(matched, draft.entries.length - matched, draft.pending)+(draft.group ? ' Grupo: '+draft.group.name+'.' : ''))
     onSaved?.(draft.group)
   }
   return <Dialog title="Escanear lista" onClose={onClose} busy={action.busy || progress !== null}>
     {receipt ? <p role="status">{receipt}</p> : <>
       <fieldset disabled={action.busy || !!submission || progress !== null} hidden={!!preview}>
-        <Field label="Tomar foto de la lista"><TextInput type="file" accept="image/*" capture="environment" onChange={chooseFile} /></Field>
-        <Field label="Elegir imagen"><TextInput type="file" accept="image/*" onChange={chooseFile} /></Field>
+        <label className="ui-button scan-file">Tomar foto de la lista<input type="file" accept="image/*" capture="environment" onChange={chooseFile} /></label>
+        <label className="ui-button scan-file">Elegir imagen<input type="file" accept="image/*" onChange={chooseFile} /></label>
       </fieldset>
       {preview && <>
-        {needsModel && <Field label="Modelo de español"><TextInput type="file" accept=".traineddata,.gz" onChange={e => setModel(e.target.files?.[0])} /></Field>}
+        {needsModel && <label className="ui-button scan-file">Modelo de español<input type="file" accept=".traineddata,.gz" onChange={e => setModel(e.target.files?.[0])} /></label>}
         <PageCrop key={preview.url} url={preview.url} warning={warning} busy={progress !== null} onRead={f => scan(f, preview)}
           onCancel={() => { release(preview.url); setPreview(undefined) }} />
       </>}
@@ -132,14 +140,16 @@ export function Scanner({ schoolId, campus, students, onClose, onSaved }: {
         {pages.map((page, i) => <details key={page.id} open={rows.every(r => r.page !== page.id) || undefined}>
           <summary>Página {i + 1} · {page.engine}</summary><img src={page.url} alt={'Lista original, página ' + (i + 1)} />
           {rows.every(r => r.page !== page.id) && <p>No encontramos nombres. Añade una fila o toma otra foto.</p>}
-          <Field label={'Volver a escanear la página ' + (i + 1)}><TextInput type="file" accept="image/*" onChange={e => chooseFile(e, page)} /></Field>
+          <label className="ui-button scan-file">{'Volver a escanear la página ' + (i + 1)}<input type="file" accept="image/*" onChange={e => chooseFile(e, page)} /></label>
           <Button disabled={rows.filter(r => r.page === page.id).length >= 45} onClick={() => addRow(page.id)}>Añadir una fila omitida</Button>
         </details>)}
         {pages.map(p => p.omitted > 0 && <p role="status" key={p.id}>{p.omitted} nombres fuera del límite de 45. Escanea el resto en otra página.</p>)}
         {!pages.length && <Button disabled={rows.length >= 45} onClick={() => addRow('')}>Añadir una fila omitida</Button>}
         {!!rows.length && <>
           <Choice label="Añadir al grupo" value={groupId} placeholder="Sin grupo" disabled={loading || !!error}
-            options={groups.filter(g => g.campus === campus && g.schoolId === schoolId)} onChange={setGroup} />
+            options={groups.filter(g => inCampus(g.campus) && g.schoolId === schoolId)} onChange={setGroup} />
+          {!!outside.length && <p role="alert">{outside.join(', ')} pertenece a otra sede. Quita la fila o elige «Sin grupo».</p>}
+          {overCapacity && <p role="alert">El grupo admite hasta 60 integrantes. Quita filas o elige «Sin grupo».</p>}
           {error && <p role="alert">{error}</p>}
           {rows.map((r, i) => {
             const result = review[i], matched = result.id && result.id !== 'new'

@@ -8,8 +8,8 @@ import { TableExport } from '../../reports/TableExport'
 import './admin.css'
 
 export interface DirectoryRow { id: string; cells: ReactNode[]; search: string }
-export function Directory({ title, headers, rows, create, editor, editLabel = 'Editar', loading = false }: {
-  title: string; headers: string[]; rows: DirectoryRow[]; create?: string; editLabel?: string; loading?: boolean
+export function Directory({ showExport = true, title, headers, rows, create, editor, editLabel = 'Editar', loading = false }: {
+  showExport?: boolean; title: string; headers: string[]; rows: DirectoryRow[]; create?: string; editLabel?: string; loading?: boolean
   editor?: (id: string | null, close: (message?: string) => void) => ReactNode
 }) {
   const container = useRef<HTMLDivElement>(null)
@@ -40,7 +40,7 @@ export function Directory({ title, headers, rows, create, editor, editLabel = 'E
         <tbody>{filtered.slice(page * 20, page * 20 + 20).map(r => <Fragment key={r.id}><tr>{r.cells.map((cell, i) => <td key={headers[i]} data-label={headers[i]}>{cell}</td>)}{editor &&
           <td data-export-ignore><Button aria-expanded={selected === r.id} onClick={() => { setNotice(''); setSelected(selected === r.id ? undefined : r.id) }}>{editLabel}</Button></td>}</tr>
           {editor && selected === r.id && <tr className="admin-expanded" data-export-ignore><td colSpan={headers.length + 1}>{editor(r.id, close)}</td></tr>}</Fragment>)}</tbody></table></div>
-      <TableExport container={container} label="Exportar página a Excel" />
+      {showExport && <TableExport container={container} label="Exportar página a Excel" />}
       <Pager page={page} count={filtered.length} setPage={p => { setPage(p); close() }} /></> :
       <p>{query ? 'No hay coincidencias. Prueba otro nombre o código.' : create ? 'Todavía no hay registros. Usa «' + create + '» para comenzar.' : 'No hay registros para esta selección. Revisa los filtros o vuelve después del próximo registro.'}</p>}
   </div>

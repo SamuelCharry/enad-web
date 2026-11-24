@@ -22,9 +22,9 @@ export function SummaryView({ filters }: Props) {
       ['Grupos de lectura', number(r.groupsBySubject.lectura)], ['Grupos de matemáticas', number(r.groupsBySubject.matematicas)],
       ['Horas ejecutadas / planeadas', number(r.hoursWorked) + ' / ' + number(r.hoursPlanned)], ['Tasa de asistencia', percent(r.attendanceRate)],
     ]
-    return <>{filters.campus && <p>Las horas se registran por institución. La cobertura docente de una sede corresponde a sus grupos asignados.</p>}<dl className="rep-metrics">{metrics.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+    return <>{!!r.unavailable?.length && <p role="alert">No disponible · {r.unavailable.join(', ')}</p>}{filters.campus && <p>Las horas se registran por institución. La cobertura docente de una sede corresponde a sus grupos asignados.</p>}<dl className="rep-metrics">{metrics.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{r.unavailable?.some(k => label.startsWith(k) || (label === 'Tasa de asistencia' && k === 'Asistencia')) ? 'No disponible' : value}</dd></div>)}</dl>
       <Card><h3>Estudiantes que asistieron por semana de implementación</h3>
-        {r.studentsOverTime.length ? <Chart type="line" axis="Semana de implementación" label="Estudiantes" data={[...r.studentsOverTime].sort((a,b) => a.week - b.week).map(p => ({ label: 'Semana ' + number(p.week), value: p.count }))} />
+        {r.unavailable?.includes('Asistencia') ? <p>No disponible</p> : r.studentsOverTime.length ? <Chart type="line" axis="Semana de implementación" label="Estudiantes" data={[...r.studentsOverTime].sort((a,b) => a.week - b.week).map(p => ({ label: 'Semana ' + number(p.week), value: p.count }))} />
           : <EmptyState title="Sin asistencia semanal." description="Amplía el período o consulta los envíos pendientes." />}
       </Card></>
   }}</ReportRead></>

@@ -26,6 +26,11 @@ export function readCounter() {
   function select(q: Ref) {
     reads.requests.push(q)
     const constraints = q.constraints ?? [], orders = constraints.filter(f => f.op === 'order')
+    const disjunctions = constraints.filter(f => f.op === 'in')
+    if (disjunctions.some(f => !Array.isArray(f.value) || f.value.length > 10) ||
+        disjunctions.length && constraints.some(f => ['>=','<=','>','<'].includes(f.op))) {
+      throw new Error('Consulta fuera del presupuesto: '+q.path)
+    }
     const after = constraints.find(f => f.op === 'cursor')?.value as unknown[] | undefined
     const end = constraints.find(f => f.op === 'endAt')?.value as unknown[] | undefined
     const take = constraints.find(f => f.op === 'limit')?.value as number | undefined

@@ -5,6 +5,7 @@ import { MemoryRouter, Outlet, Route, Routes } from 'react-router-dom'
 import { PortalLayout } from '../../app/PortalLayout'
 import { CollectRoutes } from '../collect'
 import { GroupDetail } from './GroupDetail'
+import { useTodayPlans } from '../../data/activities'
 import { TeacherHome } from './TeacherHome'
 import { Scanner } from '../collect/Scanner'
 import { useSchoolAttendance, saveGroupAttendance } from '../../data/attendance'
@@ -25,6 +26,7 @@ vi.mock('../../data/evaluations', () => ({ useSchoolEvaluations: vi.fn(), saveEv
 vi.mock('../../data/groups', () => ({ useGroups: vi.fn(), createGroup: vi.fn(), addStudentsToGroup: vi.fn(), removeStudentFromGroup: vi.fn() }))
 vi.mock('../../data/students', () => ({ useStudents: vi.fn(), getStudentHistory: vi.fn(), patchStudent: vi.fn() }))
 vi.mock('../../data/hours', () => ({ useMyHours: vi.fn() }))
+vi.mock('../../data/activities', () => ({useTodayPlans:vi.fn()}))
 vi.mock('../../data/admin', () => ({}))
 vi.mock('../../domain/weeks', async orig => ({ ...await orig<typeof import('../../domain/weeks')>(), colombiaToday: () => '2026-04-08' }))
 
@@ -55,7 +57,9 @@ afterAll(() => {
   Reflect.deleteProperty(HTMLDialogElement.prototype,'close')
 })
 beforeEach(() => {
+  localStorage.clear()
   vi.resetAllMocks()
+  vi.mocked(useTodayPlans).mockReturnValue({...loaded,data:[]})
   vi.mocked(useSession).mockReturnValue({ loading: false, user: null, profile })
   vi.mocked(useSchools).mockReturnValue({ ...loaded, schools: [{ ...school,id: 'first',name: 'Primera institución' },school] })
   vi.mocked(useProgramConfig).mockReturnValue({ ...loaded,config })
@@ -225,4 +229,32 @@ it('regresa desde Hoy a un borrador del día anterior en la fecha y el grupo cor
   click('Confirmar asistencia')
   await waitFor(() => expect(screen.getByRole('button',{name:'Guardar asistencia'})).toBeDisabled())
   vi.mocked(window.confirm).mockRestore()
+})
+
+it('abre la evaluación de un grupo propio fuera de las sedes del perfil desde un enlace incompleto', async () => {
+  vi.mocked(useSession).mockReturnValue({loading:false,user:null,profile:{...profile,campusIds:{second:['a']}}})
+  vi.mocked(saveEvaluation).mockResolvedValue({id:'e',syncState:'synced'})
+  show('/portal/evaluacion?group=g&moment=linea_media_2&student=s')
+  await screen.findByRole('button',{name:'Palabra'})
+  expect(screen.getByLabelText('Grupo')).toHaveValue('g')
+  expect(screen.getByLabelText('Sede')).toHaveValue('b')
+  click('Palabra')
+  click('Guardar evaluación')
+  await waitFor(() => expect(saveEvaluation).toHaveBeenCalledWith({studentId:'s',subject:'lectura',moment:'linea_media_2',groupId:'g',level:'palabra'}))
+})
+
+it('muestra en Hoy el título elegido para la fecha colombiana', () => {
+  vi.mocked(useTodayPlans).mockReturnValue({...loaded,data:[{activityTitle:'Leer en parejas',activityId:'a',teacherId:'d',schoolId:'second',date:'2026-04-08',savedAt:''}]})
+  show('/portal/hoy')
+  expect(useTodayPlans).toHaveBeenCalledWith('2026-04-08')
+  expect(screen.getByRole('link',{name:'Actividad de hoy · Leer en parejas'})).toHaveAttribute('href','/portal/actividades')
+})
+it('inicia la propuesta con el último momento con datos y explica el mínimo de docentes', () => {
+  vi.mocked(useStudents).mockReturnValue({...loaded,students:[{...student,levels:{lectura:{level:'cuento',moment:'linea_media_2',date:'2026-04-07'}}}]})
+  show('/portal/grupos?school=second&campus=b')
+  click('Sugerir grupos')
+  expect(screen.getByLabelText('Momento de evaluación')).toHaveValue('linea_media_2')
+  select('Número de docentes','0')
+  expect(screen.getByRole('alert')).toHaveTextContent('Indica al menos un docente')
+  expect(screen.getByRole('button',{name:'Ver propuesta'})).toBeDisabled()
 })

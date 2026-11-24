@@ -5,10 +5,10 @@ import { correctRecord } from './corrections'
 import { saveEvaluation } from './evaluations'
 import { saveGroupAttendance } from './attendance'
 import { saveHours } from './hours'
-import { planToday } from './activities'
+import { planToday, removeActivity } from './activities'
 import { readEntities } from './downloads'
-import { moveMembers, patchGroup } from './groups'
-import { adminImport, createTeacher, patchUser } from './admin'
+import { addStudentsToGroup, moveMembers, patchGroup } from './groups'
+import { adminImport, createTeacher, patchUser, saveProgramConfig, upsertSchool } from './admin'
 import { getSummary } from './reports'
 import { commit, reportCache } from './core'
 import { updateMyName } from './profile'
@@ -164,7 +164,7 @@ it('reutiliza el identificador provisional y no sobrescribe códigos existentes 
   await patchStudent(s.id, { grade: 5 })
   mem.batches.length = 0
   mem.auth.currentUser.uid = 'fundacion'
-  const rows = Array.from({ length: 403 }, (_, i) => ({ code: 'b-' + i, grade: 3, fullName: 'Estudiante' }))
+  const rows = Array.from({ length: 403 }, (_, i) => ({ code: 'b-' + i, grade: 3, fullName: 'Ana Paz' }))
   const result = await importStudents('s', [...rows, { code: 'B0', grade: 4, fullName: 'Otro' }])
   expect(result.skipped).toEqual(['B0'])
   expect(result.created).toHaveLength(403)
@@ -194,21 +194,26 @@ it('reintenta la evaluación con el mismo UUID y nunca baja el momento del nivel
 it('permite evaluar a un estudiante provisional sin edad o muestra', async () => {
   const student = {schoolId:'s', fullName:'Ana Paz', provisional:true, levels:{}}
   mem.docs.set('students/s_A',student)
-  const result = await saveEvaluation({studentId:'s_A',subject:'lectura',moment:'linea_base',level:'letra'})
+  await expect(saveEvaluation({studentId:'s_A',subject:'lectura',moment:'linea_base',level:'letra'})).rejects.toMatchObject({status:400})
+  const result = await saveEvaluation({studentId:'s_A',subject:'lectura',moment:'linea_base',level:'letra',groupId:'g'})
   expect(mem.docs.get('students/s_A/evaluations/'+result.id)?.sample).toBeNull()
   expect(mem.docs.get('students/s_A')).not.toHaveProperty('age')
   expect(mem.docs.get('students/s_A')).not.toHaveProperty('sample')
 })
 it('usa la clave compuesta para horas e invalida los reportes después de escribir', async () => {
-  expect((await getSummary({})).hoursWorked).toBe(0)
+  await expect(getSummary({})).rejects.toMatchObject({status:403})
+  mem.auth.currentUser.uid='fundacion'
+  expect((await getSummary({schoolId:'s'})).hoursWorked).toBe(0)
   const reads = mem.reads.length
-  await getSummary({})
+  await getSummary({schoolId:'s'})
+  mem.auth.currentUser.uid='t'
   expect(mem.reads).toHaveLength(reads)
   const input = { schoolId: 's', date: '2026-11-17', plannedHours: 4, workedHours: 2 }
   await expect(saveHours(input)).rejects.toMatchObject({ status: 400 })
   await saveHours({ ...input, reason: 'Salud: cita médica' })
   expect(mem.docs.get('hours/t_s_2026-11-17')).toMatchObject({ ...input, week: 11, teacherId: 't' })
-  expect((await getSummary({})).hoursWorked).toBe(2)
+  mem.auth.currentUser.uid='fundacion'
+  expect((await getSummary({schoolId:'s'})).hoursWorked).toBe(2)
   expect(mem.reads.filter(r => r.path === 'attendance').every(q => q.filters?.some(f => f.field === 'schoolId' && f.value === 's'))).toBe(true)
 })
 it('crea cuentas por función y sincroniza la agenda al desactivar', async () => {
@@ -252,6 +257,7 @@ it('refleja cambios remotos y cancela los listeners de Auth, perfil y escuela al
 
 it('vence la caché a los diez minutos y la separa por usuario y filtros', async () => {
   const start = Date.now()
+  mem.docs.set('users/t',{...mem.docs.get('users/t'),rol:'coordinador'})
   const initial = await getSummary({})
   mem.docs.set('students/s_B', { schoolId: 's', active: true })
   vi.mocked(Date.now).mockReturnValue(start + 599999)
@@ -363,6 +369,7 @@ it('traslada estudiantes y deshace solo las pertenencias que se añadieron',asyn
   const group = {schoolId:'s',subject:'lectura'}
   mem.docs.set('groups/g',{...group,studentIds:['a','b']})
   mem.docs.set('groups/h',{...group,studentIds:['a','c']})
+  for (const id of ['a','b']) mem.docs.set('students/'+id,{schoolId:'s'})
   const undo = await moveMembers('g','h',['a','b'])
   expect(mem.docs.get('groups/g')?.studentIds).toEqual([])
   expect(mem.docs.get('groups/h')?.studentIds).toEqual(['a','c','b'])
@@ -389,7 +396,50 @@ it('limita las descargas de coordinación a sus colegios e incluye solo las asig
   mem.docs.set('users/t',{rol:'docente',schoolIds:['s','otra'],campusIds:{s:['x'],otra:['y']},fullName:'Luz'})
   mem.docs.set('students/otro',{schoolId:'otra',fullName:'Fuera del colegio'})
   mem.docs.set('students/unido',{schoolId:'s',mergedInto:'s_A'})
-  const data = await readEntities(['Estudiantes','Docentes'])
+  const data = await readEntities(['Estudiantes','Personas'])
   expect(data.Estudiantes?.map(s => s.id)).toEqual(['s_A'])
-  expect(data.Docentes).toMatchObject([{id:'t',schoolIds:['s'],campusIds:{s:['x']}}])
+  expect(data.Personas).toMatchObject([{id:'t',schoolIds:['s'],campusIds:{s:['x']}},{id:'c',rol:'coordinador'}])
+})
+
+it('limpia los nombres administrativos y rechaza los incompletos antes de escribir',async () => {
+  mem.auth.currentUser.uid='fundacion'
+  await expect(createStudent({schoolId:'s',grade:3,provisional:true,fullName:'NNN'})).rejects.toMatchObject({status:400})
+  const result=await createStudent({schoolId:'s',code:'QA',fullName:'  juan   PÉREZ 123 ',grade:3})
+  expect(result).toMatchObject({id:'s_QA',fullName:'Juan Pérez',nameKey:'juan perez'})
+  await expect(patchStudent(result.id,{fullName:'X'})).rejects.toMatchObject({status:400})
+  await patchStudent(result.id,{fullName:'  ANA    RÍOS   '})
+  expect(mem.docs.get('students/s_QA')).toMatchObject({fullName:'Ana Ríos',nameKey:'ana rios'})
+})
+it('exige grupo, área y pertenencia al guardar evaluaciones y solo toma asistencia propia',async () => {
+  const input = {studentId:'s_A',subject:'lectura',moment:'linea_base',level:'letra',groupId:'g'} as const
+  const g = mem.docs.get('groups/g')!
+  for (const changes of [{teacherId:'otra'},{subject:'matematicas'},{studentIds:[]}]) {
+    mem.docs.set('groups/g',{...g,...changes})
+    await expect(saveEvaluation(input)).rejects.toHaveProperty('status')
+  }
+  mem.docs.set('groups/g',{...g,teacherId:null})
+  await expect(saveGroupAttendance('g','2026-11-17',{s_A:'vino'})).rejects.toMatchObject({status:403})
+  expect(mem.batches).toHaveLength(0)
+})
+it('protege la capacidad del grupo y los límites de horas incluso si se omite el formulario',async () => {
+  for (const name of ['', 'A'.repeat(61),'Garzas 🐦']) await expect(patchGroup('g',{name})).rejects.toMatchObject({status:400})
+  mem.docs.set('groups/g',{...mem.docs.get('groups/g'),studentIds:Array.from({length:60},(_,i) => String(i))})
+  await expect(addStudentsToGroup('g',['s_A'])).rejects.toMatchObject({status:400})
+  const input = {schoolId:'s',date:'2026-11-17',plannedHours:1,workedHours:1}
+  for (const changes of [{date:'2026-02-30'},{date:'2026-11-20'},{plannedHours:-1},{workedHours:24.5},{reason:'x'.repeat(601)}]) {
+    await expect(saveHours({...input,...changes})).rejects.toMatchObject({status:400})
+  }
+  expect([...mem.docs.keys()].some(path => path.startsWith('hours/'))).toBe(false)
+})
+it('conserva el plan histórico al desactivar una actividad y valida escuela y calendario',async () => {
+  await expect(planToday('g','no-existe')).rejects.toMatchObject({status:400})
+  mem.docs.set('activities/a',{active:true,title:'Leer en parejas'})
+  await planToday('g','a')
+  mem.auth.currentUser.uid='fundacion'
+  await removeActivity('a')
+  expect(mem.docs.get('activities/a')).toMatchObject({active:false,title:'Leer en parejas'})
+  expect(mem.docs.get('groups/g/plan/2026-11-19')).toMatchObject({activityId:'a',activityTitle:'Leer en parejas'})
+  await expect(saveProgramConfig({projectName:'ENAd',year:1999,implementationStartDate:'2026-11-01',breaks:[]})).rejects.toMatchObject({status:400})
+  await expect(upsertSchool({name:'Prueba',campuses:[]})).rejects.toMatchObject({status:400})
+  await expect(patchUser('fundacion',{activo:false})).rejects.toHaveProperty('status')
 })

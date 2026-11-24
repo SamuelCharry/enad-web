@@ -1,11 +1,11 @@
 import { useMemo } from 'react'
-import { collection, doc, documentId, getDoc, getDocs, query, updateDoc, where } from 'firebase/firestore'
+import { collection, doc, getDoc, getDocs, query, updateDoc, where } from 'firebase/firestore'
 import { SUBJECTS } from '../domain/levels'
 import { cleanName, validateName } from '../domain/text/studentNameRules'
 import { nameKey } from '../domain/nameKey'
 import type { AttendanceMark, Evaluation, LevelMark, Student, UserProfile } from '../domain/types'
 import { db } from './firebase'
-import { api, caller, chunks, commit, compare, fail, normalizeCode, now, recordOf, requireSchool, str } from './core'
+import { api, caller, chunks, commit, compare, fail, isOffline, normalizeCode, now, recordOf, requireSchool, str } from './core'
 import { scopedRows } from './scope'
 import { useLive, type Stream } from './live'
 import { insertPage } from './inserts'
@@ -85,21 +85,23 @@ export function createStudent(input: Input) {
       ...(p.rol === 'docente' ? ['nuevo_docente'] : []), ...validateName(input.fullName, confidence),
       ...(input.reviewReasons ?? []).filter(r => /^(?:posible_duplicado:[^/]+|formato_nombre|solo_iniciales|mayusculas|ocr_baja_confianza)$/.test(r))
     ])]
-    const fullName = p.rol === 'docente' ? cleanName(input.fullName) : input.fullName
+    const fullName = cleanName(input.fullName)
     const assigned = p.campusIds?.[schoolId] ?? []
     const campus = str(input.campus) || (p.rol === 'docente' && assigned.length === 1 ? assigned[0] : '')
-    const data = { ...newStudent({ ...input, fullName, campus }, code, schoolId, p.uid, provisional, now()),
+    const data = { ...newStudent({ ...input, fullName, campus }, code, schoolId, p.uid, provisional, now(),p.rol === 'docente'),
       needsReview: p.rol === 'docente' || reviewReasons.length > 0, source, reviewReasons, ocrConfidence: confidence, mergedInto: null }
-    // A missing student's document has no schoolId for the teacher read rule.
-    const existing = (await getDocs(query(collection(db, 'students'), where('schoolId', '==', schoolId), where(documentId(), '==', id)))).docs[0]
-    if (existing) {
+    const existing = await getDoc(ref).catch(error => {
+      if (p.rol === 'docente' && isOffline(error)) return null
+      throw error
+    })
+    if (existing?.exists()) {
       if (provisional && existing.data().createdBy === p.uid) {
         const target = existing.data().mergedInto
         return studentView(recordOf<Student>(target ? await studentDoc(p,target) : existing))
       }
       fail(409, 'Ya existe un estudiante con ese código.')
     }
-    const { created, syncState } = await insertPage([{ ref, data }], p.rol === 'fundacion')
+    const { created, syncState } = await insertPage([{ref,data}], existing !== null)
     if (!created.has(id)) {
       const concurrent = await studentDoc(p, id)
       if (provisional && concurrent.data().createdBy === p.uid) return studentView(recordOf<Student>(concurrent))
@@ -113,7 +115,7 @@ export function patchStudent(id: string, fields: StudentFields) {
   return api(async () => {
     const p = await caller('writer'), d = await studentDoc(p, id)
     const rename = p.rol === 'docente' && typeof fields.fullName === 'string'
-    const changes = studentFields(rename ? {...fields,fullName:cleanName(String(fields.fullName))} : fields)
+    const changes = studentFields(fields, rename)
     if (!Object.keys(changes).length) fail(400, 'No hay cambios para guardar.')
     if (p.rol === 'docente' && ['fullName', 'grade', 'campus'].some(k => k in changes)
       && !(d.data().provisional === true && d.data().createdBy === p.uid)) fail(403, 'Pide a coordinación que cambie el nombre, el grado o la sede.')

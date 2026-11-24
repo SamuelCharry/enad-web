@@ -44,7 +44,7 @@ function EvaluationStart({profile}:{profile:UserProfile}) {
   const {groups,loading,error} = useGroups(undefined,{mine:true})
   if (loading) return <p role="status">Cargando grupos…</p>
   if (error) return <LoadError message={error}/>
-  const group = groups.find(g => g.id === params.get('group')) || groups.find(g => !params.get('subject') || g.subject === params.get('subject'))
+  const group = groups.find(g => g.id === params.get('group')) || groups.find(g => (!params.has('school') || g.schoolId === params.get('school')) && (!params.has('campus') || g.campus === params.get('campus')) && (!params.get('subject') || g.subject === params.get('subject')))
   if (!group) return <TeacherScreen section="evaluacion" profile={profile}/>
   const next = new URLSearchParams(params)
   next.set('school',group.schoolId)
@@ -62,7 +62,7 @@ function ScanSchool({profile}:{profile:UserProfile}) {
 }
 function TeacherRoute({section,profile}:{section:typeof teacherSections[number][0];profile:UserProfile}) {
   const [params] = useSearchParams()
-  if (!params.has('school') && section === 'evaluacion') return <EvaluationStart profile={profile}/>
+  if (section === 'evaluacion' && (!params.has('school') || (params.has('group') && !params.has('campus')))) return <EvaluationStart profile={profile}/>
   if (!params.has('school') && section === 'estudiantes' && params.has('scan') && profile.schoolIds.length > 1) return <ScanSchool profile={profile}/>
   return <TeacherScreen section={section} profile={profile}/>
 }
@@ -71,7 +71,7 @@ function TeacherScreen({ section, profile }: { section: typeof teacherSections[n
   const groupId = params.get('group') || ''
   const scopeParams = new URLSearchParams(params)
   scopeParams.delete('guide')
-  const content = section === 'asistencia' ? <TeacherAttendance initialGroup={groupId} initialDate={params.get('date')} uid={profile.uid}/> : <><SchoolScope key={scopeParams.toString()} includeUnassigned={section === 'estudiantes' || section === 'evaluacion'} allSites={section === 'grupos'} onScopeChange={(school, campus) => {
+  const content = section === 'asistencia' ? <TeacherAttendance key={JSON.stringify([groupId,params.get('date')])} initialGroup={groupId} initialDate={params.get('date')} uid={profile.uid}/> : <><SchoolScope allCampuses={section === 'evaluacion' || section === 'grupos'} key={scopeParams.toString()} includeUnassigned={section === 'estudiantes' || section === 'evaluacion'} allSites={section === 'grupos'} onScopeChange={(school, campus) => {
     const next = new URLSearchParams({ school })
     if (campus !== null) next.set('campus', campus)
     if (params.has('guide')) next.set('guide','1')

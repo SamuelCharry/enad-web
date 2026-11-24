@@ -7,6 +7,7 @@ import { api, apiError, caller, chunks, commit, fail, isOffline, normalizeCode, 
 import { db } from './firebase'
 import { provisionTeacher, schoolFields, stringList } from './adminRecords'
 import { insertPage, type Insert } from './inserts'
+import { groupName } from './groups'
 import { newStudent } from './studentFields'
 
 type Row = Record<string, unknown>
@@ -107,6 +108,7 @@ function schoolRow(row: Row, known: Set<string>, pending: Map<string, { data: Ro
   const campusInput = row.campuses ?? (campus ? [{ name: campus, jornada: row.jornada }] : [])
   const campuses = schoolFields({ campuses: campusInput }, id, false).campuses ?? []
   if (known.has(id)) return false
+  if (!campuses.length) fail(400,'Añade al menos una sede.')
   const prior = pending.get(id)
   if (prior) {
     for (const c of campuses) if (!prior.campuses.some(x => x.id === c.id)) prior.campuses.push(c)
@@ -159,8 +161,7 @@ export function adminImport(kind: ImportKind, rows: readonly Row[]) {
           inserts.push({ ref: doc(db, 'students', id), data })
           existing.set(id, data)
         } else if (kind === 'groups') {
-          const name = str(row.name)
-          if (!name) fail(400, 'Falta el nombre del grupo.')
+          const name = groupName(row.name)
           const subject = subjectOf(row.subject), login = str(row.teacherEmail ?? row.teacherUsername ?? row.teacher).toLowerCase()
           const teacher = row.teacherId ? byId.get(str(row.teacherId)) : byEmail.get(login.includes('@') ? login : login + '@enad.app')
           if (!teacher || teacher.data().rol !== 'docente' || !teacher.data().activo || !teacher.data().schoolIds?.includes(schoolId)) fail(400, 'Selecciona un docente activo del colegio.')
@@ -170,6 +171,8 @@ export function adminImport(kind: ImportKind, rows: readonly Row[]) {
             continue
           }
           const studentIds = stringList(row.studentCodes ?? row.studentIds).map(s => s.startsWith(schoolId + '_') ? s : schoolId + '_' + normalizeCode(s))
+          const schoolRoster = await students(schoolId)
+          if (new Set(studentIds).size !== studentIds.length || studentIds.length > 60 || studentIds.some(id => !schoolRoster.has(id) || schoolRoster.get(id)?.mergedInto)) fail(400,'Elige hasta 60 estudiantes diferentes de la institución.')
           const data = {
             name,
             subject,

@@ -17,8 +17,3 @@
   .admin-directory .admin-table td:first-child {font-weight:600;}
   .admin-directory .admin-table .admin-expanded td {font-weight:400;}
 }
-.admin-workspace .ui-dialog :is(.collect-actions:has([type=submit]),fieldset > button[type=submit]:last-child,fieldset > button[data-variant=primary]:last-child) {
-  position:sticky;bottom:0;z-index:1;
-}
-.admin-workspace .ui-dialog .collect-actions:has([type=submit]) {background:var(--paper);padding-block:.5rem;}
-.admin-workspace .ui-dialog label:has(input[type=checkbox]),.admin-directory td a {min-height:44px;display:block;align-content:center;}

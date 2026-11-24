@@ -49,18 +49,22 @@ export function Students({ school, campus, admin, uid, initialStudent, scanOnOpe
           <small>{s.code} · Grado {s.grade}°{s.retired ? ' · Retirado' : ''}</small>
         </div>{!admin && 'syncState' in s && s.syncState === 'pending' && <SyncStatus pending />}{admin && <Button onClick={() => setEdit(s.id)}>Editar estudiante</Button>}</div>
     </Card>) : <p>Cambia la búsqueda o añade el primer estudiante de la sede.</p>}</>}
-    {(open === 'new' || existing) && <StudentEditor {...{ school, campus, admin }} student={existing} canEditIdentity={!!existing?.provisional && 'createdBy' in existing && existing.createdBy === uid} onSaved={id => { setReceiptId(id); setNotice('Estudiante registrado en la lista.') }} onClose={() => {
+    {(open === 'new' || existing) && <StudentEditor {...{ school, campus, admin }} student={existing} canEditIdentity={!!existing?.provisional && 'createdBy' in existing && existing.createdBy === uid} onSaved={(id,_pending,change) => {
+      setReceiptId(change === 'selected' ? '' : id)
+      setNotice({selected:'Estudiante seleccionado.',created:'Estudiante registrado.',updated:'Cambios guardados.'}[change])
+    }} onClose={() => {
       setOpen(null)
       setEdit(null)
     }} />}
     {open === 'scan' && !loading && <Suspense fallback={<p role="status">Cargando escáner…</p>}>
-      <Scanner onSaved={group => { setScannedGroup(group); setNotice('Lista revisada en este dispositivo.') }} schoolId={school.id} {...{ students, campus }} onClose={() => setOpen(null)} />
+      <Scanner campusName={school.campuses.find(c => c.id === campus)?.name} onSaved={group => { setScannedGroup(group); setNotice('') }} schoolId={school.id} {...{ students, campus }} onClose={() => setOpen(null)} />
     </Suspense>}</>
 }
+type StudentChange = 'created' | 'selected' | 'updated'
 interface EditorProps {
   groupId?: string
   classRegistration?: boolean; school: School; campus: string; admin: boolean; student?: Student;
-  canEditIdentity?: boolean; onSaved?: (id: string, pending: boolean) => void | Promise<void>; onClose: () => void
+  canEditIdentity?: boolean; onSaved?: (id: string, pending: boolean, change: StudentChange) => void | Promise<void>; onClose: () => void
 }
 
 export function StudentEditor(props: EditorProps) {
@@ -71,10 +75,11 @@ function TeacherIntake({ school, campus, groupId, onSaved, onClose }: EditorProp
   const { students, loading, error } = useStudents(school.id)
   const [name, setName] = useState('')
   const [query, setQuery] = useState('')
+  const [newName,confirmNew] = useState<string>()
   const [gender, setGender] = useState<Student['gender']>('')
   const [grade, setGrade] = useState(0)
   const [clientId] = useState(() => crypto.randomUUID())
-  const [receipt, setReceipt] = useState<{ id: string; pending: boolean }>()
+  const [receipt, setReceipt] = useState<{ id: string; pending: boolean; change: StudentChange }>()
   const action = useAction()
   useEffect(() => {
     const timer = setTimeout(() => setQuery(name), 220)
@@ -83,24 +88,25 @@ function TeacherIntake({ school, campus, groupId, onSaved, onClose }: EditorProp
   const found = useMemo(() => rosterMatches(query, students.filter(s => s.schoolId === school.id)), [query, students, school.id])
   const strong = found.filter(m => m.score >= .80)
   const clean = cleanName(name)
+  const creatingNew = !strong.length || newName === name
   const searched = !loading && !error && query === name
   async function save(existing?: Student) {
     if (!searched) return
     let result = receipt
     if (!result) {
-      if (existing) result = { id: existing.id, pending: 'syncState' in existing && existing.syncState === 'pending' }
+      if (existing) result = { id: existing.id, change:'selected', pending: 'syncState' in existing && existing.syncState === 'pending' }
       else {
-        if (!clean || !gender || !grade || strong.length) return
+        if (clean.length < 3 || clean.length > 80 || !gender || !grade) return
         const created = await createStudent({
           schoolId: school.id, campus, fullName: name, grade, gender,
           provisional: true, clientId, source: 'manual', reviewReasons: found.map(m => 'posible_duplicado:' + m.student.id)
         })
-        result = { id: created.id, pending: 'syncState' in created && created.syncState === 'pending' }
+        result = { id: created.id, change:'created', pending: 'syncState' in created && created.syncState === 'pending' }
       }
       setReceipt(result)
     }
     if (groupId) await addStudentsToGroup(groupId, [result.id])
-    await onSaved?.(result.id, result.pending)
+    await onSaved?.(result.id, result.pending,result.change)
     onClose()
   }
   return <Dialog title="Añadir estudiante" onClose={onClose} busy={action.busy}>
@@ -110,15 +116,18 @@ function TeacherIntake({ school, campus, groupId, onSaved, onClose }: EditorProp
       {error && <p role="alert">{error}</p>}
       {query !== name && <p role="status">Buscando coincidencias…</p>}
       {name && <p>{clean ? 'Se guardará como: ' + clean : 'Escribe el nombre con letras.'}</p>}
+      {clean && (clean.length < 3 || clean.length > 80) && <p role="alert">Usa de 3 a 80 caracteres para el nombre.</p>}
       {searched && strong.map(({ student }) => <Button key={student.id} onClick={() => action.run(() => save(student))}>
         ¿Es {student.fullName} ({student.grade}°)?{strong.filter(m => m.student.fullName === student.fullName && m.student.grade === student.grade).length > 1 && ' · ' + student.code}</Button>)}
-      {(!searched || !strong.length) && <>
+      {searched && strong.length > 0 && !creatingNew && <Button onClick={() => confirmNew(name)}>No, es un estudiante nuevo</Button>}
+      {creatingNew && <>
+        <strong>Sexo</strong>
         <Segmented label="Sexo" value={gender} options={[{ value: 'F', label: 'Niña' }, { value: 'M', label: 'Niño' }]} onChange={setGender} />
-        <Segmented label="Grado" value={String(grade)} options={[3, 4, 5].map(g => ({ value: String(g), label: g + '°' }))} onChange={g => setGrade(Number(g))} />
+        <strong>Grado</strong><Segmented label="Grado" value={String(grade)} options={[3, 4, 5].map(g => ({ value: String(g), label: g + '°' }))} onChange={g => setGrade(Number(g))} />
       </>}
     </fieldset>
     {receipt ? <Button variant="primary" loading={action.busy} onClick={() => action.run(() => save())}>Completar registro</Button> :
-      searched && clean && !strong.length && <Button variant="primary" loading={action.busy} disabled={!grade || !gender}
+      searched && clean && creatingNew && <Button variant="primary" loading={action.busy} disabled={!grade || !gender || clean.length < 3 || clean.length > 80}
         onClick={() => action.run(() => save())}>Crear nuevo</Button>}
     {action.feedback}
   </Dialog>
@@ -141,7 +150,7 @@ function EditDetails({ school, campus, admin, student, canEditIdentity = false, 
   const changed = !student || name.trim() !== student.fullName || site !== student.campus || +grade !== student.grade ||
     gender !== student.gender || (age ? +age : null) !== student.age || (sample ? +sample : null) !== student.sample || retired !== student.retired
   return <Dialog title={student ? 'Editar estudiante' : 'Añadir estudiante'} {...{ onClose }} busy={action.busy}>
-    <form onSubmit={e => {
+    <form noValidate onSubmit={e => {
       e.preventDefault()
       if (!name.trim() || !grade || (admin && !student && !code.trim())) return
       if (student && retired && !student.retired && !confirmRetire) { setConfirmRetire(true); return }
@@ -165,7 +174,7 @@ function EditDetails({ school, campus, admin, student, canEditIdentity = false, 
           setCreated(receipt)
         }
         if (receipt) {
-          try { await onSaved?.(receipt.id, receipt.pending) }
+          try { await onSaved?.(receipt.id, receipt.pending,student ? 'updated' : 'created') }
           catch { throw new Error('El estudiante ya se creó. Vuelve a intentar añadirlo al grupo.') }
         }
         onClose()

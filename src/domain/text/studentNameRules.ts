@@ -1,4 +1,5 @@
-import { nameSimilarity } from '../ocr/similarity'
+import { nameKey, tokens } from '../nameKey'
+import { normalizedLevenshtein, nameSimilarity } from '../ocr/similarity'
 
 const particles = new Set(['de', 'del', 'la', 'las', 'los', 'y'])
 const letters = /\p{L}/gu
@@ -29,7 +30,13 @@ export function validateName(input: string, confidence?: number | null): string[
 export function rosterMatches<T extends { id: string; fullName: string }>(input: string, roster: readonly T[]) {
   const name = cleanName(input)
   if (!name) return []
-  return roster.map(student => ({ student, score: nameSimilarity(name, student.fullName) }))
+  const surnames = (value: string) => {
+    const words = tokens(value).filter(t => !particles.has(t))
+    return words.slice(words.length >= 4 ? -2 : -1).filter(t => t.length >= 2)
+  }
+  const last = surnames(name)
+  return roster.filter(s => nameKey(name) === nameKey(s.fullName) ||
+    tokens(name).length >= 2 && last.some(a => surnames(s.fullName).some(b => normalizedLevenshtein(a,b) >= .75))).map(student => ({ student, score: nameSimilarity(name, student.fullName) }))
     .filter(match => match.score >= .70)
     .sort((a, b) => b.score - a.score || a.student.id.localeCompare(b.student.id))
 }

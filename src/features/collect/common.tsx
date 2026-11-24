@@ -25,7 +25,7 @@ export function SubjectField({ value, onChange, disabled }: { value: Subject; on
 export function MomentField({ value, onChange, disabled }: { value: Moment | ''; onChange: (s: Moment) => void; disabled?: boolean }) {
   return <Choice guide="moment" label="Momento de evaluación" required placeholder="Selecciona el momento" options={MOMENTS.map(id => ({ id, name: momentLabel(id) }))} {...{ value, onChange, disabled }} />
 }
-export function SchoolScope({ profile, children, withCampus = true, initialSchool = '', initialCampus = null, allSites = false, includeUnassigned = false, onScopeChange }: { includeUnassigned?: boolean; allSites?: boolean; onScopeChange?: (school: string, campus: string | null) => void; initialSchool?: string; initialCampus?: string | null; profile: UserProfile; withCampus?: boolean; children: (school: School, campus: string) => ReactNode }) {
+export function SchoolScope({ profile, children, withCampus = true, allCampuses = false, initialSchool = '', initialCampus = null, allSites = false, includeUnassigned = false, onScopeChange }: { allCampuses?: boolean; includeUnassigned?: boolean; allSites?: boolean; onScopeChange?: (school: string, campus: string | null) => void; initialSchool?: string; initialCampus?: string | null; profile: UserProfile; withCampus?: boolean; children: (school: School, campus: string) => ReactNode }) {
   const { schools, loading, error } = useSchools()
   const [id, setId] = useState(initialSchool)
   const [site, setSite] = useState<string | null>(initialCampus)
@@ -35,17 +35,17 @@ export function SchoolScope({ profile, children, withCampus = true, initialSchoo
   if (loading) return <p role="status">Cargando instituciones…</p>
   if (!school) return <p>Solicita a coordinación que asigne una institución a tu cuenta.</p>
   const assigned = profile.campusIds[school.id] ?? []
-  const campuses = profile.rol === 'fundacion' || !assigned.length ? school.campuses : assigned.map(id => school.campuses.find(c => c.id === id) ?? { id, name: id })
+  const campuses = allCampuses || profile.rol !== 'docente' || !assigned.length ? school.campuses : assigned.map(id => school.campuses.find(c => c.id === id) ?? { id, name: id })
   const choices = profile.rol === 'fundacion' ? [...campuses, { id: '', name: 'Sin sede asignada' }] : allSites ? [{ id: '', name: 'Todas las sedes' }, ...campuses] : includeUnassigned && !assigned.length ? [...campuses, { id: '', name: 'Sin sede asignada' }] : campuses
-  const campus = choices.find(c => c.id === site)?.id ?? choices[0]?.id ?? ''
+  const campus = choices.find(c => c.id === site || ('name' in c && c.name === site))?.id ?? choices[0]?.id ?? ''
   return <>
     <div className="collect-fields">
-      <Choice guide="school" label="Institución" options={visible} value={school.id} onChange={v => {
+      {visible.length > 1 && <Choice guide="school" label="Institución" options={visible} value={school.id} onChange={v => {
         onScopeChange?.(v,null)
         setId(v)
         setSite(null)
-      }} />
-      {withCampus && campuses.length > 0 && <Choice label="Sede" options={choices} value={campus} onChange={v => { setSite(v); onScopeChange?.(school.id,v) }} />}</div>
+      }} />}
+      {withCampus && choices.length > 1 && <Choice label="Sede" options={choices} value={campus} onChange={v => { setSite(v); onScopeChange?.(school.id,v) }} />}</div>
     <div key={JSON.stringify([school.id, withCampus ? campus : ''])}>{children(school, campus)}</div>
   </>
 }

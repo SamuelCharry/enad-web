@@ -20,7 +20,7 @@ El menú lateral admite teclado, indica la sección actual y se puede contraer. 
 | --- | --- |
 | Asistencia | `students/{sid}/attendance/{gid}_{date}`. La marca de retiro y la actualización del estudiante se guardan juntas. |
 | Evaluación | `students/{sid}/evaluations/{uuid}`. El reintento conserva el identificador. La muestra registrada puede ser nula. El nivel actual sigue la precedencia de momentos del contrato común. |
-| Horas | `hours/{uid}_{schoolId}_{date}`. Planeadas y realizadas admiten de 0 a 24 en pasos de media hora. El detalle del motivo admite hasta 200 caracteres. |
+| Horas | `hours/{uid}_{schoolId}_{date}`. Planeadas y realizadas admiten de 0 a 24 en pasos de media hora. La fecha debe existir y no ser posterior a hoy. El motivo completo admite hasta 600 caracteres. |
 | Actividad del día | `groups/{gid}/plan/{date}`. Cada grupo tiene un plan por fecha. Elegir otra actividad actualiza el mismo documento. |
 | Revisión de nombres | El registro docente queda provisional y entra en la cola del colegio. Aprobar, corregir y descartar actualizan la ficha con quién y cuándo la revisó. Unir invoca `mergeStudents({fromId, intoId})`. |
 | Personas | `createAccount`, `resetPassword` y `deleteAccount` se invocan en `southamerica-east1`. La contraseña generada se muestra al completar la operación. El inicio de sesión del operador se conserva. |
@@ -30,7 +30,7 @@ Las fechas de clase usan el calendario de Colombia. Los timestamps se escriben e
 
 ## Consultas y descargas
 
-Inicio compara la asistencia de esta semana con los mismos días de la anterior. La comparación de niveles usa estudiantes con resultados en los dos momentos. Los reportes consultan los registros dentro del alcance del perfil y los filtros elegidos. La descarga completa contiene las hojas Docentes, Estudiantes, Grupos, Asistencia, Evaluaciones, Horas, Actividades y Plan. Cada tabla se puede descargar por separado. [Presupuesto de lecturas](src/data/READ_BUDGET.md)
+Inicio compara la asistencia de esta semana con los mismos días de la anterior. La comparación de niveles usa estudiantes con resultados en los dos momentos. Los reportes consultan los registros dentro del alcance del perfil y los filtros elegidos. La descarga completa contiene las hojas Personas, Estudiantes, Grupos, Asistencia, Evaluaciones, Horas, Actividades y Plan. Cada tabla se puede descargar por separado. [Presupuesto de lecturas](src/data/READ_BUDGET.md)
 
 ## Verificación local
 

@@ -16,7 +16,7 @@ it('actualiza el tablero con una toma de asistencia y abre el envío exacto del 
   vi.mocked(useSchools).mockReturnValue({ schools: [school], loading: false, error: undefined })
   vi.mocked(useProgramConfig).mockReturnValue({ config: { projectName: 'Prueba', implementationStartDate: '2026-04-06', breaks: [], year: 2026 }, loading: false, error: undefined })
   const path='/visualizacion/seguimiento?schoolId=ie&week=1&teacher=d'
-  const data = { insights:{attendance:[null,null],planned:0,worked:0,reporters:0}, teachers:1, students:0, moment:'linea_base' as const, feed:[], alerts:[{category:'Sin asistencia esta semana',label:'Luz',path,schoolId:'ie',count:1}] }
+  const data = { unavailable:[], insights:{attendance:[null,null],planned:0,worked:0,reporters:0}, teachers:1, students:0, moment:'linea_base' as const, feed:[], alerts:[{category:'Sin asistencia esta semana',label:'Luz',path,schoolId:'ie',count:1}] }
   vi.mocked(readDashboard).mockResolvedValueOnce(data).mockResolvedValueOnce({...data,alerts:[],feed:[{kind:'Asistencia',key:'g',author:'Luz',school:'Escuela',savedAt:'2026-04-08T12:00:00Z',detail:'g'}]})
   render(<MemoryRouter><ManagerHome profile={profile} /></MemoryRouter>)
   fireEvent.click(await screen.findByText(/Sin asistencia esta semana/))

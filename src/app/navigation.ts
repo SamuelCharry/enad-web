@@ -4,12 +4,12 @@ import type { IconName } from '../ui/Icon'
 type Entry = readonly [slug: string, label: string, icon: IconName]
 const teacher: Entry[] = [
   ['hoy','Hoy','home'], ['asistencia','Asistencia','check'], ['evaluacion','Evaluación','edit'],
-  ['grupos','Grupos','groups'], ['estudiantes','Estudiantes','person'], ['horas','Horas','clock'],
+  ['grupos','Grupos','groups'], ['estudiantes','Estudiantes','student'], ['horas','Horas','clock'],
   ['actividades','Actividades','book'], ['pendientes','Pendientes','upload'], ['mis-datos','Mis datos','chart'], ['ayuda','Ayuda','help'],
 ]
 const management: Entry[] = [
   ['inicio','Inicio','home'], ['personas','Personas','person'], ['colegios','Colegios y sedes','school'],
-  ['estudiantes','Estudiantes','book'], ['revision','Revisar nombres','edit'], ['grupos','Grupos','groups'],
+  ['estudiantes','Estudiantes','student'], ['revision','Revisar nombres','edit'], ['grupos','Grupos','groups'],
   ['actividades','Actividades','book'], ['reportes','Reportes','chart'], ['descargas','Descargas','download'], ['programa','Programa','calendar'],
 ]
 export const roleNav = (role:Role) => role === 'docente' ? teacher : management.filter(([slug]) => role === 'fundacion' || slug !== 'programa')

@@ -10,7 +10,7 @@ import { updateMyName, useMyProfilePending, useProjectName } from '../../data/pr
 import { getTeacherDay, getTeacherMetrics } from '../../data/reports'
 import { useProgramConfig, useSchools } from '../../data/scope'
 import { subjectLabel } from '../../domain/levels'
-import { colombiaToday } from '../../domain/weeks'
+import { classDate, colombiaToday } from '../../domain/weeks'
 import { LineChart } from '../../ui/charts'
 import { Button, Card, DateInput, EmptyState, Field, SyncStatus, TextInput } from '../../ui/components'
 import { number, percent, ratio, shiftDay } from './model'
@@ -48,7 +48,7 @@ function NameEditor({ profile }: { profile: UserProfile }) {
   }
   return <><div className="rep-between"><h2>{profile.fullName}</h2>
     {!editing && <Button onClick={() => { setEditing(true); setName(profile.fullName); setMessage('') }}>Editar nombre</Button>}
-  </div>{editing && <form onSubmit={save}><Field label="Nombre completo"><TextInput value={name} required disabled={busy} onChange={e => setName(e.target.value)} /></Field>
+  </div>{editing && <form noValidate onSubmit={save}><Field label="Nombre completo"><TextInput value={name} required disabled={busy} onChange={e => setName(e.target.value)} /></Field>
     <div className="rep-actions"><Button type="submit" variant="primary" loading={busy}>Guardar nombre</Button>
       <Button disabled={busy} onClick={() => { setEditing(false); setMessage('') }}>Cancelar</Button></div>
   </form>}{message === 'pending' ? <ProfileReceipt uid={profile.uid} /> : message && <p role="status">{message}</p>}</>
@@ -76,7 +76,7 @@ function TeacherHours({ uid, schoolNames, schoolIds }: { uid: string; schoolName
       <p><strong>{planned ? percent(ratio(worked, planned)) : 'Sin horas planeadas'}</strong> · {number(worked)} de {number(planned)} h</p>
       {trend.length > 0 && <><h3>Cumplimiento diario (%)</h3><LineChart label="Horas ejecutadas (% de las planeadas)" data={trend} /></>}
       <details><summary>Reportes de horas</summary>{rows.map(h => <div className="teacher-record" key={JSON.stringify([h.schoolId,h.date])}>
-        <strong>{h.date} · {schoolNames.get(h.schoolId) ?? h.schoolId}</strong>
+        <strong>{classDate(h.date)} · {schoolNames.get(h.schoolId) ?? h.schoolId}</strong>
         <p>{number(h.workedHours)} h realizadas de {number(h.plannedHours)} h planeadas</p>
         {h.reason && <p>{h.reason}</p>}<SyncStatus pending={'syncState' in h && h.syncState === 'pending'} />
       </div>)}</details>
@@ -121,7 +121,7 @@ export function Teacher({ profile }: { profile: UserProfile }) {
         {metrics.recorded > 0 ? <p><strong>{percent(ratio(metrics.present, metrics.recorded))}</strong> · {number(metrics.present)} de {number(metrics.recorded)} registros</p> : <EmptyState title="Toma asistencia para consultar este indicador." />}
         <details><summary>Reportes recientes</summary>
           {metrics.history.length ? <ul>{[...metrics.history].sort((a,b) => b.date.localeCompare(a.date)).map((h, i) =>
-            <li key={i}>{h.date} · {h.label} · {h.pending ? 'Pendiente de envío' : 'Enviado'}</li>)}</ul> : <EmptyState title="Guarda una asistencia o evaluación para comenzar el historial." />}
+            <li key={i}>{classDate(h.date)} · {h.label} · {h.pending ? 'Pendiente de envío' : 'Enviado'}</li>)}</ul> : <EmptyState title="Guarda una asistencia o evaluación para comenzar el historial." />}
           <EarlierReports uid={profile.uid}/>
         </details></>}
     </ReportRead></Card>

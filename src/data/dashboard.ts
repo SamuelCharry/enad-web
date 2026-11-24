@@ -1,4 +1,4 @@
-import { cachedResult } from './reportCache'
+import { cachedResult, reportWidgets } from './reportCache'
 import { collection, collectionGroup, documentId, getDocsFromCache, limit, orderBy, query, where } from 'firebase/firestore'
 import { LEVELS, SUBJECTS } from '../domain/levels'
 import type { AttendanceMark, Evaluation, Group, HoursEntry, Moment, ProgramConfig, School, Student, Subject, UserProfile } from '../domain/types'
@@ -26,7 +26,7 @@ export async function decliningStudents(schoolId: string, subject: Subject, mome
   if (eligible.length < 2) return []
   const [students, events] = await Promise.all([
     rows<Student>(scoped('students', schoolId, equal('active', true), equal('retired', false))),
-    rows<Evaluation>(scoped('evaluations', schoolId, equal('subject', subject), where('moment', 'in', eligible), ...dates(from, to)))
+    rows<Evaluation>(scoped('evaluations', schoolId, equal('subject', subject), ...dates(from, to)))
   ])
   const history = latestLevels(events, subject)
   return students.filter(s => {
@@ -44,36 +44,38 @@ async function feedNames(schoolId: string, ids: string[]) {
 }
 async function recent<T>(path: string, ids: string[]) {
   const source = path === 'hours' ? collection(db, path) : collectionGroup(db, path)
-  const pages = await Promise.all(chunks(ids, 10).map(page => rows<T>(query(source, where('schoolId', 'in', page), orderBy('savedAt', 'desc'), limit(15)))))
+  const pages = await Promise.all(chunks(ids, 10).map(page => rows<T>(query(source, where('schoolId', 'in', page), orderBy('savedAt', 'desc'), limit(12)))))
   return pages.flat()
 }
 async function missingGroup(g: Group, moment: Moment, from: string, to: string) {
   const base = scoped('evaluations', g.schoolId, equal('subject', g.subject), equal('moment', moment), ...dates(from, to))
   if (await total(query(base, equal('groupId', g.id)))) return false
-  // Historical imports omit groupId. Subtract records that have that field.
-  for (const ids of chunks([...new Set(g.studentIds)], 30)) {
-    const members = query(base, where('studentId', 'in', ids))
-    const all = await total(members)
-    if (all && all > await total(query(members, orderBy('date'), orderBy('groupId')))) return false
+  // Imported evaluations may lack a group. Read only this moment and subject,
+  // then check the period locally so membership and range never share a query.
+  for (const ids of chunks([...new Set(g.studentIds)],10)) {
+    const records = await rows<Evaluation>(scoped('evaluations',g.schoolId,equal('subject',g.subject),
+      equal('moment',moment),where('studentId','in',ids)))
+    if (records.some(e => !e.groupId && e.date >= from && e.date <= to)) return false
   }
   return true
 }
 async function dashboard(schools: School[], cfg: ProgramConfig | null, today: string, selected?: Moment) {
+  const {unavailable,widget} = reportWidgets()
   const ids = schools.map(s => s.id)
   const [marks, evaluations, hours, directories] = await Promise.all([
-    recent<AttendanceMark>('attendance', ids), recent<Evaluation>('evaluations', ids), recent<HoursEntry>('hours', ids),
+    widget('Actividad reciente',recent<AttendanceMark>('attendance', ids),[]), widget('Actividad reciente',recent<Evaluation>('evaluations', ids),[]), widget('Actividad reciente',recent<HoursEntry>('hours', ids),[]),
     Promise.all(schools.map(async school => {
       const [teachers, groups, active] = await Promise.all([
-        rows<{ uid: string; fullName: string }>(collection(db, 'schools', school.id, 'teachers')),
-        rows<Group>(scoped('groups', school.id)), enrollment(scoped('students', school.id))
+        widget('Docentes',rows<{ uid: string; fullName: string }>(collection(db, 'schools', school.id, 'teachers')),[]),
+        widget('Grupos',rows<Group>(scoped('groups', school.id)),[]), widget('Estudiantes activos',enrollment(scoped('students', school.id)),0)
       ])
       return { school, teachers: teachers.map(t => ({ ...t, uid: t.uid || t.id })), groups, active }
     }))
   ])
-  const students = (await Promise.all(chunks([...new Set(evaluations.map(e => e.studentId))], 30).flatMap(page =>
+  const students = (await Promise.all(chunks([...new Set(evaluations.map(e => e.studentId))], 10).flatMap(page =>
     schools.flatMap(s => {
       const ids = page.filter(id => evaluations.some(e => e.studentId === id && e.schoolId === s.id))
-      return ids.length ? [feedNames(s.id, ids)] : []
+      return ids.length ? [widget('Actividad reciente',feedNames(s.id, ids),[])] : []
     })))).flat()
   const feed = activityFeed(directories.map(d => ({
     ...d, students,
@@ -82,8 +84,8 @@ async function dashboard(schools: School[], cfg: ProgramConfig | null, today: st
   let moment = selected ?? milestones[0]
   if (!selected && cfg && cfg.implementationStartDate <= today && ids.length) {
     for (const m of milestones.slice(1).reverse()) {
-      const counts = await Promise.all(ids.map(id => total(scoped('evaluations', id, equal('moment', m), ...dates(cfg.implementationStartDate, today)))))
-      if (counts.some(Boolean)) { moment = m; break }
+      const count = (id:string) => widget('Momento',total(scoped('evaluations',id,equal('moment',m),...dates(cfg.implementationStartDate,today))),0)
+      if (await count(ids[0]) || (await Promise.all(ids.slice(1).map(count))).some(Boolean)) { moment = m; break }
     }
   }
   const reporters = new Set<string>()
@@ -94,7 +96,7 @@ async function dashboard(schools: School[], cfg: ProgramConfig | null, today: st
   const relative = (delta:number) => new Date(day.getTime()+delta*86400000).toISOString().slice(0,10)
   await Promise.all(ids.flatMap(id => totals.map(async (sum,i) => {
     const range = dates(relative(-offset-7*i),relative(-7*i))
-    const n = await attendanceTotals(scoped('attendance',id,...range))
+    const n = await widget('Asistencia',attendanceTotals(scoped('attendance',id,...range)),{present:0,absent:0})
     sum.present += n.present
     sum.absent += n.absent
   })))
@@ -103,8 +105,10 @@ async function dashboard(schools: School[], cfg: ProgramConfig | null, today: st
     function add(category: string, label: string, route: string, params: Record<string, string>, count = 1, subject?: Subject) {
       list.push({ category, label, path: '/portal/reportes/' + route + '?' + new URLSearchParams({ schoolId, ...params }), count, schoolId, subject })
     }
+    const backlog = await widget('Nombres por revisar',total(scoped('students',schoolId,equal('needsReview',true))),0)
+    if (backlog) list.push({category:'Nombres por revisar',label:school.name,path:'/portal/revision',count:backlog,schoolId})
     for (const g of groups) if (!g.teacherId) list.push({category:'Grupos sin docente',label:g.name,path:'/portal/grupos?buscar='+encodeURIComponent(g.name),count:1,schoolId})
-    const hours = await hoursTotal(scoped('hours',schoolId,...dates(relative(-offset),today)))
+    const hours = await widget('Horas',hoursTotal(scoped('hours',schoolId,...dates(relative(-offset),today))),{worked:0,planned:0})
     worked += hours.worked
     planned += hours.planned
     if (!cfg || today < cfg.implementationStartDate) return list
@@ -113,29 +117,29 @@ async function dashboard(schools: School[], cfg: ProgramConfig | null, today: st
       const from = rangeOf(week, cfg).from
       await Promise.all(teachers.map(async t => {
         const filters = [equal('teacherId', t.uid), ...dates(from, today)]
-        const [sent, h] = await Promise.all([total(scoped('attendance', schoolId, ...filters)), hoursTotal(scoped('hours', schoolId, ...filters))])
-        if (sent) reporters.add(t.uid)
+        const [sent, h] = await Promise.all([widget('Envíos',total(scoped('attendance', schoolId, ...filters)),-1), widget('Horas por debajo del 80 %',hoursTotal(scoped('hours', schoolId, ...filters)),{worked:0,planned:0})])
+        if (sent > 0) reporters.add(t.uid)
         if (!sent) add('Sin asistencia esta semana', t.fullName, 'seguimiento', { week: String(week), teacher: t.uid })
         if ((ratio(h.worked, h.planned) ?? 100) < alertThreshold) add('Horas por debajo del 80 %', t.fullName, 'docentes', { teacher: t.uid, from, to: today })
       }))
       await Promise.all(school.campuses.map(async c => {
         const ids = groups.filter(g => campusId(school, g.campus) === c.id).map(g => g.id)
-        const counts = await Promise.all(chunks(ids, 30).map(page => attendanceTotals(scoped('attendance', schoolId, where('groupId', 'in', page), ...dates(from, today)))))
+        const counts = await widget('Asistencia por debajo del 80 %',Promise.all(ids.map(id => attendanceTotals(scoped('attendance', schoolId, equal('groupId',id), ...dates(from, today))))),[])
         const present = counts.reduce((n, v) => n + v.present, 0), absent = counts.reduce((n, v) => n + v.absent, 0)
         if ((ratio(present, present + absent) ?? 100) < alertThreshold) add('Asistencia por debajo del 80 %', c.name, 'comparacion', { campus: c.id, from, to: today })
       }))
     }
     await Promise.all(groups.map(async g => {
-      if (await missingGroup(g, moment, cfg.implementationStartDate, today)) add('Grupos sin evaluación', g.name, 'instituciones', { campus: campusId(school, g.campus), group: g.id, moment, from: cfg.implementationStartDate, to: today })
+      if (!unavailable.has('Momento') && await widget('Grupos sin evaluación',missingGroup(g, moment, cfg.implementationStartDate, today),false)) add('Grupos sin evaluación', g.name, 'instituciones', { campus: campusId(school, g.campus), group: g.id, moment, from: cfg.implementationStartDate, to: today })
     }))
     await Promise.all(SUBJECTS.map(async subject => {
-      const q = beginners(schoolId, subject, moment), count = q ? await total(q) : 0
+      const q = beginners(schoolId, subject, moment), count = q ? await widget('Principiante en línea media',total(q),0) : 0
       if (count) add('Principiante en línea media', school.name, 'estudiante', {}, count, subject)
     }))
     return list
   }))).flat().sort((a, b) => a.category.localeCompare(b.category, 'es') || a.label.localeCompare(b.label, 'es'))
   const insights = {attendance:totals.map(n => ratio(n.present,n.present+n.absent)),worked,planned,reporters:reporters.size}
-  return { insights, feed, alerts, moment, students: directories.reduce((n, d) => n + d.active, 0), teachers: new Set(directories.flatMap(d => d.teachers.map(t => t.uid))).size }
+  return { unavailable:[...unavailable], insights, feed, alerts, moment, students: directories.reduce((n, d) => n + d.active, 0), teachers: new Set(directories.flatMap(d => d.teachers.map(t => t.uid))).size }
 }
 
 export function readDashboard(profile: UserProfile, schools: School[], config: ProgramConfig | null, today: string, selected?: Moment) {

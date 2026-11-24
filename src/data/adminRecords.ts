@@ -16,7 +16,6 @@ export function schoolFields(input: Fields, id: string, create: boolean, project
   const out: Partial<School> = create ? { projectId: projectId ?? '', department: '', municipality: '', active: true, campuses: [] } : {}
   for (const k of ['name', 'region', 'department', 'municipality', 'projectId'] as const) if (k in input) out[k] = str(input[k])
   if ((create || 'name' in input) && !out.name) fail(400, 'Escribe el nombre de la institución.')
-  if (create && !out.region) fail(400, 'Escribe la región de la institución.')
   if ('zone' in input || create) {
     const zone = str(input.zone).toLowerCase() || 'urbana'
     if (zone !== 'urbana' && zone !== 'rural') fail(400, 'La zona debe ser urbana o rural.')

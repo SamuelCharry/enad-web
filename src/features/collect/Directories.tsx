@@ -3,7 +3,7 @@ import { LoadError } from '../../ui/LoadError'
 import { useState } from 'react'
 import type { Role, Jornada, School, UserProfile } from '../../domain/types'
 import { removeSchool, patchUser, upsertSchool, useUsers } from '../../data/admin'
-import { useSchools } from '../../data/scope'
+import { useProjects, useSchools } from '../../data/scope'
 import { Button, Field, TextInput } from '../../ui/components'
 import { useAction } from './useAction'
 import { Directory } from './admin/Directory'
@@ -16,23 +16,26 @@ export function Schools({restricted=false}:{restricted?:boolean}) {
   const { schools, loading, error } = useSchools()
   if (error) return <LoadError message={error} />
   return <Directory title="Instituciones y sedes" loading={loading} headers={['Institución','Municipio','Sedes','Estado']} create={restricted ? undefined : 'Crear institución'}
-    rows={schools.map(s => ({id:s.id,search:[s.name,s.id,s.municipality,s.region,...s.campuses.map(c => c.name)].join(' '),
+    rows={schools.map(s => ({id:s.id,search:[s.name,s.id,s.municipality,...s.campuses.map(c => c.name)].join(' '),
       cells:[s.name,s.municipality,s.campuses.map(c => c.name).join(' · ') || 'Sin sedes',s.active ? 'Activa':'Inactiva']}))}
     editor={(id,close) => <SchoolEditor restricted={restricted} key={id} school={schools.find(s => s.id===id)} onClose={close}/>}/>
 }
 function SchoolEditor({ school, restricted, onClose }: { restricted:boolean; school?: School; onClose: (notice?:string) => void }) {
   const [form, setForm] = useState<School>(() => school ?? { id: crypto.randomUUID(), name: '', projectId: '', region: '', department: '', municipality: '', zone: 'urbana', active: true, campuses: [] })
   const action = useAction()
-  const fields = [['name', 'Nombre de la institución'], ['projectId', 'Proyecto'], ['region', 'Región'], ['department', 'Departamento'], ['municipality', 'Municipio']] as const
+  const projects = useProjects()
+  const fields = [['name', 'Nombre de la institución'], ['department', 'Departamento'], ['municipality', 'Municipio']] as const
   const editable = fields.filter(([key]) => !restricted || key === 'name')
   return <section><h3>{school ? 'Editar institución' : 'Crear institución'}</h3>
-    <form onSubmit={e => {
+    <form noValidate onSubmit={e => {
       e.preventDefault()
       const removed = school?.campuses.filter(c => !form.campuses.some(v => v.id===c.id)) ?? []
       if (school && ((school.active && !form.active) || removed.length) &&
         !window.confirm('¿Guardar los cambios de '+school.name+'? '+(removed.length ? 'Se quitarán las sedes '+removed.map(c => c.name).join(', ')+'. ' : '')+(school.active && !form.active ? 'La institución quedará inactiva.' : ''))) return
       void action.run(async () => {
         if (editable.some(([key]) => !form[key].trim()) || form.campuses.some(c => !c.name.trim())) throw new Error('Completa los campos de la institución y sus sedes.')
+        if (!form.campuses.length) throw new Error('Añade al menos una sede.')
+        if (!restricted && !projects.data.some(p => p.id === form.projectId)) throw new Error('Selecciona un proyecto de la lista.')
         const result = await upsertSchool(restricted ? {id:form.id,name:form.name,campuses:form.campuses} : form)
         onClose(savedNotice(result))
       })
@@ -41,6 +44,8 @@ function SchoolEditor({ school, restricted, onClose }: { restricted:boolean; sch
         <div className="collect-fields">{editable.map(([key, label]) => <Field key={key} label={label}>
           <TextInput required value={form[key]} onChange={e => setForm({ ...form, [key]: e.target.value })} />
         </Field>)}
+          {!restricted && <Choice label="Proyecto" value={form.projectId} options={projects.data} placeholder={projects.loading ? 'Cargando proyectos…' : 'Selecciona el proyecto'} onChange={projectId => setForm({...form,projectId})}/>}
+          {!restricted && projects.error && <p role="alert">{projects.error}</p>}
           {!restricted && <Choice label="Zona" value={form.zone} options={[{ id: 'urbana', name: 'Urbana' }, { id: 'rural', name: 'Rural' }]} onChange={zone => setForm({ ...form, zone })} />}
         </div>
         {!restricted && <label>
@@ -73,7 +78,7 @@ export function Teachers({profile}:{profile?:UserProfile}) {
     <Directory title="Directorio de personas" loading={loading || directory.loading} headers={['Nombre','Perfil','Instituciones','Jornada','Estado']} create="Crear cuenta"
     rows={users.filter(u => !filter || u.rol === filter).map(u => {
       const names = schools.filter(s => u.schoolIds?.includes(s.id)).map(s => s.name).join(' · ')
-      return {id:u.uid,search:[u.fullName,u.email,u.username,names].join(' '),cells:[u.fullName,roles.find(r => r.id === u.rol)?.name,names || 'Sin asignación',u.jornada,u.activo ? 'Activo':'Inactivo']}
+      return {id:u.uid,search:[u.fullName,u.email,u.username,names].join(' '),cells:[u.fullName,roles.find(r => r.id === u.rol)?.name,names || 'Sin asignación',u.rol === 'docente' ? u.jornada : '—',u.activo ? 'Activo':'Inactivo']}
     })}
     editor={(id,close) => <TeacherEditor profile={profile} key={id} user={users.find(u => u.uid===id)} schools={schools} onClose={close}/>}/></>
 }
@@ -91,7 +96,7 @@ function TeacherEditor({ user, schools, profile, onClose }: { profile?:UserProfi
     return <section><h3>{user.fullName}</h3><p>La Fundación gestiona esta cuenta porque tiene colegios fuera de tu asignación.</p><Button onClick={() => onClose()}>Cerrar</Button></section>
   }
   return <section><h3>{user ? 'Editar persona' : 'Crear persona'}</h3>
-    {credentials ? <><p role="status">Copia la contraseña antes de cerrar.</p><Credentials items={[credentials]} /><Button onClick={() => onClose('Acceso actualizado.')}>Cerrar</Button></> : <form onSubmit={e => {
+    {credentials ? <><p role="status">{user ? 'Contraseña actualizada.' : 'Cuenta creada.'} Copia la contraseña antes de cerrar.</p><Credentials items={[credentials]} /><Button onClick={() => onClose(user ? 'Contraseña actualizada.' : 'Cuenta creada')}>Cerrar</Button></> : <form noValidate onSubmit={e => {
       e.preventDefault()
       if (user && ((user.activo && !active) || user.schoolIds.some(id => !sites[id] || (user.campusIds?.[id] ?? []).some(c => !sites[id].includes(c)))) &&
         !window.confirm('¿Confirmas el cambio de acceso de '+user.fullName+'? Revisa las instituciones, sedes y el estado de la cuenta.')) return
@@ -110,11 +115,11 @@ function TeacherEditor({ user, schools, profile, onClose }: { profile?:UserProfi
         <Field label="Nombre completo">
           <TextInput required value={fullName} onChange={e => setName(e.target.value)} />
         </Field>
-        <Field label="Usuario"><TextInput required disabled={!!user} minLength={3} maxLength={30} pattern="[a-z0-9.]{3,30}" value={username} onChange={e => setUsername(e.target.value)}/></Field>
+        <Field label="Usuario" hint={user ? undefined : "De 3 a 30 letras minúsculas, números o puntos."}><TextInput required disabled={!!user} minLength={3} maxLength={30} pattern="[a-z0-9.]{3,30}" value={username} onChange={e => setUsername(e.target.value)}/></Field>
         {!restricted && <Choice label="Perfil" value={role} options={roles} onChange={setRole}/>}
-        <Choice label="Jornada" options={shifts} value={jornada} onChange={setShift} />
+        {role === 'docente' && <Choice label="Jornada" options={shifts} value={jornada} onChange={setShift} />}
         {user && <label>
-          <input type="checkbox" checked={active} onChange={e => setActive(e.target.checked)} /> Cuenta activa</label>}
+          <input type="checkbox" disabled={user.uid === profile?.uid} checked={active} onChange={e => setActive(e.target.checked)} /> Cuenta activa</label>}
         <fieldset>
           <legend>Instituciones y sedes asignadas</legend>{schools.map(s => <div key={s.id}>
             <label>

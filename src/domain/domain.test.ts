@@ -56,8 +56,8 @@ it('valida categoría y detalle y conserva motivos históricos', () => {
   expect(check('Salud')).toBe('Escribe el motivo.')
   expect(check(null)).toBe('Selecciona un motivo.')
   expect(check('Salud: cita médica')).toBeNull()
-  expect(check('Salud: ' + 'x'.repeat(201))).toContain('200')
-  expect(check('Salud: ' + 'x'.repeat(200))).toBeNull()
+  expect(check('Salud: ' + 'x'.repeat(594))).toContain('600')
+  expect(check('Salud: ' + 'x'.repeat(593))).toBeNull()
   expect(formatReason('Salud', '  cita médica  ')).toBe('Salud: cita médica')
   expect(parseReason('Lluvia')).toEqual({ category: 'Otro', detail: 'Lluvia' })
   expect(check('Lluvia')).toBeTruthy()
@@ -98,4 +98,12 @@ describe('propuestas de grupos', () => {
     expect(() => suggestGroups([], 'lectura', 'linea_base', 0)).toThrow()
     expect(suggestGroups(roster({ letra: 3, palabra: 27 }), 'lectura', 'linea_base', 2)[0].studentIds).toHaveLength(3)
   })
+})
+
+it('explica cuántos docentes hacen falta por capacidad o por niveles incompatibles', () => {
+  expect(() => suggestGroups(roster({letra:61}),'lectura','linea_base',1)).toThrow(/al menos 2 docentes/)
+  expect(() => suggestGroups(roster({cuento:1,letra:1}),'lectura','linea_base',1)).toThrow(/al menos 2 docentes/)
+  const proposals = suggestGroups(roster({principiante:17,letra:41}),'lectura','linea_base',1)
+  expect(proposals).toHaveLength(1)
+  expect(proposals[0].studentIds).toHaveLength(58)
 })

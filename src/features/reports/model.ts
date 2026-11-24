@@ -4,13 +4,13 @@ export const geography = ['projectId', 'department', 'municipality', 'schoolId',
 export type Geography = typeof geography[number]
 export type Option = { value: string; label: string }
 export interface FilterOptions {
-  projects: string[]; departments: string[]; municipalities: string[]; schools: School[]; campuses: Campus[]
+  projectNames?: Record<string,string>; projects: string[]; departments: string[]; municipalities: string[]; schools: School[]; campuses: Campus[]
   loading: boolean; error?: string
 }
 export function filterChoices(options: FilterOptions): Record<Geography, Option[]> {
   const values = (items: string[]) => items.map(value => ({ value, label: value }))
   return {
-    projectId: values(options.projects), department: values(options.departments), municipality: values(options.municipalities),
+    projectId: options.projects.map(value => ({value,label:options.projectNames ? options.projectNames[value] || 'Proyecto sin nombre' : value})), department: values(options.departments), municipality: values(options.municipalities),
     schoolId: options.schools.map(s => ({ value: s.id, label: s.name })),
     campus: options.campuses.map(c => ({ value: c.id, label: c.name })),
   }

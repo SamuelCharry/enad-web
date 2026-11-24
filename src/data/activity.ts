@@ -1,4 +1,6 @@
 import type { AttendanceMark, Evaluation, Group, HoursEntry, School, Student } from '../domain/types'
+import { validStoredHours } from '../domain/hoursReason'
+import { classDate } from '../domain/weeks'
 import { compare } from './core'
 import type { SchoolData } from './reportMath'
 
@@ -18,7 +20,7 @@ export function activityFeed(schools: SchoolData[]) {
     }
     for (const m of s.attendance) add([m.groupId, m.date, m.teacherId], 'Asistencia', m, groups.get(m.groupId)?.name || m.groupId)
     for (const e of s.evaluations) add([e.studentId, e.id], 'Evaluación', e, students.get(e.studentId) || e.studentId)
-    for (const h of s.hours) add([h.teacherId, h.date], 'Horas', h, h.date)
+    for (const h of s.hours) if (validStoredHours(h)) add([h.teacherId, h.date], 'Horas', h, classDate(h.date))
   }
   return [...events.values()].sort((a, b) => Date.parse(b.savedAt) - Date.parse(a.savedAt) || compare(a.key, b.key)).slice(0, 12)
 }

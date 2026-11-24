@@ -1,4 +1,4 @@
-const prefix = 'enad:report:v2:'
+const prefix = 'enad:report:v2.2:'
 export const reportTtl = 600_000
 export const reportCache = new class extends Map<string, { expires: number; value: Promise<unknown> }> {
   override clear() {
@@ -37,12 +37,22 @@ export function cachedResult<T>(key: string, read: (signal: AbortSignal) => Prom
   return value
 }
 
-export async function withReadTimeout<T>(read: Promise<T>, onTimeout?: () => void): Promise<T> {
+export async function withReadTimeout<T>(read: Promise<T>, onTimeout?: () => void, delay = 20_000): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
     const timeout = new Promise<never>((_, reject) => {
-      timer = setTimeout(() => { onTimeout?.(); reject(new Error('La consulta tardó demasiado. Intenta de nuevo en unos minutos.')) }, 20_000)
+      timer = setTimeout(() => { onTimeout?.(); reject(new Error('La consulta tardó demasiado. Intenta de nuevo en unos minutos.')) }, delay)
     })
     return await Promise.race([read, timeout])
   } finally { clearTimeout(timer) }
+}
+
+export function reportWidgets() {
+  const unavailable = new Set<string>()
+  const deadline = Date.now() + 15_000
+  async function widget<T>(label:string,read:Promise<T>,fallback:T) {
+    try { return await withReadTimeout(read,undefined,Math.max(0,deadline-Date.now())) }
+    catch { unavailable.add(label); return fallback }
+  }
+  return {unavailable,widget}
 }

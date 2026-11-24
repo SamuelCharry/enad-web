@@ -1,4 +1,4 @@
-import { useContext, createContext, useEffect, useId, useRef } from 'react'
+import { useContext, createContext, useEffect, useId, useLayoutEffect, useRef } from 'react'
 import type { ComponentProps, PropsWithChildren, ReactNode } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import type { Subject } from '../domain/types'
@@ -48,7 +48,16 @@ export function DateInput(props: ComponentProps<'input'>) { return <TextInput {.
 export function NumberInput(props: ComponentProps<'input'>) { return <TextInput {...props} type="number" /> }
 export function Select({ className, ...props }: ComponentProps<'select'>) {
   const control = useControl()
-  return <span className="ui-select"><select {...control} {...props} className={classes('ui-control', className)} /></span>
+  const select = useRef<HTMLSelectElement>(null)
+  const mirror = useRef<HTMLSpanElement>(null)
+  useLayoutEffect(() => {
+    if (mirror.current) mirror.current.textContent = select.current?.selectedOptions[0]?.label || ''
+  })
+  return <span className="ui-select"><select ref={select} {...control} {...props} className={classes('ui-control', className)}
+    onChange={event => {
+      if (mirror.current) mirror.current.textContent = event.currentTarget.selectedOptions[0]?.label || ''
+      props.onChange?.(event)
+    }}/><span className="select-value" aria-hidden="true" ref={mirror}/></span>
 }
 
 export function Segmented<T extends string>({ label, value, options, onChange, disabled }: {

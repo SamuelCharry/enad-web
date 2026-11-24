@@ -3,6 +3,7 @@ import { db } from './firebase'
 import { api, caller, fail, now, requireSchool, reportCache } from './core'
 import { listenMany, useLive, withSession } from './live'
 import type { Student } from '../domain/types'
+import { cleanName, validateName } from '../domain/text/studentNameRules'
 import { nameKey } from '../domain/nameKey'
 
 const stream = withSession<Student[]>([],(p,next,error) => {
@@ -18,14 +19,8 @@ export type ReviewAction = 'aprobar'|'corregir'|'descartar'
 export function reviewPatch(action:ReviewAction,uid:string,stamp:string,name?:string) {
   const base = {needsReview:false,provisional:false,reviewReasons:[],reviewedBy:uid,reviewedAt:stamp,updatedAt:stamp}
   if (action === 'descartar') return {...base,active:false}
-  if (action === 'aprobar') return base
-  const particles = new Set(['de','del','la','las','los','y'])
-  const fullName = (name || '').normalize('NFC').toLocaleLowerCase('es').split(/\s+/u).map(token => {
-    const word = token.replace(/’/g,"'").replace(/[^\p{L}\p{M}'-]/gu,'').match(/\p{L}[\p{L}\p{M}]*(?:['-]\p{L}[\p{L}\p{M}]*)*/gu)?.join('') || ''
-    return particles.has(word) ? word : word.replace(/(^|['-])(\p{L})/gu,(_,separator:string,letter:string) => separator+letter.toLocaleUpperCase('es'))
-  }).filter(Boolean).join(' ')
-  const words = fullName.split(' '), letters = fullName.match(/\p{L}/gu)?.length || 0
-  if (words.length < 2 || words.length > 6 || letters < 3 || letters > 60 || words.some(w => !/^\p{L}+(?:[-'’]\p{L}+)*$/u.test(w) || (w.length === 1 && w.toLowerCase() !== 'y'))) fail(400,'Escribe el nombre y los apellidos completos.')
+  const fullName = cleanName(name || '')
+  if (validateName(fullName).includes('formato_nombre') || fullName.length > 80) fail(400,'Escribe el nombre y los apellidos completos.')
   return {...base,fullName,nameKey:nameKey(fullName)}
 }
 export function resolveReview(id:string,action:ReviewAction,name?:string) {
@@ -35,7 +30,7 @@ export function resolveReview(id:string,action:ReviewAction,name?:string) {
       const data = (await tx.get(ref)).data()
       if (!data?.needsReview || data.mergedInto) fail(409,'Este nombre ya fue revisado.')
       await requireSchool(p,data.schoolId)
-      const patch = reviewPatch(action,p.uid,stamp,name)
+      const patch = reviewPatch(action,p.uid,stamp,action === 'aprobar' ? data.fullName : name)
       const original = Object.fromEntries(Object.keys(patch).map(k => [k,k in data ? data[k] : deleteField()]))
       tx.update(ref,patch)
       return original

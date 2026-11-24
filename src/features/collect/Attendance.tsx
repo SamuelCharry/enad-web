@@ -1,14 +1,15 @@
 import { LoadError } from '../../ui/LoadError'
-import { useId, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { AttendanceStatus, Group, School, Student } from '../../domain/types'
 import { saveGroupAttendance, useSchoolAttendance } from '../../data/attendance'
 import { addStudentsToGroup, useGroups } from '../../data/groups'
 import { useStudents } from '../../data/students'
-import { colombiaToday } from '../../domain/weeks'
+import { classDate, colombiaToday } from '../../domain/weeks'
 import { Button, Card, Dialog, SyncStatus } from '../../ui/components'
 import { useAction } from './useAction'
-import { validDay } from './formValues'
+import { preference, remember } from '../../domain/preferences'
+import { matches, validDay } from './formValues'
 import { Field, TextInput } from '../../ui/components'
 import { useSchools } from '../../data/scope'
 import { Choice, SessionDate } from './common'
@@ -36,12 +37,19 @@ export function Attendance({ schoolId, initialGroup = '', initialDate, school, s
   })
   const [typed,setTyped] = useState<string>()
   const list = useId()
-  const [id, setId] = useState(initialGroup)
+  const storageKey = 'attendance:'+JSON.stringify([uid,schoolId || ''])
+  const [id, selectGroup] = useState(() => initialGroup || (uid && preference(storageKey)) || '')
   const [saving, setSaving] = useState(false)
   const group = groups.find(g => g.id === id)
-  const optionText = (g:Group) => [g.name,schools.find(s => s.id === g.schoolId)?.name,g.campus].filter(Boolean).join(' · ')
+  const selectedId = group?.id
+  useEffect(() => { if (uid && selectedId) remember(storageKey,selectedId) },[uid,storageKey,selectedId])
+  const optionText = (g:Group) => {
+    const institution = school || schools.find(s => s.id === g.schoolId)
+    const campus = institution?.campuses.find(c => c.id === g.campus || c.name === g.campus)
+    return [g.name,campus?.name,schools.length > 1 && institution?.name].filter(Boolean).join(' · ')
+  }
   const labels = groups.map(g => optionText(g))
-  const options = groups.map((g,i) => ({id:g.id,name:labels.indexOf(labels[i]) === labels.lastIndexOf(labels[i]) ? labels[i] : labels[i]+' · '+g.id}))
+  const options = groups.map((g,i) => ({id:g.id,name:labels.indexOf(labels[i]) === labels.lastIndexOf(labels[i]) ? labels[i] : labels[i]+' ('+(i+1)+')'}))
   const activeSchool = school || schools.find(s => s.id === group?.schoolId)
   const { drafts, update } = useAttendanceDrafts(uid,group?.schoolId || '')
   const key = JSON.stringify([id, date])
@@ -50,9 +58,9 @@ export function Attendance({ schoolId, initialGroup = '', initialDate, school, s
   return <>
     <fieldset disabled={saving} className="collect-fields">
       {groups.length > 5 ? <Field label="Grupo"><TextInput data-guide="group" list={list} type="search" placeholder="Busca tu grupo" value={typed ?? options.find(o => o.id === id)?.name ?? ''}
-        onChange={e => {setTyped(e.target.value);setId(options.find(o => o.name === e.target.value)?.id || '')}} data-complete={!!group}/>
+        onChange={e => {setTyped(e.target.value);const value = e.target.value.trim(); const found = options.filter(o => matches(value,o.name)); selectGroup(options.find(o => o.name === value)?.id || (value && found.length === 1 ? found[0].id : ''))}} data-complete={!!group}/>
         <datalist id={list}>{options.map(o => <option key={o.id} value={o.name}/>)}</datalist></Field> :
-        <Choice guide="group" label="Grupo" placeholder="Selecciona un grupo" options={options} value={group?.id || ''} onChange={setId}/>}
+        <Choice guide="group" label="Grupo" placeholder="Selecciona un grupo" options={options} value={group?.id || ''} onChange={selectGroup}/>}
       <SessionDate {...{ date, today, setDate }} />
     </fieldset>
     <div className="teacher-tools">
@@ -114,7 +122,7 @@ function AttendanceSheet({ date, group, students, draft, setDraft, setSaving, sc
     }, '')
   }
   return <Card>
-    <div className="collect-heading"><h3>{group.name}</h3><strong>Asistió el {percent} %</strong></div>
+    <div className="collect-heading"><h3>{group.name}</h3>{missing < roster.length && <strong>Asistió el {percent} %</strong>}</div>
     {members.size !== roster.length && <p role="alert">Faltan integrantes del grupo por cargar.</p>}
     {!members.size && <p>Añade el primer estudiante para tomar asistencia.</p>}
     {roster.length > 0 && <Button data-guide="attendance" data-complete={complete} disabled={action.busy} onClick={() => {
@@ -127,7 +135,7 @@ function AttendanceSheet({ date, group, students, draft, setDraft, setSaving, sc
       setDraft(next)
     }}>Marcar a todos presentes</Button>}
     {roster.map(s => <div className="collect-row" key={s.id}>
-      <div><Button variant="ghost" disabled={action.busy} aria-label={'Alternar asistencia de ' + s.fullName} onClick={() => mark(s.id, status(s.id) === 'vino' ? 'no_vino' : 'vino')}>{s.fullName}</Button><small>{s.code} · Grado {s.grade}°</small>
+      <div><strong>{s.fullName}</strong><small>{s.code} · Grado {s.grade}°</small>
         {changes[s.id] ? <small className="ui-sync" data-dirty="true">Sin guardar</small> : baseline[s.id] ? <SyncStatus pending={pending.has(s.id)} /> : <small>Sin registrar</small>}
         {school && <Link to={collectLink('estudiantes', { school: s.schoolId, campus: s.campus, student: s.id })}>Ver perfil</Link>}</div>
       <div className="collect-actions" role="group" aria-label={'Asistencia de ' + s.fullName}>
@@ -143,7 +151,7 @@ function AttendanceSheet({ date, group, students, draft, setDraft, setSaving, sc
       <Button data-guide="save" variant="primary" loading={action.busy} disabled={!complete || !Object.keys(changes).length} onClick={() => setConfirmSave(true)}>Guardar asistencia</Button>
       {guideSaved && complete && !Object.keys(changes).length && <Button onClick={() => guideSaved(pending.size > 0)}>Terminar con la asistencia registrada</Button>}
       {action.feedback}</div>
-    {confirmSave && <Dialog title="¿Guardar la asistencia?" onClose={() => setConfirmSave(false)}><p>{group.name} · {date} · {Object.keys(changes).length} marcas por guardar</p>
+    {confirmSave && <Dialog title="¿Guardar la asistencia?" onClose={() => setConfirmSave(false)}><p>{group.name} · {classDate(date)} · {Object.keys(changes).length} {Object.keys(changes).length === 1 ? 'marca' : 'marcas'} por guardar</p>
       <Button variant="primary" disabled={!complete || !Object.keys(changes).length} onClick={save}>Confirmar asistencia</Button></Dialog>}
     {retiring && <Dialog title="¿Marcar como retirado?" onClose={() => setRetiring(null)}><p>Al guardar, {retiring.fullName} quedará retirado del programa.</p>
       <Button variant="danger" onClick={() => { mark(retiring.id, 'retirado'); setRetiring(null) }}>Confirmar retiro</Button></Dialog>}

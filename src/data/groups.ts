@@ -8,6 +8,11 @@ import { useLive } from './live'
 import { useMemo } from 'react'
 import { studentDoc } from './students'
 
+export function groupName(value: unknown) {
+  const name = str(value)
+  if (!name || name.length > 60 || /[\p{Extended_Pictographic}\p{Regional_Indicator}\u20E3]/u.test(name)) fail(400, 'Escribe un nombre de hasta 60 caracteres, sin emojis.')
+  return name
+}
 function groupView<T extends Group>(group: T) {
   const studentIds = group.studentIds ?? []
   return {
@@ -53,8 +58,7 @@ export function createGroup(input: {
   teacherId?: string
 }) {
   return api(async () => {
-    const p = await caller('writer'), name = str(input.name), { subject, schoolId } = input
-    if (!name) fail(400, 'Escribe el nombre del grupo.')
+    const p = await caller('writer'), name = groupName(input.name), { subject, schoolId } = input
     if (!SUBJECTS.includes(subject)) fail(400, 'La materia debe ser lectura o matemáticas.')
     await requireSchool(p, schoolId)
     const owner = p.rol !== 'docente' ? await teacher(str(input.teacherId), schoolId) : { teacherId: p.uid, teacherName: p.fullName }
@@ -78,8 +82,7 @@ export function patchGroup(id: string, fields: Partial<Pick<Group, 'name' | 'cam
   return api(async () => {
     const p = await caller('writer'), d = await groupDoc(p, id, true), changes: Partial<Group> = {}
     if ('name' in fields) {
-      changes.name = str(fields.name);
-      if (!changes.name) fail(400, 'Escribe el nombre del grupo.')
+      changes.name = groupName(fields.name)
     }
     if ('campus' in fields) changes.campus = str(fields.campus)
     if ('teacherId' in fields && fields.teacherId !== d.data().teacherId) {
@@ -108,6 +111,7 @@ export function addStudentsToGroup(id: string, studentIds: string[]) {
       if ((await studentDoc(p, sid)).data().schoolId !== group.schoolId) fail(400, 'El estudiante es de otra institución.')
     }
     const added = ids.filter(s => !group.studentIds.includes(s))
+    if (group.studentIds.length + added.length > 60) fail(400,'El grupo admite hasta 60 estudiantes.')
     if (!added.length) return group
     const syncState = await commit(updateDoc(d.ref, { studentIds: arrayUnion(...added), updatedAt: now() }))
     return groupView({ ...group, studentIds: [...group.studentIds, ...added], syncState })
@@ -136,6 +140,9 @@ export function moveMembers(from:string,into:string,ids:string[]) {
       await requireSchool(p,source.schoolId)
       if (!ids.every(id => source.studentIds.includes(id))) fail(409,'Los integrantes cambiaron. Revisa la selección.')
       const added = ids.filter(id => !target.studentIds.includes(id))
+      if (target.studentIds.length + added.length > 60) fail(400,'El grupo admite hasta 60 estudiantes.')
+      const students = await Promise.all(added.map(id => tx.get(doc(db,'students',id))))
+      if (students.some(s => s.data()?.schoolId !== source.schoolId)) fail(400,'El estudiante es de otra institución.')
       tx.update(sourceRef,{studentIds:arrayRemove(...ids),updatedAt:stamp})
       tx.update(targetRef,{studentIds:arrayUnion(...ids),updatedAt:stamp})
       return {added,schoolId:source.schoolId}

@@ -21,6 +21,7 @@ export function submissionWindow(config: ProgramConfig, filters: ReportFilters, 
   const week = Math.max(1, Math.min(latest, selected ?? (date ? weeksElapsed(config, date) : latest)))
   const window = rangeOf(week, config)
   const from = filters.from && filters.from > window.from ? filters.from : window.from
-  const to = filters.to && filters.to < window.to ? filters.to : window.to
+  const end = !filters.to && week === latest ? reportRange(config,{}).to : window.to
+  const to = filters.to && filters.to < end ? filters.to : end
   return { latest, week, range: { from, to } }
 }

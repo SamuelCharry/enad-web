@@ -24,7 +24,7 @@ export function reviewName(row: ReviewName, matches: Matches) {
   const id = choice ?? (uncertain ? '' : best?.student.id ?? 'new')
   const flags = [...new Set([...validateName(row.input, row.confidence), ...(row.input === row.name ? row.flags : []),
   ...(id === 'new' ? matches.map(m => 'posible_duplicado:' + m.student.id) : [])])]
-  const problem = !cleanName(row.input) ? 'Escribe el nombre o quita la fila.' :
+  const problem = id === 'new' && (cleanName(row.input).length < 3 || cleanName(row.input).length > 80) ? 'Escribe un nombre de 3 a 80 caracteres.' : !cleanName(row.input) ? 'Escribe el nombre o quita la fila.' :
     !id ? 'Elige a qué estudiante corresponde.' : ''
   const identity = id === 'new' ? 'new:' + nameKey(cleanName(row.input)) : 'id:' + id
   return { id, flags, problem, identity }
@@ -48,5 +48,5 @@ export function scanReceipt(matched: number, created: number, pending: boolean) 
   const fresh = created === 1 ? '1 nuevo' : created + ' nuevos'
   const sent = pending ? 'para revisión de la fundación. Pendiente de envío.' :
     (created === 1 ? 'enviado' : 'enviados') + ' a revisión de la fundación.'
-  return existing + ', ' + fresh + ' ' + sent
+  return created ? existing + ', ' + fresh + ' ' + sent : 'Lista guardada. '+existing+'.'+(pending ? ' Pendiente de envío.' : '')
 }

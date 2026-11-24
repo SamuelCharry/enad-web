@@ -2,12 +2,12 @@ import { runTransaction, writeBatch, type DocumentReference } from 'firebase/fir
 import { commit, isOffline, reportCache } from './core'
 import { db } from './firebase'
 
-/** New record whose absence was checked in a school-scoped snapshot. */
+/** Record with a deterministic or client-generated document reference. */
 export interface Insert { ref: DocumentReference; data: Record<string, unknown> }
 
-/** Inserts one page; admins can also recheck individual missing documents inside a transaction. */
-export async function insertPage(page: Insert[], admin: boolean) {
-  if (admin) {
+/** Recheck absence atomically when individual document reads are authorized. */
+export async function insertPage(page: Insert[], checkIndividual: boolean) {
+  if (checkIndividual) {
     try {
       const created = await runTransaction(db, async tx => {
         const snapshots = await Promise.all(page.map(record => tx.get(record.ref)))
@@ -25,8 +25,6 @@ export async function insertPage(page: Insert[], admin: boolean) {
       if (!isOffline(error)) throw error
     }
   }
-  // Teacher rules permit a scoped roster query, but deny get() on an absent
-  // student since it has no schoolId. Use the mobile batch path in that case.
   const batch = writeBatch(db)
   for (const record of page) batch.set(record.ref, record.data)
   return { created: new Set(page.map(record => record.ref.id)), syncState: await commit(batch.commit()) }

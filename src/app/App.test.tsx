@@ -25,6 +25,7 @@ function open(path: string) {
   return render(<App />)
 }
 beforeEach(() => {
+  localStorage.clear()
   vi.resetAllMocks()
   vi.mocked(useSession).mockReturnValue(signedOut)
   vi.mocked(useSchools).mockReturnValue({ schools: [], loading: false, error: undefined })
@@ -159,4 +160,13 @@ it('contiene el foco del menú móvil y lo devuelve al cerrar',async () => {
     Reflect.deleteProperty(HTMLDialogElement.prototype,'close')
     vi.unstubAllGlobals()
   }
+})
+
+it('recuerda la barra contraída al reabrir el portal',async () => {
+  vi.mocked(useSession).mockReturnValue(signedIn())
+  const view=open('/portal/hoy')
+  fireEvent.click(await screen.findByRole('button',{name:'Contraer barra lateral'}))
+  view.unmount()
+  open('/portal/hoy')
+  expect(await screen.findByRole('button',{name:'Ampliar barra lateral'})).toBeTruthy()
 })

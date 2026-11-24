@@ -17,7 +17,7 @@ export function useSchoolAttendance(schoolId: string, date: string, groupIds?: s
       next([])
       return () => {}
     }
-    const pages = keys ? chunks<string>(JSON.parse(keys),30).map(ids => [where('groupId','in',ids)]) : [[]]
+    const pages = keys ? chunks<string>(JSON.parse(keys),10).map(ids => [where('groupId','in',ids)]) : [[]]
     return listenMany(pages.map(page => query(collectionGroup(db, 'attendance'), where('schoolId', '==', schoolId),
       where('date', '==', date), ...page)), next, error)
   }), [schoolId, date, keys])
@@ -50,7 +50,7 @@ export function saveGroupAttendance(groupId: string, date: string, marks: Record
     requireDate(date)
     const entries = Object.entries(marks)
     if (!entries.length) fail(400, 'No hay marcas de asistencia para guardar.')
-    const d = await groupDoc(p, groupId), members = new Set(d.data().studentIds as string[]), schoolId = String(d.data().schoolId)
+    const d = await groupDoc(p, groupId,true), members = new Set(d.data().studentIds as string[]), schoolId = String(d.data().schoolId)
     for (const [sid, status] of entries) {
       if (!members.has(sid)) fail(400, 'Hay estudiantes que no pertenecen a este grupo.')
       if (!['vino', 'no_vino', 'retirado'].includes(status)) fail(400, 'La asistencia debe ser vino, no_vino o retirado.')

@@ -84,7 +84,7 @@ function StudentForm({ student, groups, schools, close }: { student?: Student; g
   const [retired, setRetired] = useState(initial?.retired ?? false)
   const action = useAction()
   const local = groups.filter(g => g.schoolId === schoolId && campusId(school, g.campus) === site)
-  return <form onSubmit={e => {
+  return <form noValidate onSubmit={e => {
     e.preventDefault()
     const changed = initial && (retired !== initial.retired || site !== campusId(school, initial.campus) || before.some(id => !selected.includes(id)))
     if (changed && !window.confirm('¿Guardar los cambios de ' + name + '? Sede: ' + (school.campuses.find(c => c.id === site)?.name || 'Sin asignar') + '. Estado: ' + (retired ? 'retirado' : 'activo') + '. Grupos: ' + (groups.filter(g => selected.includes(g.id)).map(g => g.name).join(', ') || 'ninguno') + '.')) return
@@ -115,7 +115,7 @@ function GroupForm({ group, schools, users, close }: { group?: Group; schools: S
   const [campus, setCampus] = useState(group?.campus ?? ''), [subject, setSubject] = useState<Subject>(group?.subject ?? 'lectura')
   const action = useAction()
   const options = users.filter(u => u.activo && u.schoolIds?.includes(schoolId)).map(u => ({ id: u.uid, name: u.fullName }))
-  return <form onSubmit={e => {
+  return <form noValidate onSubmit={e => {
     e.preventDefault()
     if (group && teacher !== group.teacherId && !window.confirm('¿Reasignar ' + group.name + ' a ' + options.find(t => t.id === teacher)?.name + '?')) return
     void action.run(async () => {
@@ -125,7 +125,7 @@ function GroupForm({ group, schools, users, close }: { group?: Group; schools: S
       close(savedNotice(result))
     })
   }}><fieldset disabled={action.busy}><legend>{group ? 'Editar grupo' : 'Crear grupo'}</legend>
-      <div className="collect-fields"><Field label="Nombre del grupo"><TextInput value={name} required onChange={e => setName(e.target.value)} /></Field>
+      <div className="collect-fields"><Field label="Nombre del grupo"><TextInput maxLength={60} value={name} required onChange={e => setName(e.target.value)} /></Field>
         <Choice label="Institución" value={schoolId} disabled={!!group} options={schools} onChange={id => { setSchool(id); setCampus(''); setTeacher('') }} />
         <Choice label="Sede" disabled={!!group} value={campus} placeholder="Sin asignar" options={school.campuses} onChange={setCampus} />
         <SubjectField value={subject} disabled={!!group} onChange={setSubject} />

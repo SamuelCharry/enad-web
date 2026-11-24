@@ -5,7 +5,7 @@ import type { Evaluation, Moment, Student, Subject } from '../../domain/types'
 import { adminImport } from '../../data/admin'
 import { getStudentHistory, useStudents } from '../../data/students'
 import { levelLabel, LEVELS, momentLabel, subjectLabel } from '../../domain/levels'
-import { colombiaToday } from '../../domain/weeks'
+import { classDate, colombiaToday } from '../../domain/weeks'
 import { Button, Card, DateInput, Dialog, Field } from '../../ui/components'
 import { useAction } from './useAction'
 import { matches, numbers } from './formValues'
@@ -54,7 +54,7 @@ function HistoryList({ student }: { student: Student }) {
     </p> : !items ? <p>Cargando historial…</p> : !items.length && <p>Sin evaluaciones registradas.</p>}
     {items?.map(ev => <Card key={ev.id}>
       <h3>{subjectLabel(ev.subject)} · {momentLabel(ev.moment)}</h3>
-      <p>{ev.date} · {levelLabel(ev.subject, ev.level)}</p>
+      <p>{classDate(ev.date)} · {levelLabel(ev.subject, ev.level)}</p>
       {ev.id === 'imp_' + ev.subject + '_' + ev.moment && <Button onClick={() => setEdit(ev)}>Editar evaluación histórica</Button>}</Card>)}
     {edit && <HistoricalEditor student={student} evaluation={edit === 'new' ? undefined : edit} saved={() => {
       setNotice('Evaluación histórica guardada.')
@@ -71,7 +71,7 @@ function HistoricalEditor({ student, evaluation, saved, onClose }: { student: St
   const action = useAction()
   return <Dialog title="Evaluación histórica" {...{ onClose }} busy={action.busy}>
     <p>{student.fullName}</p>
-    <form onSubmit={e => {
+    <form noValidate onSubmit={e => {
       e.preventDefault()
       if (!window.confirm('¿Guardar la evaluación histórica de '+student.fullName+'? Si ya existe un registro importado para esta área y momento, se reemplazará.')) return
       void action.run(async () => {

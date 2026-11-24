@@ -31,3 +31,18 @@ export function rangeOf(week: number, cfg: ProgramConfig) {
 }
 /** Today's calendar date in Colombia (UTC−5). */
 export function colombiaToday() { return iso(Date.now() - 5 * 3_600_000) }
+
+export function validCalendarDay(value:unknown): value is string {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const ms = Date.parse(value)
+  return Number.isFinite(ms) && iso(ms) === value
+}
+
+export function classDate(iso:string) {
+  const date = new Date(iso+'T12:00:00Z')
+  if (!Number.isFinite(date.getTime())) return 'Fecha sin registrar'
+  const parts = new Intl.DateTimeFormat('es-CO',{weekday:'short',day:'numeric',month:'short',timeZone:'America/Bogota'}).formatToParts(date)
+  const part = (type:string) => parts.find(p => p.type === type)?.value.replace(/\./g,'') || ''
+  const day = part('weekday')
+  return day.charAt(0).toUpperCase()+day.slice(1)+' '+part('day')+' '+part('month')
+}

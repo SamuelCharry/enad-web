@@ -1,4 +1,4 @@
-import { collection, deleteDoc, doc, getDoc, onSnapshot, query, setDoc, where } from 'firebase/firestore'
+import { collection, collectionGroup, updateDoc, doc, getDoc, onSnapshot, query, setDoc, where } from 'firebase/firestore'
 import { useMemo } from 'react'
 import type { Group, Student, Subject } from '../domain/types'
 import { LEVELS } from '../domain/levels'
@@ -49,7 +49,7 @@ export const saveActivity = (fields:ActivityFields,id?:string) => api(async () =
 })
 export const removeActivity = (id:string) => api(async () => {
   await caller('fundacion')
-  return {syncState:await commit(deleteDoc(doc(db,'activities',id)))}
+  return {syncState:await commit(updateDoc(doc(db,'activities',id),{active:false,updatedAt:now()}))}
 })
 export function usePlan(group:Group,date:string) {
   const source = useMemo(() => withSession<(Plan & {pending:boolean})|null>(null,(p,next,error) => {
@@ -67,3 +67,10 @@ export const planToday = (groupId:string,activityId:string) => api(async () => {
   const data:Plan = {activityId,activityTitle:activity.title,schoolId:group.data().schoolId,teacherId:p.uid,date,savedAt:now()}
   return {syncState:await trackSubmission({uid:p.uid,schoolId:data.schoolId,label:'Actividad · '+data.activityTitle,date,writes:[{path:ref.path,data}]},() => setDoc(ref,data))}
 })
+
+export function useTodayPlans(date:string) {
+  const source = useMemo(() => withSession<Plan[]>([], (p,next,error) =>
+    listenMany(p.schoolIds.map(id => query(collectionGroup(db,'plan'),where('schoolId','==',id),
+      where('teacherId','==',p.uid),where('date','==',date))),next,error)),[date])
+  return useLive(source,[])
+}

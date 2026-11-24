@@ -1,3 +1,4 @@
+import { validCalendarDay } from '../../domain/weeks'
 import { Records } from './Records'
 import { LoadError } from '../../ui/LoadError'
 import { useEffect, useRef, useState } from 'react'
@@ -97,10 +98,10 @@ export function Foundation() {
   const target = (to:string) => ({pathname:to,search:new URLSearchParams(filters as Record<string,string>).toString()})
   const invalid = !!(filters.from && filters.to && filters.from > filters.to)
   const calendar = useProgramConfig()
-  const validDates = [filters.from,filters.to].every(v => !v || (/^\d{4}-\d{2}-\d{2}$/.test(v) && Number.isFinite(Date.parse(v))))
+  const validDates = [filters.from,filters.to].every(v => !v || validCalendarDay(v))
   const current = validDates && calendar.config && (tabPath.endsWith('/seguimiento')
     ? submissionWindow(calendar.config, filters, Number(params.get('week'))).range
-    : reportRange(calendar.config, filters, tabPath === '/portal/reportes' ? 4 : 1))
+    : reportRange(calendar.config, filters))
   return <>
     <div className="rep-actions"><ExportButton key={JSON.stringify([filters,visibility,current])} filters={current ? {...filters,...current} : filters} disabled={!validDates || invalid || (!!current && current.from > current.to) || options.loading || !!options.error} /></div>
     <nav className="ui-tabs" aria-label="Secciones del informe"><div className="ui-tab-links">{tabs.map(t => <Link key={t.to} to={target(t.to)} aria-current={tabPath===t.to ? 'page':undefined} className={tabPath===t.to ? 'active':undefined}>{t.label}</Link>)}</div>
