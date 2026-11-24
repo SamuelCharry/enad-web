@@ -1,56 +1,55 @@
-import { useEffect, useRef, useState, type ChangeEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import type { Group, Student } from '../../domain/types'
 import { addStudentsToGroup, useGroups } from '../../data/groups'
-import { createStudent, importStudents } from '../../data/students'
-import { matchRow } from '../../domain/ocr/rosterMatcher'
-import { type ParsedRow } from '../../domain/ocr/rowParser'
-import { validateRows } from '../../domain/ocr/rowValidator'
-import { Button, Dialog, Field, Select, Card, TextInput } from '../../ui/components'
+import { createStudent } from '../../data/students'
+import { reasonLabel } from '../../domain/text/studentNameRules'
+import { reviewerForRoster, scanReceipt, type ReviewName } from '../../domain/ocr/reviewNames'
+import { Button, Dialog, Field, Segmented, Select, TextInput } from '../../ui/components'
 import { useAction } from './useAction'
-import { numbers } from './formValues'
 import { Choice } from './common'
-
 import { checkPhoto } from '../teacher/photoQuality'
+import { PageCrop } from './crop/PageCrop'
 
-interface Page { id: string; file: File; url: string }
-interface Review { page?: string; id: string; parsed: ParsedRow; choice: string }
-export function Scanner({ schoolId, campus, students, onClose, onSaved }: { onSaved?: (group?: Group) => void; schoolId: string; campus: string; students: Student[]; onClose: () => void }) {
-  const [rows, setRows] = useState<Review[]>([])
+interface Page { id: string; url: string; engine: string; omitted: number }
+interface Entry { existing?: string; row: ReviewName; grade: number; flags: string[] }
+interface Submission { entries: Entry[]; group?: Group; ids: string[]; pending: boolean }
+export function Scanner({ schoolId, campus, students, onClose, onSaved }: {
+  onSaved?: (group?: Group) => void; schoolId: string; campus: string; students: Student[]; onClose: () => void
+}) {
+  const [rows, setRows] = useState<ReviewName[]>([])
   const [pages, setPages] = useState<Page[]>([])
   const [preview, setPreview] = useState<Page>()
   const [warning, setWarning] = useState('')
-  const urls = useRef(new Set<string>())
-  useEffect(() => {
-    const current = urls.current
-    return () => { current.forEach(url => URL.revokeObjectURL(url)); current.clear() }
-  }, [])
-  const [needsModel, setNeedsModel] = useState(false)
   const [model, setModel] = useState<File>()
-  const [grade, setGrade] = useState('3')
-  const [groupId, setGroup] = useState('')
+  const [needsModel, setNeedsModel] = useState(false)
   const [progress, setProgress] = useState<number | null>(null)
-  const [receipts, setReceipts] = useState<Record<string, string>>({})
-  const [imported, setImported] = useState<string[] | null>(null)
-  const { groups, error: groupError, loading: groupLoading } = useGroups(schoolId, { mine: true })
+  const [groupId, setGroup] = useState('')
+  const [receipt, setReceipt] = useState('')
+  const [submission, setSubmission] = useState<Submission>()
   const action = useAction()
-  const roster = students.filter(s => s.schoolId === schoolId).map(s => ({ id: s.id, name: s.fullName, sex: s.gender, age: s.age, code: s.code }))
-  const reviewed = (rows.length ? validateRows(rows.map(r => r.parsed)) : []).map((r, i) => {
-    const match = matchRow(r, roster)
-    const choice = receipts[rows[i].id] || rows[i].choice || match.chosenStudentId || (match.status === 'newStudent' && r.code ? 'new' : '')
-    const errors = [...new Set([...r.issues, ...match.reasons])]
-    const student = students.find(s => s.id === choice)
-    const conflict = choice === 'new' && !!r.code && roster.some(s => s.code === r.code)
-    if (conflict) errors.push('Este código ya existe. Verifica la coincidencia.')
-    const wrongSite = !!groupId && student && (student.campus !== campus || student.retired)
-    if (wrongSite) errors.push('Este estudiante no puede añadirse al grupo de esta sede.')
-    return { r, match, choice, errors, valid: !!choice && !wrongSite && !conflict && match.status !== 'invalid' && (choice === 'new' || !!student || !!receipts[rows[i].id]) }
-  })
-  const used = reviewed.map(d => d.choice).filter(v => v && v !== 'new')
-  const duplicate = used.length !== new Set(used).size
-  const ready = reviewed.length > 0 && reviewed.length <= 200 && !duplicate && reviewed.every(r => r.valid)
-  function edit(i: number, patch: Partial<ParsedRow>) {
-    setRows(list => list.map((row, j) => i === j ? { ...row, parsed: { ...row.parsed, ...patch }, choice: '' } : row))
+  const urls = useRef(new Set<string>())
+  useEffect(() => { const all = urls.current; return () => all.forEach(url => URL.revokeObjectURL(url)) }, [])
+  const { groups, loading, error } = useGroups(schoolId, { mine: true })
+  const group = groups.find(g => g.id === groupId && g.schoolId === schoolId && g.campus === campus)
+  const roster = useMemo(() => students.filter(s => s.schoolId === schoolId), [students, schoolId])
+  const members = new Set(group?.studentIds)
+  const counts = [0, 0, 0, 0, 0, 0]
+  for (const s of roster) if (members.has(s.id)) counts[s.grade]++
+  const defaultGrade = [3, 4, 5].sort((a, b) => counts[b] - counts[a])[0]
+  const reviewer = useMemo(() => reviewerForRoster(roster), [roster])
+  const review = useMemo(() => rows.map(reviewer), [reviewer, rows])
+  const identities = new Set<string>()
+  const repeated = new Set<string>()
+  for (const r of review) {
+    if (r.problem) continue
+    if (identities.has(r.identity)) repeated.add(r.identity)
+    identities.add(r.identity)
   }
+  const ready = rows.length > 0 && rows.length <= 200 && !repeated.size && review.every(r => !r.problem) && (!groupId || !!group)
+  function patch(id: string, changes: Partial<ReviewName>) {
+    setRows(prev => prev.map(r => r.id === id ? { ...r, ...changes } : r))
+  }
+  function release(url: string) { urls.current.delete(url); URL.revokeObjectURL(url) }
   function chooseFile(e: ChangeEvent<HTMLInputElement>, replacing?: Page) {
     const file = e.target.files?.[0]
     e.target.value = ''
@@ -58,110 +57,117 @@ export function Scanner({ schoolId, campus, students, onClose, onSaved }: { onSa
     void action.run(async () => {
       const url = URL.createObjectURL(file)
       urls.current.add(url)
-      const page = { id: replacing?.id ?? crypto.randomUUID(), file, url }
-      const issue = await checkPhoto(url).catch(() => 'Comprueba que los nombres se lean bien.')
-      if (issue) { setWarning(issue); setPreview(page) }
-      else await scan(page)
+      setWarning(await checkPhoto(url).catch(() => 'Comprueba que los nombres se lean bien.'))
+      setPreview({ url, id: replacing?.id ?? crypto.randomUUID(), engine: '', omitted: 0 })
     }, '')
   }
-  async function scan(page: Page) {
+  async function scan(file: File, page: Page) {
     setProgress(0)
-    const { readPhoto, SpanishModelMissing } = await import('./readPhoto')
     try {
-      const parsed = await readPhoto(page.file, setProgress, model)
-      if (!parsed.length) throw new Error('No se identificaron filas.')
-      setPages(prev => prev.some(p => p.id === page.id) ? prev.map(p => p.id === page.id ? page : p) : [...prev,page])
-      setRows(prev => [...prev.filter(r => r.page !== page.id), ...parsed.map(p => ({ id: crypto.randomUUID(), page: page.id, parsed: p, choice: '' }))])
+      const { readPhoto } = await import('./readPhoto')
+      const result = await readPhoto(file, setProgress, model, schoolId)
+      const old = pages.find(p => p.id === page.id)
+      if (!result.rows.length && old) throw new Error('No encontramos nombres. Conservamos la página anterior.')
+      const updated = { ...page, engine: result.engine, omitted: result.omitted }
+      setPages(prev => old ? prev.map(p => p.id === page.id ? updated : p) : [...prev, updated])
+      setRows(prev => [...prev.filter(r => r.page !== page.id), ...result.rows.map(r => ({
+        ...r,
+        id: crypto.randomUUID(), page: page.id, input: r.name, gender: '' as const
+      }))])
+      if (old) release(old.url)
       setPreview(undefined)
-    } catch (error) {
-      if (error instanceof SpanishModelMissing) {
+    } catch (e) {
+      if (e instanceof Error && e.name === 'SpanishModelMissing') {
         setNeedsModel(true)
-        throw new Error('No se pudo cargar el modelo de español. Selecciona el archivo spa.traineddata o spa.traineddata.gz y vuelve a elegir la foto.')
+        throw new Error('Falta el modelo de español. Selecciona el archivo y vuelve a leer la foto.')
       }
-      throw new Error('No se pudo leer la lista. Intenta con una foto nítida, tomada de frente.')
-    }
-    finally { setProgress(null) }
+      throw e
+    } finally { setProgress(null) }
   }
-  function addRow(page?: string) {
-    setRows(list => [...list, { id: crypto.randomUUID(), page, choice: '', parsed: { name: '', rawText: '', confidence: {}, issues: [], readingIssues: [] } }])
+  function addRow(page: string) {
+    setRows(prev => [...prev, { page, id: crypto.randomUUID(), raw: '', name: '', input: '', confidence: null, flags: [], gender: '' }])
   }
   async function save() {
-    let ids = imported
-    if (!ids) {
-      const saved = { ...receipts }
-      const additions = reviewed.flatMap((d, i) => d.choice === 'new' && d.r.code ? [{ i, row: { campus, code: d.r.code, fullName: d.r.name.trim(), grade: d.r.grade ?? +grade, gender: d.r.sex || '', age: d.r.age ?? null } }] : [])
-      if (additions.length) {
-        const result = await importStudents(schoolId, additions.map(a => a.row))
-        for (const { i, row } of additions) {
-          const created = result.created.find(s => s.code === row.code)
-          if (created) saved[rows[i].id] = created.id
-        }
-        setReceipts({ ...saved })
-        if (result.skipped.length) {
-          setRows(prev => prev.map(r => ({ ...r, choice: '' })))
-          throw new Error('Un código ya existe. Revisa las coincidencias antes de continuar.')
-        }
+    let draft = submission
+    if (!draft) {
+      if (!ready) return
+      draft = {
+        group, ids: [], pending: false, entries: rows.map((row, i) => ({
+          row, grade: row.grade ?? defaultGrade,
+          existing: review[i].id === 'new' ? undefined : review[i].id, flags: review[i].flags
+        }))
       }
-      ids = []
-      for (const [i, d] of reviewed.entries()) {
-        const key = rows[i].id
-        if (d.choice === 'new' && !saved[key]) {
-          if (d.r.code) throw new Error('Falta confirmar un registro importado.')
-          const student = await createStudent({ schoolId, campus, fullName: d.r.name.trim(), grade: d.r.grade ?? +grade, gender: d.r.sex === 'F' || d.r.sex === 'M' ? d.r.sex : '', age: d.r.age ?? null, provisional: true, clientId: key })
-          saved[key] = student.id
-          setReceipts({ ...saved })
-        }
-        ids.push(saved[key] || d.choice)
-      }
-      setImported(ids)
+      setSubmission(draft)
     }
-    if (groupId) await addStudentsToGroup(groupId, ids)
-    onSaved?.(groups.find(g => g.id === groupId))
-    onClose()
+    for (const { row, grade, existing, flags } of draft.entries.slice(draft.ids.length)) {
+      if (existing) { draft.ids.push(existing); continue }
+      const s = await createStudent({
+        schoolId, campus, fullName: row.input, grade, gender: row.gender, provisional: true,
+        clientId: row.id, source: 'ocr', ocrConfidence: row.confidence, reviewReasons: flags
+      })
+      draft.ids.push(s.id)
+      draft.pending ||= 'syncState' in s && s.syncState === 'pending'
+    }
+    if (draft.group) {
+      const result = await addStudentsToGroup(draft.group.id, draft.ids)
+      draft.pending ||= result?.syncState === 'pending'
+    }
+    const matched = draft.entries.filter(e => e.existing).length
+    setReceipt(scanReceipt(matched, draft.entries.length - matched, draft.pending))
+    onSaved?.(draft.group)
   }
-  return <Dialog title="Escanear lista" {...{ onClose }} busy={action.busy}>
-    <fieldset disabled={action.busy || !!imported}>
-      {needsModel && <Field label="Modelo de español">
-        <TextInput type="file" accept=".traineddata,.gz" onChange={e => setModel(e.target.files?.[0])} />
-      </Field>}
-      <Field label="Tomar foto de la lista"><TextInput type="file" accept="image/*" capture="environment" onChange={chooseFile} /></Field>
-      <Field label="Elegir imagen"><TextInput type="file" accept="image/*" onChange={chooseFile} /></Field>
-      {preview && <Card><h3>Revisar la foto</h3><img src={preview.url} alt="Página por escanear" /><p>{warning}</p>
-        <Button onClick={() => setPreview(undefined)}>Volver a tomar</Button>
-        <Button onClick={() => action.run(() => scan(preview),'')}>Usar de todos modos</Button></Card>}
-      {pages.map((page,i) => <details key={page.id}><summary>Ver foto de la página {i+1}</summary>
-        <img src={page.url} alt={'Lista original, página ' + (i+1)} />
-        <Field label={'Volver a escanear la página ' + (i+1)}><TextInput type="file" accept="image/*" capture="environment"
-          disabled={rows.some(r => r.page === page.id && receipts[r.id])} onChange={e => chooseFile(e,page)} /></Field>
-        <Button disabled={rows.length >= 200} onClick={() => addRow(page.id)}>Añadir una fila omitida en la página {i+1}</Button>
-      </details>)}
-      {!pages.length && <Button disabled={rows.length >= 200} onClick={() => addRow()}>Añadir una fila omitida</Button>}
-      {progress !== null && <p role="status">Leyendo la lista… {progress} %</p>}
-      {!!rows.length && <>
-        <h3>Revisar estudiantes</h3>
-        <p>{reviewed.filter(row => row.valid).length} correctas · {reviewed.filter(row => !row.valid).length} por revisar</p>
-        <Choice label="Grado para filas sin grado" value={grade} options={numbers(3, 5)} onChange={setGrade} />
-        {reviewed.map(({ r, choice, errors, match }, i) => {
-          const row = rows[i]
-          const locked = !!receipts[row.id]
-          return <Card key={row.id}><h3>Fila {i+1}{row.page && ' · Página ' + (pages.findIndex(p => p.id === row.page) + 1)}</h3>
-            {r.rawText && <p>Texto leído: {r.rawText}</p>}
-            <div className="collect-fields">{(['name', 'code', 'sex', 'age', 'grade'] as const).map((key,k) =>
-              <Field key={key} label={['Nombre', 'Código', 'Sexo', 'Edad', 'Grado'][k] + ' · fila ' + (i+1)}>
-                <TextInput disabled={locked} type={key === 'grade' || key === 'age' ? 'number' : 'text'} value={r[key] ?? ''} onChange={e => {
-                  const v = e.target.value
-                  edit(i, { [key]: key === 'grade' || key === 'age' ? v ? +v : null : key === 'sex' ? v.toUpperCase() : v })
-                }} /></Field>)}</div>
-            <Field label={'Identidad · fila ' + (i+1)}><Select disabled={locked} value={choice} onChange={e => setRows(list => list.map(item => item.id === row.id ? { ...item, choice: e.target.value } : item))}>
-              <option value="">Verifica la identidad</option><option value="new">Confirmar como nuevo</option>
-              {roster.map(s => <option key={s.id} value={s.id}>{s.name} · {s.code}{match.candidates.some(c => c.student.id === s.id) ? ' (coincidencia)' : ''}</option>)}</Select></Field>
-            <p>{errors.join(' · ') || 'Revisada'}</p><Button disabled={locked} onClick={() => setRows(list => list.filter(item => item.id !== row.id))}>Quitar fila</Button>
-          </Card>
-        })}
-        {groupError && <p role="alert">{groupError}</p>}
-        {duplicate && <p role="alert">Dos filas apuntan al mismo estudiante.</p>}{rows.length > 200 && <p>El máximo es de 200 filas por importación.</p>}
-        <Choice label="Añadir al grupo" disabled={groupLoading || !!groupError} value={groupId} placeholder="Solo importar" options={groups.filter(g => g.campus === campus)} onChange={setGroup} />
+  return <Dialog title="Escanear lista" onClose={onClose} busy={action.busy || progress !== null}>
+    {receipt ? <p role="status">{receipt}</p> : <>
+      <fieldset disabled={action.busy || !!submission || progress !== null} hidden={!!preview}>
+        <Field label="Tomar foto de la lista"><TextInput type="file" accept="image/*" capture="environment" onChange={chooseFile} /></Field>
+        <Field label="Elegir imagen"><TextInput type="file" accept="image/*" onChange={chooseFile} /></Field>
+      </fieldset>
+      {preview && <>
+        {needsModel && <Field label="Modelo de español"><TextInput type="file" accept=".traineddata,.gz" onChange={e => setModel(e.target.files?.[0])} /></Field>}
+        <PageCrop key={preview.url} url={preview.url} warning={warning} busy={progress !== null} onRead={f => scan(f, preview)}
+          onCancel={() => { release(preview.url); setPreview(undefined) }} />
       </>}
-    </fieldset>
-    <div className="teacher-save"><Button variant="primary" loading={action.busy} disabled={!imported && !ready} onClick={() => action.run(save)}>{imported ? 'Completar grupo' : 'Importar lista revisada'}</Button>{action.feedback}</div></Dialog>
+      {progress !== null && <p role="status">Leyendo la lista… {progress || ''}{progress ? ' %' : ''}</p>}
+      {!preview && <fieldset disabled={action.busy || !!submission}>
+        {pages.map((page, i) => <details key={page.id} open={rows.every(r => r.page !== page.id) || undefined}>
+          <summary>Página {i + 1} · {page.engine}</summary><img src={page.url} alt={'Lista original, página ' + (i + 1)} />
+          {rows.every(r => r.page !== page.id) && <p>No encontramos nombres. Añade una fila o toma otra foto.</p>}
+          <Field label={'Volver a escanear la página ' + (i + 1)}><TextInput type="file" accept="image/*" onChange={e => chooseFile(e, page)} /></Field>
+          <Button disabled={rows.filter(r => r.page === page.id).length >= 45} onClick={() => addRow(page.id)}>Añadir una fila omitida</Button>
+        </details>)}
+        {pages.map(p => p.omitted > 0 && <p role="status" key={p.id}>{p.omitted} nombres fuera del límite de 45. Escanea el resto en otra página.</p>)}
+        {!pages.length && <Button disabled={rows.length >= 45} onClick={() => addRow('')}>Añadir una fila omitida</Button>}
+        {!!rows.length && <>
+          <Choice label="Añadir al grupo" value={groupId} placeholder="Sin grupo" disabled={loading || !!error}
+            options={groups.filter(g => g.campus === campus && g.schoolId === schoolId)} onChange={setGroup} />
+          {error && <p role="alert">{error}</p>}
+          {rows.map((r, i) => {
+            const result = review[i], matched = result.id && result.id !== 'new'
+            const problem = result.problem || (repeated.has(result.identity) ? 'La fila está repetida. Revisa o quita una.' : '')
+            const label = problem ? 'Revisar' : matched ? 'Ya registrado' : result.flags.length ? 'Revisar' : 'Nuevo'
+            const selected = result.matches.find(m => m.student.id === result.id)?.student
+            return <section className="scan-row" key={r.id}>
+              {result.matches.length ? <details open={problem ? true : undefined}><summary><span className="scan-status" data-review={label === 'Revisar'}>{label}</span>
+                {selected && ' · ' + selected.fullName}</summary>
+                <Field label={'Identidad · fila ' + (i + 1)}><Select value={result.id} onChange={e => patch(r.id, { choice: e.target.value })}>
+                  <option value="">Elige un estudiante</option>{result.matches.map(({ student: s }) => <option key={s.id} value={s.id}>{s.fullName} · {s.grade}° · {s.code}</option>)}
+                  <option value="new">Es un estudiante nuevo</option></Select></Field></details> :
+                <span className="scan-status" data-review={label === 'Revisar'}>{label}</span>}
+              {problem ? <p>{problem}</p> : !matched && result.flags.length > 0 && <p>{[...new Set(result.flags.map(reasonLabel))].join(' · ')}</p>}
+              <Field label={'Nombre · fila ' + (i + 1)}><TextInput value={r.input} onChange={e => patch(r.id, { input: e.target.value, choice: undefined })} /></Field>
+              <div role="group" aria-label="Sexo">{(['F', 'M'] as const).map(s => <Button key={s} disabled={!!selected} aria-pressed={(selected?.gender ?? r.gender) === s}
+                onClick={() => patch(r.id, { gender: r.gender === s ? '' : s })}>{s === 'F' ? 'Niña' : 'Niño'}</Button>)}</div>
+              <Segmented disabled={!!selected} label="Grado" value={String(selected?.grade ?? r.grade ?? defaultGrade)}
+                options={[3, 4, 5].map(g => ({ value: String(g), label: g + '°' }))} onChange={g => patch(r.id, { grade: Number(g) })} />
+              <Button variant="ghost" onClick={() => setRows(prev => prev.filter(row => row.id !== r.id))}>Quitar fila</Button>
+            </section>
+          })}
+          {rows.length > 200 && <p>Revisa hasta 200 estudiantes por lista.</p>}
+        </>}
+      </fieldset>}
+      {!preview && !!rows.length && <Button variant="primary" loading={action.busy} disabled={!submission && !ready} onClick={() => action.run(save, '')}>
+        {submission ? 'Reintentar guardado' : 'Guardar lista'}</Button>}
+      {action.feedback}
+    </>}
+  </Dialog>
 }

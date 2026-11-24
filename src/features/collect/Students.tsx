@@ -1,8 +1,10 @@
+import { cleanName, rosterMatches } from '../../domain/text/studentNameRules'
+import { addStudentsToGroup } from '../../data/groups'
 import { LoadError } from '../../ui/LoadError'
-import { lazy, Suspense, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import type { School, Student } from '../../domain/types'
-import { createStudent, importStudents, patchStudent, useStudents } from '../../data/students'
-import { Button, Card, Dialog, Field, SyncStatus, TextInput } from '../../ui/components'
+import { createStudent, patchStudent, useStudents } from '../../data/students'
+import { Button, Card, Dialog, Field, Segmented, SyncStatus, TextInput } from '../../ui/components'
 import { useAction } from './useAction'
 import { genders, matches, numbers } from './formValues'
 import { Choice, Search } from './common'
@@ -57,7 +59,74 @@ export function Students({ school, campus, admin, uid, initialStudent, scanOnOpe
       <Scanner onSaved={group => { setScannedGroup(group); setNotice('Lista revisada en este dispositivo.') }} schoolId={school.id} {...{ students, campus }} onClose={() => setOpen(null)} />
     </Suspense>}</>
 }
-export function StudentEditor({ school, campus, admin, student, canEditIdentity = false, classRegistration = false, onSaved, onClose }: { classRegistration?: boolean; school: School; campus: string; admin: boolean; student?: Student; canEditIdentity?: boolean; onSaved?: (id: string, pending: boolean) => void | Promise<void>; onClose: () => void }) {
+interface EditorProps {
+  groupId?: string
+  classRegistration?: boolean; school: School; campus: string; admin: boolean; student?: Student;
+  canEditIdentity?: boolean; onSaved?: (id: string, pending: boolean) => void | Promise<void>; onClose: () => void
+}
+
+export function StudentEditor(props: EditorProps) {
+  return !props.admin && !props.student ? <TeacherIntake {...props} /> : <EditDetails {...props} />
+}
+
+function TeacherIntake({ school, campus, groupId, onSaved, onClose }: EditorProps) {
+  const { students, loading, error } = useStudents(school.id)
+  const [name, setName] = useState('')
+  const [query, setQuery] = useState('')
+  const [gender, setGender] = useState<Student['gender']>('')
+  const [grade, setGrade] = useState(0)
+  const [clientId] = useState(() => crypto.randomUUID())
+  const [receipt, setReceipt] = useState<{ id: string; pending: boolean }>()
+  const action = useAction()
+  useEffect(() => {
+    const timer = setTimeout(() => setQuery(name), 220)
+    return () => clearTimeout(timer)
+  }, [name])
+  const found = useMemo(() => rosterMatches(query, students.filter(s => s.schoolId === school.id)), [query, students, school.id])
+  const strong = found.filter(m => m.score >= .80)
+  const clean = cleanName(name)
+  const searched = !loading && !error && query === name
+  async function save(existing?: Student) {
+    if (!searched) return
+    let result = receipt
+    if (!result) {
+      if (existing) result = { id: existing.id, pending: 'syncState' in existing && existing.syncState === 'pending' }
+      else {
+        if (!clean || !gender || !grade || strong.length) return
+        const created = await createStudent({
+          schoolId: school.id, campus, fullName: name, grade, gender,
+          provisional: true, clientId, source: 'manual', reviewReasons: found.map(m => 'posible_duplicado:' + m.student.id)
+        })
+        result = { id: created.id, pending: 'syncState' in created && created.syncState === 'pending' }
+      }
+      setReceipt(result)
+    }
+    if (groupId) await addStudentsToGroup(groupId, [result.id])
+    await onSaved?.(result.id, result.pending)
+    onClose()
+  }
+  return <Dialog title="Añadir estudiante" onClose={onClose} busy={action.busy}>
+    <fieldset disabled={action.busy || !!receipt}>
+      <Field label="Nombre completo"><TextInput value={name} onChange={e => setName(e.target.value)} /></Field>
+      {loading && <p role="status">Cargando estudiantes…</p>}
+      {error && <p role="alert">{error}</p>}
+      {query !== name && <p role="status">Buscando coincidencias…</p>}
+      {name && <p>{clean ? 'Se guardará como: ' + clean : 'Escribe el nombre con letras.'}</p>}
+      {searched && strong.map(({ student }) => <Button key={student.id} onClick={() => action.run(() => save(student))}>
+        ¿Es {student.fullName} ({student.grade}°)?{strong.filter(m => m.student.fullName === student.fullName && m.student.grade === student.grade).length > 1 && ' · ' + student.code}</Button>)}
+      {(!searched || !strong.length) && <>
+        <Segmented label="Sexo" value={gender} options={[{ value: 'F', label: 'Niña' }, { value: 'M', label: 'Niño' }]} onChange={setGender} />
+        <Segmented label="Grado" value={String(grade)} options={[3, 4, 5].map(g => ({ value: String(g), label: g + '°' }))} onChange={g => setGrade(Number(g))} />
+      </>}
+    </fieldset>
+    {receipt ? <Button variant="primary" loading={action.busy} onClick={() => action.run(() => save())}>Completar registro</Button> :
+      searched && clean && !strong.length && <Button variant="primary" loading={action.busy} disabled={!grade || !gender}
+        onClick={() => action.run(() => save())}>Crear nuevo</Button>}
+    {action.feedback}
+  </Dialog>
+}
+
+function EditDetails({ school, campus, admin, student, canEditIdentity = false, onSaved, onClose }: EditorProps) {
   const [name, setName] = useState(student?.fullName ?? '')
   const [code, setCode] = useState(student?.code ?? '')
   const [site, setSite] = useState(student?.campus ?? campus)
@@ -76,7 +145,7 @@ export function StudentEditor({ school, campus, admin, student, canEditIdentity 
   return <Dialog title={student ? 'Editar estudiante' : 'Añadir estudiante'} {...{ onClose }} busy={action.busy}>
     <form onSubmit={e => {
       e.preventDefault()
-      if (!name.trim() || !grade || (classRegistration && (!gender || !age)) || (admin && !student && !code.trim())) return
+      if (!name.trim() || !grade || (admin && !student && !code.trim())) return
       if (student && retired && !student.retired && !confirmRetire) { setConfirmRetire(true); return }
       void action.run(async () => {
         const fields = { fullName: name.trim(), campus: site, grade: +grade, gender, age: age ? +age : null }
@@ -93,14 +162,8 @@ export function StudentEditor({ school, campus, admin, student, canEditIdentity 
           })
           receipt = { id: student.id, pending: result.syncState === 'pending' }
         } else if (!receipt) {
-          if (!admin && code.trim()) {
-            const result = await importStudents(school.id, [{ ...fields, code: code.trim() }])
-            if (!result.created.length) throw new Error('Este código ya existe. Busca al estudiante en la lista.')
-            receipt = { id: result.created[0].id, pending: result.syncState === 'pending' }
-          } else {
-            const result = await createStudent({ ...fields, schoolId: school.id, ...(admin ? { code: code.trim() } : { provisional: true, clientId }) })
-            receipt = { id: result.id, pending: 'syncState' in result && result.syncState === 'pending' }
-          }
+          const result = await createStudent({ ...fields, schoolId: school.id, code: code.trim(), clientId })
+          receipt = { id: result.id, pending: 'syncState' in result && result.syncState === 'pending' }
           setCreated(receipt)
         }
         if (receipt) {
@@ -114,15 +177,15 @@ export function StudentEditor({ school, campus, admin, student, canEditIdentity 
         <Field label="Nombre completo">
           <TextInput required disabled={!identity} value={name} onChange={e => setName(e.target.value)} />
         </Field>
-        {((!student && !classRegistration) || admin) && <Field label={admin ? "Código" : "Código oficial (opcional)"}>
-            <TextInput required={admin} disabled={!!student} value={code} onChange={e => setCode(e.target.value)} />
-          </Field>}
-          {(admin || canEditIdentity) && <Choice label="Sede" options={school.campuses} placeholder="Sin asignar" value={site} onChange={setSite} />}
+        {admin && <Field label="Código">
+          <TextInput required={admin} disabled={!!student} value={code} onChange={e => setCode(e.target.value)} />
+        </Field>}
+        {admin && <Choice label="Sede" options={school.campuses} placeholder="Sin asignar" value={site} onChange={setSite} />}
         <Choice disabled={!identity} required label="Grado" value={grade} options={numbers(3, 5)} placeholder="Selecciona el grado" onChange={setGrade} />
-        <Choice required={classRegistration} label="Sexo" value={gender} options={genders} placeholder="Selecciona" onChange={setGender} />
-        <Choice required={classRegistration} label="Edad en años" value={age} options={numbers(5, 18)} placeholder="Selecciona" onChange={setAge} />
+        <Choice label="Sexo" value={gender} options={admin ? genders : [{ id: 'F', name: 'Niña' }, { id: 'M', name: 'Niño' }]} placeholder="Selecciona" onChange={setGender} />
+        {admin && <Choice label="Edad en años" value={age} options={numbers(5, 18)} placeholder="Selecciona" onChange={setAge} />}
         {student && <>
-          <Choice label="Muestra" value={sample} options={numbers(1, 4)} placeholder="Sin asignar" onChange={setSample} />
+          {admin && <Choice label="Muestra" value={sample} options={numbers(1, 4)} placeholder="Sin asignar" onChange={setSample} />}
           <label>
             <input type="checkbox" checked={retired} onChange={e => setRetired(e.target.checked)} /> Estudiante retirado</label>
         </>}
