@@ -8,9 +8,8 @@ import './landing.css'
 const assets = import.meta.env.BASE_URL
 const roles = [
   ['Docente', 'Organiza sus grupos, toma asistencia, evalúa y registra sus horas.'],
-  ['Coordinación', 'Lee informes y consulta los grupos de sus regiones asignadas (solo lectura).'],
-  ['Fundación', 'Consulta informes y niveles de estudiantes de todo el programa (solo lectura).'],
-  ['Administración', 'Carga datos, gestiona cuentas docentes y configura el calendario del programa.'],
+  ['Coordinación', 'Acompaña a los docentes y gestiona los grupos de sus colegios.'],
+  ['Fundación', 'Gestiona cuentas, carga actividades y consulta informes de todo el programa.'],
 ]
 
 export function Landing() {
@@ -61,7 +60,7 @@ export function Landing() {
         <div className="guide-entry-links">
           <Link to="/guia"><strong>Docente</strong><span>Tomar asistencia, evaluar y registrar horas</span><Icon name="arrow" /></Link>
           <Link to="/guia?rol=seguimiento"><strong>Coordinación / Fundación</strong><span>Consultar informes y exportarlos a Excel</span><Icon name="arrow" /></Link>
-          <Link to="/guia?rol=administracion"><strong>Administración</strong><span>Importar archivos y activar cuentas</span><Icon name="arrow" /></Link>
+          <Link to="/guia?rol=administracion"><strong>Gestión de la fundación</strong><span>Importar archivos y activar cuentas</span><Icon name="arrow" /></Link>
         </div>
       </section>
     </main>

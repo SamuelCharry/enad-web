@@ -20,7 +20,7 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
 
 describe('Portada y guía pública', () => {
-  it('enlaza Roles y diferencia el alcance de las cuatro cuentas', async () => {
+  it('enlaza Roles y diferencia el alcance de las tres cuentas', async () => {
     open('/')
     const section = await screen.findByRole('region', { name: 'Roles' })
     expect(screen.getByRole('link', { name: 'Roles' }).getAttribute('href')).toBe('#/#roles')
@@ -30,14 +30,14 @@ describe('Portada y guía pública', () => {
     expect(document.activeElement).toBe(section)
     expect(section.scrollIntoView).toHaveBeenCalled()
     expect(within(section).getAllByRole('term').map(term => term.textContent)).toEqual([
-      'Docente', 'Coordinación', 'Fundación', 'Administración',
+      'Docente', 'Coordinación', 'Fundación',
     ])
     const descriptions = within(section).getAllByRole('definition')
-    expect(descriptions[1].textContent).toMatch(/regiones asignadas.*solo lectura/)
-    expect(descriptions[2].textContent).toMatch(/todo el programa.*solo lectura/)
+    expect(descriptions[1].textContent).toMatch(/sus colegios/)
+    expect(descriptions[2].textContent).toMatch(/todo el programa/)
 
     const preview = screen.getByRole('region', { name: 'Guía de uso' })
-    fireEvent.click(within(preview).getByRole('link', { name: /Administración/ }))
+    fireEvent.click(within(preview).getByRole('link', { name: /Gestión de la fundación/ }))
     expect(await screen.findByRole('heading', { name: 'Descargar la plantilla' })).toBeTruthy()
     expect(useSession).not.toHaveBeenCalled()
   })
@@ -55,7 +55,7 @@ describe('Portada y guía pública', () => {
     fireEvent.click(screen.getByRole('button', { name: /Exportar a Excel/ }))
     expect(screen.getByRole('heading', { name: 'Exportar a Excel' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Siguiente' })).toBeNull()
-    fireEvent.click(screen.getByRole('radio', { name: 'Administración' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Gestión de la fundación' }))
     expect(screen.getByRole('heading', { name: 'Descargar la plantilla' })).toBeTruthy()
     expect(screen.queryByRole('heading', { name: 'Consultar el resumen' })).toBeNull()
     expect(useSession).not.toHaveBeenCalled()

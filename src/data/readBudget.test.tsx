@@ -2,9 +2,9 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { readCounter, semester } from './testing/readCounter'
-import { Home } from '../app/Home'
+
 import { RequireSession } from '../app/RequireSession'
-import { PortalLayout } from '../app/PortalLayout'
+import { LegacyRedirect, PortalLayout } from '../app/PortalLayout'
 import { ReportRoutes } from '../features/reports'
 import { CollectRoutes } from '../features/collect'
 import { getAttendanceReport, getMovement, getSummary, refreshReports } from './reports'
@@ -30,7 +30,8 @@ afterEach(() => {
 })
 function page(path: string) {
   return render(<MemoryRouter initialEntries={[path]}><Routes><Route element={<RequireSession />}><Route element={<PortalLayout />}>
-    <Route path="/portal" element={<Home />} /><Route path="/recoleccion/*" element={<CollectRoutes />} /><Route path="/visualizacion/*" element={<ReportRoutes />} />
+    <Route path="/portal" element={<LegacyRedirect/>}/><Route path="/recoleccion/*" element={<LegacyRedirect/>}/><Route path="/visualizacion/*" element={<LegacyRedirect/>}/>
+    <Route path="/portal/reportes/*" element={<ReportRoutes/>}/><Route path="/portal/mis-datos" element={<ReportRoutes/>}/><Route path="/portal/*" element={<CollectRoutes/>}/>
   </Route></Route></Routes></MemoryRouter>)
 }
 async function settled(text: RegExp) {
@@ -40,16 +41,13 @@ async function settled(text: RegExp) {
     expect(screen.queryByRole('alert')).toBeNull()
   }, { timeout: 5000 })
 }
-for (const role of ['coordinador', 'fundacion', 'admin', 'docente']) it('presupuesta /portal para ' + role, async () => {
+for (const role of ['coordinador', 'fundacion', 'docente']) it('presupuesta /portal para ' + role, async () => {
   auth.currentUser.uid = semester(store, role).uid
   page('/portal')
-  await settled(role === 'docente' ? /Asistencia completa/ : /Actividad reciente/)
-  expect(store.cost()).toBeLessThanOrEqual(role === 'docente' ? 400 : 300)
+  await settled(role === 'docente' ? /registros por enviar/ : /Actividad reciente/)
+  expect(store.cost()).toBeLessThanOrEqual(role === 'docente' ? 5 : 300)
   const streams = store.reads.listeners.filter(q => ['attendance', 'evaluations'].includes(q.path))
-  if (role === 'docente') {
-    expect(streams.length).toBeGreaterThan(0)
-    expect(streams.every(q => q.constraints?.some(f => f.field === 'date') && q.constraints?.some(f => f.field === 'groupId'))).toBe(true)
-  } else expect(streams).toEqual([])
+  expect(streams).toEqual([])
   console.info('Presupuesto', role, store.cost())
 })
 for (const [path, label] of [
@@ -155,7 +153,7 @@ it('termina la espera a los veinte segundos y reintenta únicamente por solicitu
 
 for (const [path, role, ready] of [
   ['/portal', 'coordinador', 'Actividad reciente'], ['/visualizacion', 'fundacion', 'Estudiantes que asistieron'],
-  ['/recoleccion/calidad', 'admin', 'Registros para revisión']
+  ['/recoleccion/calidad', 'fundacion', 'Registros para revisión']
 ]) it('recupera la vista ' + path + ' después de resource-exhausted', async () => {
   auth.currentUser.uid = semester(store, role).uid
   const failure = { code: 'resource-exhausted' }
@@ -172,11 +170,11 @@ for (const [path, role, ready] of [
 })
 
 for (const [section, label] of [
-  ['instituciones', 'Instituciones y sedes'], ['docentes', 'Directorio docente'],
+  ['instituciones', 'Crear institución'], ['docentes', 'Crear cuenta'],
   ['estudiantes', 'Añadir estudiante'], ['grupos', 'Crear grupo'], ['evaluaciones', 'Selecciona el estudiante'],
-  ['configuracion', 'Configuración del programa'], ['calidad', 'Registros para revisión'], ['importaciones', 'El historial se llena']
+  ['configuracion', 'Editar configuración'], ['calidad', 'Registros para revisión'], ['importaciones', 'El historial se llena']
 ]) it('abre administración sin cargar eventos históricos: ' + section, async () => {
-  auth.currentUser.uid = semester(store, 'admin').uid
+  auth.currentUser.uid = semester(store, 'fundacion').uid
   page('/recoleccion/' + section)
   await settled(new RegExp(label))
   console.info('Presupuesto administración', section, store.cost())

@@ -37,12 +37,12 @@ export function apiError(error: unknown) {
     'already-exists': [409, 'El registro ya existe.'],
     'resource-exhausted': [429, 'Se alcanzó el límite de uso por hoy. Intenta más tarde.'],
     'failed-precondition': [500, 'La consulta necesita un índice de Firestore que no está desplegado.'],
-    'unavailable': [0, 'No pudimos conectar. Tus cambios quedan guardados en el dispositivo.'],
+    'unavailable': [0, 'No hay conexión con el servidor. Intenta de nuevo.'],
     'deadline-exceeded': [0, 'La conexión tardó demasiado. Intenta de nuevo.'],
     'email-already-in-use': [409, 'Ya existe una cuenta con ese usuario o correo.'],
     'weak-password': [400, 'La contraseña debe tener al menos 6 caracteres.'],
     'invalid-email': [400, 'El correo no es válido.'],
-    'user-disabled': [403, 'Tu cuenta está desactivada. Contacta al administrador.'],
+    'user-disabled': [403, 'Tu cuenta está desactivada. Comunícate con la fundación.'],
     'too-many-requests': [429, 'Demasiados intentos. Espera unos minutos e intenta de nuevo.'],
     'network-request-failed': [0, 'No pudimos conectar. Revisa tu conexión.'],
   }
@@ -56,15 +56,14 @@ export async function api<T>(action: () => Promise<T>) {
 /** Read the active profile, treating missing activity or roles as denied. */
 export function profileOf(snap: DocumentSnapshot): UserProfile {
   const d = snap.data()
-  if (!d) fail(403, 'Tu cuenta todavía no tiene perfil. Contacta al administrador.')
-  if (d.activo !== true) fail(403, 'Tu cuenta está inactiva. Contacta al administrador.')
-  if (!['docente', 'coordinador', 'admin', 'fundacion'].includes(d.rol)) fail(403, 'Tu cuenta no tiene un rol asignado. Contacta al administrador.')
+  if (!d) fail(403, 'Tu cuenta todavía no tiene perfil. Comunícate con la fundación.')
+  if (d.activo !== true) fail(403, 'Tu cuenta está inactiva. Comunícate con la fundación.')
+  if (!['docente', 'coordinador', 'fundacion'].includes(d.rol)) fail(403, 'Tu cuenta no tiene un rol asignado. Comunícate con la fundación.')
   return {
-    schoolIds: [],
-    campusIds: {},
-    regions: [],
-    jornada: 'única',
     ...d,
+    schoolIds: Array.isArray(d.schoolIds) ? d.schoolIds.filter((id:unknown) => typeof id === 'string' && id) : [],
+    campusIds: d.campusIds && typeof d.campusIds === 'object' ? d.campusIds : {},
+    jornada: d.jornada || 'única',
     rol: d.rol,
     activo: true,
     fullName: str(d.fullName),
@@ -73,19 +72,18 @@ export function profileOf(snap: DocumentSnapshot): UserProfile {
   } as UserProfile
 }
 /** Current caller with the role needed by an operation. */
-export async function caller(access?: 'writer' | 'admin') {
+export async function caller(access?: 'writer' | 'manager' | 'fundacion') {
   const uid = auth.currentUser?.uid
   if (!uid) fail(401, 'Inicia sesión para continuar.')
   const p = profileOf(await getDoc(doc(db, 'users', uid)))
   if (auth.currentUser?.uid !== uid) fail(401, 'Inicia sesión para continuar.')
-  if (access === 'admin' && p.rol !== 'admin') fail(403, 'Solo un administrador puede hacer este cambio.')
-  if (access === 'writer' && !['admin', 'docente'].includes(p.rol)) fail(403, 'Tu rol solo permite consultar la información.')
+  if (access === 'fundacion' && p.rol !== 'fundacion') fail(403, 'Este cambio requiere una cuenta de fundación.')
+  if (access === 'manager' && p.rol === 'docente') fail(403, 'Se requiere una cuenta de coordinación o fundación.')
   return p
 }
 /** Verifies the school scope of a document read or write. */
 export async function requireSchool(p: UserProfile, id: string) {
-  if (id && (p.rol === 'admin' || p.rol === 'fundacion' || (p.rol === 'docente' && p.schoolIds.includes(id)))) return
-  if (id && p.rol === 'coordinador' && p.regions.includes((await getDoc(doc(db, 'schools', id))).data()?.region)) return
+  if (id && (p.rol === 'fundacion' || p.schoolIds.includes(id))) return
   fail(403, 'No tienes acceso a esta institución.')
 }
 /** Splits query operands and writes at the service limit. */
@@ -97,10 +95,9 @@ export function chunks<T>(values: T[], limit: number) {
 /** Queries whose predicates prove access under the schools rules. */
 export function schoolQueries(p: UserProfile): Query[] {
   const schools = collection(db, 'schools')
-  if (p.rol === 'admin' || p.rol === 'fundacion') return [schools]
-  const regional = p.rol === 'coordinador'
-  return chunks([...new Set(regional ? p.regions : p.schoolIds)], 10)
-    .map(ids => query(schools, where(regional ? 'region' : documentId(), 'in', ids)))
+  if (p.rol === 'fundacion') return [schools]
+  return chunks([...new Set(p.schoolIds)], 10)
+    .map(ids => query(schools, where(documentId(), 'in', ids)))
 }
 /** Converts a snapshot to the gateway JSON including local pending state. */
 export function recordOf<T>(d: DocumentSnapshot) {

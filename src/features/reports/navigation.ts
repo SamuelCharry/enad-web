@@ -18,7 +18,7 @@ export function reportFilters(params: URLSearchParams): ReportFilters {
   return Object.fromEntries([...geography, 'from', 'to'].flatMap(k => params.get(k) ? [[k, params.get(k)]] : []))
 }
 export function reportLink(route: string, filters: ReportFilters, details: Record<string, string> = {}) {
-  return '/visualizacion/' + route + '?' + new URLSearchParams({ ...filters, ...details })
+  return '/portal/reportes/' + route + '?' + new URLSearchParams({ ...filters, ...details })
 }
 const colombianTime = new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/Bogota' })
 export const savedTime = (value: string) => value && Number.isFinite(Date.parse(value))

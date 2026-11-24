@@ -78,7 +78,7 @@ function Questions() {
       <details><summary>Olvidé mi contraseña</summary>
         <p>Comunícate con quien administra ENAd en tu institución. Indícale tu usuario o correo para que te ayude a recuperar el acceso.</p></details>
       <details><summary>No veo mi grupo</summary>
-        <p>En Grupos, revisa la institución, la sede y la materia seleccionadas. En la app puedes tocar Actualizar grupos. Para tomar asistencia, el grupo debe estar asignado a tu cuenta. Si sigue sin aparecer, pídele a administración que revise la asignación.</p></details>
+        <p>En Grupos, revisa la institución, la sede y la materia seleccionadas. En la app puedes tocar Actualizar grupos. Para tomar asistencia, el grupo debe estar asignado a tu cuenta. Si sigue sin aparecer, pídele a la fundación que revise la asignación.</p></details>
       <details><summary>¿Se pierde lo que registro sin señal?</summary>
         <p>Primero toca Guardar. Si ves Pendiente de envío, el registro quedó en ese dispositivo y se enviará cuando vuelva la conexión. Conserva los datos de la app o del navegador hasta ver Guardado. Si todavía dice Sin guardar o aparece un error, revisa el formulario y vuelve a guardar.</p></details>
     </div>

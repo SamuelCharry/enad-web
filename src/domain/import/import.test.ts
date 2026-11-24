@@ -45,7 +45,7 @@ it('interpreta fechas nativas, niveles de matemáticas y fórmulas con valor de 
 })
 it('resuelve docentes, sedes y grupos y rechaza encabezados inválidos', () => {
   const teachers = csv('teachers', 'Nombre,Correo,IE,Sede,Jornada\nAna,ana@enad.app,ie1,s1,Mañana\nBeto,x@@y,ie2,,Inválida')
-  expect(teachers.validRows[0].data).toEqual({ fullName: 'Ana', email: 'ana@enad.app', schoolIds: ['ie1'], campusIds: { ie1: ['s1'] }, jornada: 'mañana' })
+  expect(teachers.validRows[0].data).toEqual({ fullName: 'Ana', username:'ana', email: 'ana@enad.app', schoolIds: ['ie1'], campusIds: { ie1: ['s1'] }, jornada: 'mañana' })
   expect(teachers.rows[1].errors).toHaveLength(2)
   expect(() => csv('students', 'código,nombre,grado\n1,Ana,3')).toThrow('Faltan columnas')
   expect(() => csv('students', 'ie,código,nombre,estudiante,grado\nie1,1,Ana,Ana,3')).toThrow('repetida')
@@ -85,4 +85,9 @@ it('aplana los cruces anidados del gateway y conserva momentos por materia', asy
   expect(data[0]).toContain('Lectura · Línea base')
   const cross = XLSX.utils.sheet_to_json<unknown[]>(book.Sheets.Cruces, { header: 1 })
   for (const r of [['Diana', 3, 8, 6.5], ['IE San José', 80], ['lectura', 'Línea base', 'palabra', 1], ['F', 1]]) expect(cross).toContainEqual(r)
+})
+
+it('acepta la plantilla v2 de docentes con usuario y sin correo', () => {
+  const data = csv('teachers','Nombre,Usuario,IE\nLuz García,luz.g,ie1')
+  expect(data.validRows[0].data.username).toBe('luz.g')
 })

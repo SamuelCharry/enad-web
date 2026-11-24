@@ -1,3 +1,4 @@
+import { StudentDetail } from '../../reports/Roster'
 import { LoadError } from '../../../ui/LoadError'
 import { useState } from 'react'
 import type { Group, School, Student, Subject, UserProfile } from '../../../domain/types'
@@ -42,7 +43,7 @@ function GroupDirectory({schools,schoolId,place}:DirectoryScope) {
   const teams=useGroups(schoolId)
   if(teams.error) return <LoadError message={teams.error}/>
   return <Directory title="Grupos" headers={['Grupo', 'Institución y sede', 'Docente', 'Estudiantes']} create="Crear grupo" loading={teams.loading}
-    rows={teams.groups.map(g => ({ id: g.id, search: [g.name, g.teacherName, place(g), subjectLabel(g.subject)].join(' '), cells: [g.name, place(g), g.teacherName || 'Sin asignar', g.studentIds.length] }))}
+    rows={teams.groups.map(g => ({ id: g.id, search: [g.name, g.teacherName, place(g), subjectLabel(g.subject)].join(' '), cells: [g.name, place(g), g.teacherId ? g.teacherName : <strong key="vacante" className="unassigned">Sin docente</strong>, g.studentIds.length] }))}
     editor={(id, close) => <GroupEditor key={id} group={teams.groups.find(g=>g.id===id)} schools={schools} close={close}/>}/>
 }
 function GroupEditor({group,schools,close}:{group?:Group;schools:School[];close:Close}) {
@@ -68,7 +69,7 @@ function StudentEditor({student,schoolId,schools,close}:{student?:Student;school
   const teams=useGroups(student?.schoolId || schoolId)
   if(teams.error) return <LoadError message={teams.error}/>
   if(teams.loading) return <p role="status">Consultando grupos…</p>
-  return <StudentForm student={student} groups={teams.groups} schools={schools} close={close}/>
+  return <>{student && <StudentHistoryLink student={student}/>}<StudentForm student={student} groups={teams.groups} schools={schools} close={close}/></>
 }
 function StudentForm({ student, groups, schools, close }: { student?: Student; groups: Group[]; schools: School[]; close: Close }) {
   const [initial] = useState(student)
@@ -134,4 +135,10 @@ function GroupForm({ group, schools, users, close }: { group?: Group; schools: S
         {group && <Button variant="danger" onClick={() => {
           if (window.confirm('¿Eliminar el grupo ' + group.name + '? Se conservarán los registros históricos.')) void action.run(async () => { const result = await deleteGroup(group.id); close(savedNotice(result)) })
         }}>Eliminar grupo</Button>}</div></fieldset>{action.feedback}</form>
+}
+
+function StudentHistoryLink({student}:{student:Student}) {
+  const [open,setOpen] = useState(false)
+  return open ? <StudentDetail student={student} onBack={() => setOpen(false)} backLabel="Cerrar historial"/> :
+    <Button onClick={() => setOpen(true)}>Ver perfil e historial</Button>
 }

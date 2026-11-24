@@ -26,16 +26,16 @@ vi.mock('firebase/firestore', async original => ({
 }))
 vi.mock('./session', () => ({
   watchSession: (cb: (s: unknown) => void) => {
-    cb({ profile: { uid: 'p', activo: true, rol: store.role, regions: ['Norte'], schoolIds: [], fullName: 'Coordinación', email: 'p@example.test', campusIds: {}, jornada: 'única' } as UserProfile })
+    cb({ profile: { uid: 'p', activo: true, rol: store.role, schoolIds: [], fullName: 'Coordinación', email: 'p@example.test', campusIds: {}, jornada: 'única' } as UserProfile })
     return () => { }
   }
 }))
 beforeEach(() => { store.role = 'coordinador'; store.queries.length = 0; store.callbacks.clear(); vi.clearAllMocks() })
-it('solo suscribe al historial de importación en administración', () => {
+it('solo suscribe al historial de importación en fundación', () => {
   const regional = renderHook(useImportHistory)
-  expect(regional.result.current.error).toMatch(/administración/)
+  expect(regional.result.current.error).toMatch(/fundación/)
   regional.unmount()
-  store.role = 'admin'
+  store.role = 'fundacion'
   const admin = renderHook(useImportHistory)
   expect(admin.result.current.data).toEqual([])
   expect(store.queries.map(q => q.path)).toEqual(['imports'])

@@ -8,7 +8,8 @@ import { useUsers } from '../../data/admin'
 import { addStudentsToGroup, createGroup, deleteGroup, patchGroup, removeStudentFromGroup, useGroups } from '../../data/groups'
 import { useStudents } from '../../data/students'
 import { suggestGroups } from '../../domain/groupSuggester'
-import { subjectLabel } from '../../domain/levels'
+import {levelColor} from '../../domain/levelPalette'
+import { LEVELS, subjectLabel } from '../../domain/levels'
 import { Button, Card, Dialog, Field, NumberInput, TextInput } from '../../ui/components'
 import { useAction } from './useAction'
 import { matches } from './formValues'
@@ -23,7 +24,7 @@ export function Groups({ schoolId, campus, profile, initialGroup, campuses = [] 
   const [search, setSearch] = useState('')
   const [edit, setEdit] = useState<string | null>(null)
   const [suggest, setSuggest] = useState(false)
-  const admin = profile.rol === 'admin'
+  const admin = profile.rol === 'fundacion'
   const [area, setArea] = useState<Subject | ''>('')
   const [selectedCampus, setSelectedCampus] = useState('')
   const actionCampus = campus || selectedCampus || (campuses.length === 1 ? campuses[0].id : '')
@@ -136,14 +137,16 @@ function Suggestions({ schoolId, campus, roster, initialSubject, onClose }: Site
   const [name, setName] = useState('')
   const [created, setCreated] = useState<string | null>(null)
   const action = useAction()
+  const step = preview === null ? 1 : selected === null ? 2 : 3
   function reset() {
     setPreview(null)
     setSelected(null)
   }
   function proposalName(p: Proposal, i: number) { return 'Grupo ' + (i + 1) + ' · ' + p.levelLabels.join(' y ') }
   return <Dialog title="Sugerir grupos" {...{ onClose }} busy={action.busy}>
+    <p>Paso {step} de 3 · {step === 1 ? 'Elige el área, el momento y el número de docentes.' : step === 2 ? 'Elige el grupo que vas a acompañar.' : 'Revisa el nombre y los integrantes de tu grupo.'}</p>
     <fieldset disabled={action.busy || !!created}>
-      <SubjectField value={subject} onChange={s => {
+      {step === 1 && <><SubjectField value={subject} onChange={s => {
         setSubject(s)
         reset()
       }} />
@@ -160,20 +163,26 @@ function Suggestions({ schoolId, campus, roster, initialSubject, onClose }: Site
       <Button disabled={!Number.isSafeInteger(+count) || +count < 1} onClick={() => {
         setSelected(null)
         setPreview(suggestGroups(roster, subject, moment, +count))
-      }}>Ver propuesta</Button>
-      {preview && (preview.length ? <>
-        <p>Elige el grupo que vas a acompañar.</p>
-        {preview.map((p, i) => <Button key={i} aria-pressed={selected === i} onClick={() => {
+      }}>Ver propuesta</Button></>}
+      {step === 2 && preview && <p>{roster.length - preview.reduce((n,p) => n+p.studentIds.length,0)} estudiantes quedaron fuera por no tener nivel en este momento y área.</p>}
+      {step === 2 && preview && (preview.length ? <>
+
+        {preview.map((p, i) => {
+          const level = roster.find(s => s.id === p.studentIds[0])?.levels[subject]?.level
+          const colors = levelColor(LEVELS[subject].indexOf(level || ''))
+          return <Button key={i} style={{backgroundColor:colors.bg,color:colors.fg}} aria-pressed={selected === i} onClick={() => {
           setSelected(i)
           setMembers(p.studentIds)
           setName(proposalName(p, i))
-        }}>{proposalName(p, i)} · {p.studentIds.length} estudiantes</Button>)}</> : <p>Evalúa estudiantes de esta sede en el área y momento elegidos para generar una propuesta.</p>)}
+        }}>{proposalName(p, i)} · {p.studentIds.length} estudiantes</Button>
+        })}</> : <p>Evalúa estudiantes de esta sede en el área y momento elegidos para generar una propuesta.</p>)}
       {selected !== null && preview && <>
         <Field label="Nombre de mi grupo">
           <TextInput value={name} onChange={e => setName(e.target.value)} />
         </Field>
         {preview[selected].studentIds.map(id => <label key={id}>
           <input type="checkbox" checked={members.includes(id)} onChange={e => setMembers(e.target.checked ? [...members, id] : members.filter(v => v !== id))} />{roster.find(s => s.id === id)?.fullName ?? id}</label>)}</>}
+      {step > 1 && <Button onClick={() => step === 2 ? reset() : setSelected(null)}>Atrás</Button>}
     </fieldset>{selected !== null && <Button loading={action.busy} variant="primary" disabled={!name.trim() || !members.length} onClick={() => action.run(async () => {
       const id = created ?? (await createGroup({ schoolId, campus, subject, name: name.trim() })).id
       setCreated(id)

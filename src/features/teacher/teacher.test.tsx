@@ -28,10 +28,10 @@ vi.mock('../../data/hours', () => ({ useMyHours: vi.fn() }))
 vi.mock('../../data/admin', () => ({}))
 vi.mock('../../domain/weeks', async orig => ({ ...await orig<typeof import('../../domain/weeks')>(), colombiaToday: () => '2026-04-08' }))
 
-const profile: UserProfile = { uid: 'd', rol: 'docente', activo: true, fullName: 'Ana Pérez', email: 'ana@example.test', jornada: 'mañana', schoolIds: ['first','second'], campusIds: {}, regions: [] }
+const profile: UserProfile = { uid: 'd', rol: 'docente', activo: true, fullName: 'Ana Pérez', email: 'ana@example.test', jornada: 'mañana', schoolIds: ['first','second'], campusIds: {} }
 const school: School = { id: 'second', name: 'Institución de prueba', active: true, projectId: 'p', region: '', department: '', municipality: '', zone: 'rural',
   campuses: [{ id: 'a', name: 'Central', jornada: 'mañana' }, { id: 'b', name: 'Sede rural', jornada: 'mañana' }] }
-const group: Group & { studentCount: number } = { id: 'g', name: 'Lectores de la mañana', teacherName: profile.fullName, schoolId: school.id, campus: 'b', teacherId: profile.uid, subject: 'lectura', studentIds: ['s'], studentCount: 1 }
+const group: Group & { studentCount: number; teacherId:string } = { id: 'g', name: 'Lectores de la mañana', teacherName: profile.fullName, schoolId: school.id, campus: 'b', teacherId: profile.uid, subject: 'lectura', studentIds: ['s'], studentCount: 1 }
 const student: Student = { id: 's', fullName: 'Estudiante de prueba', nameKey: 'estudiante de prueba', grade: 4, schoolId: 'second', campus: 'b', code: '321', levels: {},
   age: 10, gender: 'F', sample: 1, active: true, retired: false, provisional: false }
 const config = { projectName: 'ENAd', year: 2026, implementationStartDate: '2026-03-23', breaks: [] }
@@ -39,8 +39,8 @@ const loaded = { loading: false, error: undefined }
 const deep = '?school=second&campus=b&group=g&subject=lectura'
 function show(route: string) {
   return render(<MemoryRouter initialEntries={[route]}><Routes><Route element={<Outlet context={profile} />}>
-    <Route element={<PortalLayout />}><Route path="/portal" element={<TeacherHome profile={profile} />} />
-      <Route path="/recoleccion/*" element={<CollectRoutes />} /></Route></Route></Routes></MemoryRouter>)
+    <Route element={<PortalLayout />}><Route path="/portal/hoy" element={<TeacherHome profile={profile} />} />
+      <Route path="/portal/*" element={<CollectRoutes />} /></Route></Route></Routes></MemoryRouter>)
 }
 function click(name: string) { fireEvent.click(screen.getByRole('button',{name})) }
 function select(label: string, value: string) { fireEvent.change(screen.getByLabelText(label),{ target: { value } }) }
@@ -70,9 +70,7 @@ afterEach(cleanup)
 
 it('abre el grupo de la segunda institución desde Hoy, conserva la sede y guarda una lista completa', async () => {
   vi.mocked(saveGroupAttendance).mockResolvedValue({ groupId: 'g', date: '2026-04-08', saved: 1, syncState: 'pending' })
-  show('/portal')
-  expect(screen.getByText('Semana 3 de implementación')).toBeVisible()
-  fireEvent.click(screen.getByRole('link',{name: group.name}))
+  show('/portal/grupos' + deep)
   expect(screen.getByLabelText('Institución')).toHaveValue('second')
   expect(screen.getByLabelText('Sede')).toHaveValue('b')
   fireEvent.click(screen.getByRole('link',{ name: 'Tomar asistencia' }))
@@ -88,17 +86,18 @@ it('usa el historial del momento y permite corregir una verificación sin reempl
   vi.mocked(useSchoolEvaluations).mockReturnValue({ ...loaded, data: [{ id: 'e', subject: 'lectura', moment: 'verificacion', level: 'cuento',
     teacherId: 'd', schoolId: 'second', studentId: 's', date: '2026-04-07', savedAt: '2026-04-07', sample: 1 }] })
   vi.mocked(saveEvaluation).mockResolvedValue({ id:'e2',syncState:'synced' })
-  show('/recoleccion/evaluacion' + deep + '&moment=verificacion&student=s')
+  show('/portal/evaluacion' + deep + '&moment=verificacion&student=s')
   expect(screen.getByText(/conservará el nivel actual/)).toBeVisible()
   click('Comprensión')
   click('Guardar evaluación')
-  await waitFor(() => expect(saveEvaluation).toHaveBeenCalledWith({studentId:'s',subject:'lectura',moment:'verificacion',level:'comprension',sample:1,gender:'F',age:10,groupId:'g'}))
+  await waitFor(() => expect(saveEvaluation).toHaveBeenCalledWith({studentId:'s',subject:'lectura',moment:'verificacion',level:'comprension',groupId:'g'}))
 })
-it('distingue el momento pendiente de una evaluación histórica ya registrada', () => {
-  show('/portal')
-  fireEvent.click(screen.getByText('Evaluaciones pendientes'))
-  select('Momento de evaluación','linea_media_1')
-  expect(screen.getByRole('link',{name:/Evaluar a 1 estudiante/})).toHaveAttribute('href',expect.stringContaining('moment=linea_media_1'))
+it('ofrece cuatro tareas en Hoy y lleva los registros pendientes a su lista', () => {
+  show('/portal/hoy')
+  expect(within(screen.getByRole('navigation',{name:'Registro de clase'})).getAllByRole('link')).toHaveLength(4)
+  expect(screen.getByRole('link',{name:'Escanear lista'})).toHaveAttribute('href','/portal/estudiantes?scan=1')
+  expect(screen.getByRole('link',{name:'0 registros por enviar'})).toHaveAttribute('href','/portal/pendientes')
+  expect(screen.queryByLabelText('Momento de evaluación')).toBeNull()
 })
 it('confirma el retiro del grupo y permite deshacerlo sin retirar al estudiante del programa', async () => {
   vi.mocked(removeStudentFromGroup).mockResolvedValue({ ...group, studentIds:[], syncState:'synced' })
@@ -117,24 +116,24 @@ it('confirma el retiro del grupo y permite deshacerlo sin retirar al estudiante 
 })
 it('presenta el grupo de otro docente en modo de consulta', () => {
   vi.mocked(useGroups).mockReturnValue({ ...loaded,groups: [{...group,teacherId:'other'}] })
-  show('/recoleccion/grupos'+deep)
+  show('/portal/grupos'+deep)
   expect(screen.getByText(/Solo lectura/)).toBeVisible()
   expect(screen.queryByRole('button',{name:'Eliminar grupo'})).toBeNull()
   expect(screen.queryByRole('button',{name:'Quitar del grupo'})).toBeNull()
 })
 it('edita datos y confirma el retiro de un estudiante oficial sin enviar campos de identidad', async () => {
   vi.mocked(patchStudent).mockResolvedValue({ ...student, retired:true, syncState:'synced' })
-  show('/recoleccion/estudiantes?school=second&campus=b&student=s')
+  show('/portal/estudiantes?school=second&campus=b&student=s')
   await screen.findByText('Historial de asistencia')
   click('Editar estudiante')
   expect(screen.getByLabelText('Nombre completo')).toBeDisabled()
   expect(screen.getByLabelText('Grado')).toBeDisabled()
-  select('Edad en años','11')
+  select('Sexo','M')
   fireEvent.click(screen.getByLabelText('Estudiante retirado'))
   click('Guardar estudiante')
   expect(patchStudent).not.toHaveBeenCalled()
   click('Confirmar retiro')
-  await waitFor(() => expect(patchStudent).toHaveBeenCalledWith('s',expect.objectContaining({ retired:true, age:11 })))
+  await waitFor(() => expect(patchStudent).toHaveBeenCalledWith('s',expect.objectContaining({ retired:true, gender:'M' })))
   expect(vi.mocked(patchStudent).mock.calls[0][1]).not.toHaveProperty('fullName')
 })
 it('permite cámara y galería, coteja una fila omitida y añade un estudiante existente sin duplicarlo', async () => {
@@ -143,17 +142,18 @@ it('permite cámara y galería, coteja una fila omitida y añade un estudiante e
   expect(screen.getByLabelText('Tomar foto de la lista')).toHaveAttribute('capture','environment')
   expect(screen.getByLabelText('Elegir imagen')).toHaveAttribute('accept','image/*')
   click('Añadir una fila omitida')
-  expect(screen.getByRole('button',{name:'Importar lista revisada'})).toBeDisabled()
+  const save = screen.getByRole('button',{name:/Guardar lista|Importar lista revisada/})
+  expect(save).toBeDisabled()
   select('Nombre · fila 1',student.fullName)
-  select('Código · fila 1',student.code)
+
   expect(screen.getByLabelText('Identidad · fila 1')).toHaveValue('s')
   select('Añadir al grupo','g')
-  click('Importar lista revisada')
+  fireEvent.click(save)
   await waitFor(() => expect(addStudentsToGroup).toHaveBeenCalledWith('g',['s']))
   expect(saved).toHaveBeenCalledWith(group)
 })
 it('guía el registro sobre el formulario y exige seleccionar un grupo antes de avanzar', () => {
-  show('/recoleccion/asistencia?school=second&guide=1')
+  show('/portal/asistencia?school=second&guide=1')
   const guide = screen.getByRole('region',{name:'Guía de registro'})
   fireEvent.click(within(guide).getByRole('button',{name:'Continuar'}))
   expect(within(guide).getByRole('alert')).toHaveTextContent('Completa este paso')
@@ -177,7 +177,7 @@ it('reconoce oscuridad, reflejo y desenfoque con los umbrales de la cámara móv
 
 it('abre el perfil de un estudiante sin sede desde un enlace de grupo', async () => {
   vi.mocked(useStudents).mockReturnValue({ ...loaded, students: [{ ...student, campus: '' }] })
-  show('/recoleccion/estudiantes?school=second&campus=&student=s')
+  show('/portal/estudiantes?school=second&campus=&student=s')
   expect(screen.getByLabelText('Sede')).toHaveValue('')
   expect(await screen.findByRole('button', { name: 'Editar estudiante' })).toBeVisible()
   await waitFor(() => expect(getStudentHistory).toHaveBeenCalled())
@@ -185,7 +185,7 @@ it('abre el perfil de un estudiante sin sede desde un enlace de grupo', async ()
 
 it('solicita una sede al crear un grupo desde todas las sedes', async () => {
   vi.mocked(createGroup).mockResolvedValue({ ...group, createdAt: '', updatedAt: '', syncState: 'synced' })
-  show('/recoleccion/grupos?school=second')
+  show('/portal/grupos?school=second')
   click('Crear grupo')
   click('Sede rural')
   select('Nombre del grupo', group.name)
@@ -198,7 +198,7 @@ it('conserva el grupo de una propuesta si hay que reintentar el envío de sus in
   vi.mocked(useStudents).mockReturnValue({ ...loaded, students: [{ ...student, levels: { lectura: { level: 'cuento', moment: 'linea_base', date: '2026-04-07' } } }] })
   vi.mocked(createGroup).mockResolvedValue({ ...group, createdAt: '', updatedAt: '', syncState: 'synced' })
   vi.mocked(addStudentsToGroup).mockRejectedValueOnce(new Error('Reintenta el envío')).mockResolvedValueOnce({ ...group, syncState: 'synced' })
-  show('/recoleccion/grupos?school=second&campus=b')
+  show('/portal/grupos?school=second&campus=b')
   click('Sugerir grupos')
   click('Ver propuesta')
   fireEvent.click(screen.getByRole('button', { name: /Grupo 1 ·/ }))
@@ -212,17 +212,17 @@ it('conserva el grupo de una propuesta si hay que reintentar el envío de sus in
 
 it('regresa desde Hoy a un borrador del día anterior en la fecha y el grupo correctos', async () => {
   vi.spyOn(window, 'confirm').mockReturnValue(true)
-  show('/recoleccion/asistencia' + deep)
+  show('/portal/asistencia' + deep)
   click('Día anterior')
   click('Marcar a todos presentes')
-  expect(screen.getByLabelText('1 marca de asistencia por guardar')).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('link', { name: 'Ir a Hoy' }))
-  fireEvent.click(screen.getByRole('link', { name: 'Continuar asistencia del 2026-04-07' }))
+  fireEvent.click(screen.getByRole('link', { name: 'Hoy' }))
+  fireEvent.click(screen.getByRole('link', { name: 'Reportar asistencia' }))
+  select('Grupo','g')
+  click('Día anterior')
   expect(screen.getByLabelText('Fecha')).toHaveValue('2026-04-07')
-  expect(screen.getByLabelText('Grupo')).toHaveValue('g')
   vi.mocked(saveGroupAttendance).mockResolvedValue({ groupId:'g', date:'2026-04-07', saved:1, syncState:'synced' })
   click('Guardar asistencia')
   click('Confirmar asistencia')
-  await waitFor(() => expect(screen.queryByLabelText('1 marca de asistencia por guardar')).toBeNull())
+  await waitFor(() => expect(screen.getByRole('button',{name:'Guardar asistencia'})).toBeDisabled())
   vi.mocked(window.confirm).mockRestore()
 })

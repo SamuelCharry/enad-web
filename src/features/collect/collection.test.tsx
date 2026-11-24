@@ -149,3 +149,12 @@ describe('Horas', () => {
     await waitFor(() => expect(saveHours).toHaveBeenCalledWith(expect.objectContaining({ reason: null, workedHours: 2 })))
   })
 })
+
+it('uses one searchable group control for a teacher with many groups',() => {
+  vi.mocked(useGroups).mockReturnValue({groups:Array.from({length:12},(_,i) => ({...group,id:'g'+i,name:'Lectura '+i})),loading:false,error:undefined})
+  render(<Attendance schoolId="s"/>)
+  const field = screen.getByRole('combobox',{name:'Grupo'})
+  expect(field.tagName).toBe('INPUT')
+  fireEvent.change(field,{target:{value:'Lectura 11 · c'}})
+  expect(screen.getByRole('heading',{name:'Lectura 11'})).toBeVisible()
+})

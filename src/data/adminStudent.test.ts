@@ -17,7 +17,7 @@ vi.mock('firebase/firestore', () => ({
 const student: Student = { id: 'ie_001', schoolId: 'ie', campus: 'origen', code: '001', nameKey: 'ana', fullName: 'Ana', grade: 3, age: null, sample: null, gender: '', active: true, retired: false, provisional: false, levels: {} }
 beforeEach(() => {
   vi.clearAllMocks()
-  mock.caller.mockResolvedValue({ rol: 'admin' })
+  mock.caller.mockResolvedValue({ rol: 'fundacion' })
   mock.docs.set('schools/ie', { campuses: [{ id: 'destino', name: 'Destino' }] })
   mock.docs.set('students/ie_001', { ...student })
   mock.docs.set('groups/antes', { schoolId: 'ie', campus: 'origen' })
@@ -25,7 +25,7 @@ beforeEach(() => {
 })
 it('guarda campos móviles y deltas de pertenencia en una sola transacción sin cambiar el id', async () => {
   await saveStudentAssignment(student, { campus: 'destino', retired: false }, ['antes'], ['despues'])
-  expect(mock.caller).toHaveBeenCalledWith('admin')
+  expect(mock.caller).toHaveBeenCalledWith('manager')
   expect(mock.transaction).toHaveBeenCalledTimes(1)
   expect(mock.update.mock.calls).toEqual([
     ['students/ie_001', { campus: 'destino', retired: false, updatedAt: expect.any(String) }],

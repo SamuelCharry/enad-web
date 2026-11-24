@@ -7,7 +7,7 @@ import { listenMany, useLive, withSession, type Stream } from './live'
 
 const schoolStream = withSession<School[]>([], (p, next, error) => listenMany<School>(schoolQueries(p), schools =>
   next(schools.sort((a, b) => compare(a.name, b.name))), error))
-/** Live school directory restricted to the caller's institutions or regions. */
+/** Live school directory restricted to the caller's assigned schools. */
 export function useSchools() {
   const { data: schools, loading, error } = useLive(schoolStream, [])
   return { schools, loading, error }
@@ -34,11 +34,11 @@ export function scopedRows<T>(path: string, schoolId?: string, constraints: (p: 
         error(new ApiError(403, 'No tienes acceso a esta institución.'))
         return
       }
-      stopData = listenMany<T>(ids.map(id => query(collection(db, path), where('schoolId', '==', id), ...constraints(p))), next, error)
+      stopData = listenMany<T>(ids.map(id => query(collection(db, path), where('schoolId', '==', id), ...constraints(p))), rows => next(path === 'students' ? rows.filter(r => !(r as {mergedInto?: string}).mergedInto) : rows), error)
     }
-    if (p.rol === 'docente' || (schoolId && p.rol !== 'coordinador')) {
+    if (p.rol !== 'fundacion' || schoolId) {
       const ids = schoolId ? [schoolId] : [...new Set(p.schoolIds)]
-      select(ids.filter(id => p.rol !== 'docente' || p.schoolIds.includes(id)))
+      select(ids.filter(id => p.rol === 'fundacion' || p.schoolIds.includes(id)))
       return () => stopData?.()
     }
     const stopSchools = listenMany<School>(schoolQueries(p), rows => select(rows.map(r => r.id).filter(id => !schoolId || id === schoolId)), e => {

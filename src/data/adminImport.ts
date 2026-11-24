@@ -36,7 +36,7 @@ function subjectOf(value: unknown) {
   if (!SUBJECTS.includes(subject)) fail(400, 'La materia debe ser lectura o matemáticas.')
   return subject
 }
-// A single scoped snapshot serves every row for this school. Admin transactions
+// A single scoped snapshot serves every row for this school. Import transactions
 // recheck absence on the server before inserting, protecting existing records.
 function roster(path: string) {
   const cache = new Map<string, Map<string, DocumentData>>()
@@ -113,10 +113,10 @@ function schoolRow(row: Row, known: Set<string>, pending: Map<string, { data: Ro
   } else pending.set(id, { data: schoolFields(row, id, true, p.projectId), campuses })
   return true
 }
-/** Bulk-imports validated rows and records the administrator's audit summary. */
+/** Bulk-imports validated rows and records the foundation's audit summary. */
 export function adminImport(kind: ImportKind, rows: readonly Row[]) {
   return api(async () => {
-    const p = await caller('admin')
+    const p = await caller('fundacion')
     if (!Array.isArray(rows)) fail(400, 'Envía las filas a importar.')
     if (!knownKinds.includes(kind)) fail(400, 'El tipo de importación debe ser schools, teachers, students, groups o evaluations.')
     const known = new Set((await schoolsOf(p)).map(s => s.id))
@@ -155,7 +155,7 @@ export function adminImport(kind: ImportKind, rows: readonly Row[]) {
             result.skipped++;
             continue
           }
-          const data = newStudent({ ...row, campus }, code, schoolId, p.uid, false, timestamp)
+          const data = {...newStudent({ ...row, campus }, code, schoolId, p.uid, false, timestamp),source:'import',needsReview:false,reviewReasons:[],ocrConfidence:null,mergedInto:null}
           inserts.push({ ref: doc(db, 'students', id), data })
           existing.set(id, data)
         } else if (kind === 'groups') {
@@ -163,7 +163,7 @@ export function adminImport(kind: ImportKind, rows: readonly Row[]) {
           if (!name) fail(400, 'Falta el nombre del grupo.')
           const subject = subjectOf(row.subject), login = str(row.teacherEmail ?? row.teacherUsername ?? row.teacher).toLowerCase()
           const teacher = row.teacherId ? byId.get(str(row.teacherId)) : byEmail.get(login.includes('@') ? login : login + '@enad.app')
-          if (!teacher) fail(400, 'No encontramos al docente del grupo.')
+          if (!teacher || teacher.data().rol !== 'docente' || !teacher.data().activo || !teacher.data().schoolIds?.includes(schoolId)) fail(400, 'Selecciona un docente activo del colegio.')
           const id = schoolId + '_' + subject + '_' + slug(name), existing = await groups(schoolId)
           if (existing.has(id)) {
             result.skipped++;

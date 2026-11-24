@@ -1,7 +1,7 @@
 export const guideRoles = [
   { value: 'docente', label: 'Docente' },
   { value: 'seguimiento', label: 'Coordinación / Fundación' },
-  { value: 'administracion', label: 'Administración' },
+  { value: 'administracion', label: 'Gestión de la fundación' },
 ] as const
 
 export type GuideRole = typeof guideRoles[number]['value']
@@ -22,7 +22,7 @@ export const stepsByRole: Record<GuideRole, GuideStep[]> = {
     {
       title: 'Ingresar con tu cuenta',
       actions: [
-        'Abre ENAd Móvil. En Usuario, escribe el usuario o el correo que te entregó administración.',
+        'Abre ENAd Móvil. En Usuario, escribe el usuario o el correo que te entregó la fundación.',
         'Escribe tu contraseña y toca Entrar. Usa el botón del ojo si necesitas revisar lo que escribiste.',
       ],
       portal: 'Desde el navegador del celular, toca Ingresar al portal e ingresa con la misma cuenta. Allí también puedes tomar asistencia, evaluar, organizar grupos y registrar horas.',
@@ -97,7 +97,7 @@ export const stepsByRole: Record<GuideRole, GuideStep[]> = {
       actions: [
         'Ingresa con tu cuenta de Coordinación o Fundación y abre Resumen. En el portal, empieza por Visualización de datos.',
         'En Por revisar, elige el momento de evaluación. Consulta los grupos sin evaluación, los docentes sin asistencia esta semana y las sedes con baja asistencia.',
-        'Consulta los totales en Alcance del informe. Coordinación puede consultar sus regiones asignadas y Fundación, todo el programa. Ambos perfiles son de solo lectura.',
+        'Consulta los totales en Alcance del informe. Coordinación puede consultar sus colegios asignados y Fundación, todo el programa.',
         'Para acotar la consulta, abre Filtros. Elige proyecto, departamento o municipio según lo que necesites. Selecciona una institución para poder escoger su sede.',
       ],
       image: { file: '20_fundacion_resumen', alt: 'Resumen de Fundación con el selector de momento y las tres alertas de Por revisar. Debajo se ven los totales de estudiantes y docentes.' },
@@ -148,7 +148,7 @@ export const stepsByRole: Record<GuideRole, GuideStep[]> = {
     {
       title: 'Descargar la plantilla',
       actions: [
-        'Ingresa con tu cuenta de administración y abre Carga de datos. Selecciona el tipo de registro que vas a cargar, por ejemplo, Estudiantes.',
+        'Ingresa con tu cuenta de fundación y abre Carga de datos. Selecciona el tipo de registro que vas a cargar, por ejemplo, Estudiantes.',
         'Toca Importar archivo y luego Descargar plantilla. Completa una fila por registro y conserva los encabezados del archivo.',
       ],
       portal: 'Desde Inicio, abre Recolección de datos. Allí encontrarás Carga de datos con las secciones de instituciones y sedes, docentes, estudiantes, grupos y evaluaciones históricas.',

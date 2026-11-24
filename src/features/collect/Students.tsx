@@ -10,13 +10,12 @@ import { StudentDetail } from '../reports/Roster'
 import { groupLink } from '../teacher/navigation'
 import { Link } from 'react-router-dom'
 import type { Group } from '../../domain/types'
-import { FileImport } from './FileImport'
 const Scanner = lazy(() => import('./Scanner').then(m => ({ default: m.Scanner })))
 
 export function Students({ school, campus, admin, uid, initialStudent, scanOnOpen }: { school: School; campus: string; admin: boolean; uid?: string; initialStudent?: string | null; scanOnOpen?: boolean }) {
   const { students, loading, error } = useStudents(school.id)
   const [search, setSearch] = useState('')
-  const [open, setOpen] = useState<'new' | 'file' | 'scan' | null>(scanOnOpen ? 'scan' : null)
+  const [open, setOpen] = useState<'new' | 'scan' | null>(scanOnOpen ? 'scan' : null)
   const [edit, setEdit] = useState<string | null>(null)
   const [selected, select] = useState(initialStudent)
   const [scannedGroup, setScannedGroup] = useState<Group>()
@@ -39,7 +38,7 @@ export function Students({ school, campus, admin, uid, initialStudent, scanOnOpe
       <Button variant="primary" onClick={() => setOpen('new')}>Añadir estudiante</Button>
       {!admin && <>
         <Button disabled={loading} onClick={() => setOpen('scan')}>Escanear lista</Button>
-        <Button disabled={loading} onClick={() => setOpen('file')}>Importar archivo</Button>
+
       </>}</div>
     {loading ? <p>Cargando estudiantes…</p> : visible.length ? visible.map(s => <Card key={s.id}>
       <div className="collect-row">
@@ -52,7 +51,6 @@ export function Students({ school, campus, admin, uid, initialStudent, scanOnOpe
       setOpen(null)
       setEdit(null)
     }} />}
-    {open === 'file' && <FileImport kind="students" schools={[school]} scope={{ schoolId: school.id, campus, students }} onClose={() => setOpen(null)} />}
     {open === 'scan' && !loading && <Suspense fallback={<p role="status">Cargando escáner…</p>}>
       <Scanner onSaved={group => { setScannedGroup(group); setNotice('Lista revisada en este dispositivo.') }} schoolId={school.id} {...{ students, campus }} onClose={() => setOpen(null)} />
     </Suspense>}</>

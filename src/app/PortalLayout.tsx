@@ -1,44 +1,67 @@
-import { Link, NavLink, Outlet, useLocation, useOutletContext } from 'react-router-dom'
-import type { Role, UserProfile } from '../domain/types'
-import { Suspense } from 'react'
+import { colombiaToday } from '../domain/weeks'
+import { Link, NavLink, Navigate, Outlet, useLocation, useOutletContext } from 'react-router-dom'
+import { Suspense, useEffect, useRef, useState } from 'react'
+import type { UserProfile } from '../domain/types'
 import { Icon } from '../ui/Icon'
-import { useAttendanceDraftCount } from '../features/teacher/useAttendanceDrafts'
 import { SwitchUser } from './sessionControls'
+import { homePath, legacyPath, roleNav } from './navigation'
+import { useReviewQueue } from '../data/review'
 
-const roleNames: Record<Role, string> = {
-  docente: 'docente', coordinador: 'coordinación', fundacion: 'fundación', admin: 'administración',
+export function LegacyRedirect() {
+  const {rol} = useOutletContext<UserProfile>()
+  const {pathname,search} = useLocation()
+  return <Navigate replace to={legacyPath(pathname,rol) + search} />
 }
-
-function AttendanceBadge({ uid }: { uid: string }) {
-  const count = useAttendanceDraftCount(uid)
-  return count > 0 ? <small className="teacher-draft-badge" aria-label={count === 1 ? '1 marca de asistencia por guardar' : count + ' marcas de asistencia por guardar'}>{count}</small> : null
+function ReviewCount() {
+  const queue = useReviewQueue()
+  return queue.data.length ? <small aria-label={queue.data.length + ' por revisar'}>{queue.data.length}</small> : null
 }
-
 export function PortalLayout() {
   const profile = useOutletContext<UserProfile>()
-  const { pathname } = useLocation()
-  const section = pathname.startsWith('/recoleccion') ? 'Recolección' : pathname.startsWith('/visualizacion') ? 'Visualización' : null
-  const firstName = profile.fullName.trim().split(/\s+/)[0]
-  return <>
-    <a className="skip-link" href="#portal-main" onClick={e => { e.preventDefault(); document.getElementById('portal-main')?.focus() }}>Saltar al contenido</a>
-    <header className="portal-header"><div className="shell-width portal-bar">
-      <Link className="portal-brand" to="/portal" aria-label={'Portal ' + roleNames[profile.rol] + ', inicio'}>
-        <img src={import.meta.env.BASE_URL + 'branding/enad_isotipo_white.png'} alt="" width="26" height="38" />
-        <span>Portal <span className="role-name">{roleNames[profile.rol]}</span></span>
-      </Link>
-      <span className="first-name">{firstName}</span><SwitchUser />
-    </div></header>
-    <main data-teacher={profile.rol === 'docente' || undefined} className="shell-width portal-main" id="portal-main" tabIndex={-1}>{section &&
-      <nav className="portal-crumb" aria-label="Ruta de navegación">
-        <Link to="/portal"><Icon name="back" size={16} />Volver al inicio</Link>
-        <span aria-hidden="true">/</span><span>{section}</span>
-      </nav>}
-      <Suspense fallback={<p role="status">Cargando sección…</p>}><Outlet context={profile} /></Suspense>
-    </main>
-    {profile.rol === 'docente' && <nav className="teacher-bottom" aria-label="Pestañas del docente">
-      {([['Hoy', '/portal', 'check'], ['Grupos', '/recoleccion/grupos', 'book'], ['Estudiantes', '/recoleccion/estudiantes', 'edit'],
-        ['Horas', '/recoleccion/horas', 'clock'], ['Mis datos', '/visualizacion', 'chart']] as const).map(([label, to, icon]) =>
-        <NavLink key={to} to={to} aria-label={'Ir a ' + label}><Icon name={icon} size={18} /><span>{label}</span>{label === 'Hoy' && <AttendanceBadge uid={profile.uid} />}</NavLink>)}
-    </nav>}
+  const {pathname} = useLocation()
+  const entries = roleNav(profile.rol)
+  const section = pathname.split('/')[2]
+  const title = entries.find(([slug]) => slug === section)?.[1] || ({historicas:'Evaluaciones históricas', calidad:'Calidad de datos', importaciones:'Importaciones'} as Record<string,string>)[section] || entries[0][1]
+  const [collapsed,setCollapsed] = useState(false)
+  const [drawer,setDrawer] = useState(false)
+  const dialog = useRef<HTMLDialogElement>(null)
+  const toggle = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    if (drawer) {
+      dialog.current?.showModal()
+      const size = window.matchMedia('(max-width: 900px)')
+      const resize = () => { if (!size.matches) setDrawer(false) }
+      size.addEventListener('change',resize)
+      return () => size.removeEventListener('change',resize)
+    }
+    dialog.current?.close()
+  },[drawer])
+  function close() { dialog.current?.close(); setDrawer(false); toggle.current?.focus() }
+  const sidebar = (mobile:boolean) => <>
+    <div className="side-brand"><Link to={homePath(profile.rol)} onClick={mobile ? close : undefined} aria-label="ENAd, inicio">
+      <img src={import.meta.env.BASE_URL + 'branding/enad_logo.png'} alt="ENAd" /></Link>
+      <button type="button" className="shell-icon" aria-label={mobile ? 'Cerrar menú' : collapsed ? 'Ampliar barra lateral' : 'Contraer barra lateral'}
+        onClick={mobile ? close : () => setCollapsed(!collapsed)}><Icon name={collapsed && !mobile ? 'arrow' : 'back'} /></button></div>
+    <nav aria-label="Menú principal">{entries.map(([slug,label,icon]) => <NavLink key={slug} aria-label={label} title={label} to={'/portal/' + slug} onClick={mobile ? close : undefined}>
+      <Icon name={icon} size={20}/><span>{label}</span>{slug === 'revision' && <ReviewCount/>}</NavLink>)}</nav>
+    <footer><strong>{profile.fullName}</strong><span>{{ docente:'Docente',coordinador:'Coordinación',fundacion:'Fundación' }[profile.rol]}</span><SwitchUser /></footer>
   </>
+  return <div className="workspace" data-collapsed={collapsed}>
+    <a className="skip-link" href="#portal-main" onClick={e => { e.preventDefault(); document.getElementById('portal-main')?.focus() }}>Saltar al contenido</a>
+    <aside className="side-panel">{sidebar(false)}</aside>
+    {drawer && <dialog ref={dialog} className="side-drawer" aria-label="Menú de navegación" onCancel={e => { e.preventDefault(); close() }}
+      onKeyDown={e => {
+        if (e.key !== 'Tab') return
+        const items = e.currentTarget.querySelectorAll<HTMLElement>('a[href],button:not(:disabled)')
+        const first = items[0], last = items[items.length-1]
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus() }
+        if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus() }
+      }} onClick={e => { if (e.target === dialog.current) close() }}><div>{sidebar(true)}</div></dialog>}
+    <div className="workspace-body"><header className="workspace-top">
+      <button ref={toggle} className="shell-icon menu-toggle" aria-label="Abrir menú" aria-expanded={drawer} onClick={() => setDrawer(true)}><Icon name="menu"/></button>
+      <h1>{title}</h1>{section === 'hoy' && <time>{new Intl.DateTimeFormat('es-CO',{timeZone:'America/Bogota',day:'numeric',month:'long'}).format(new Date(colombiaToday()+'T12:00:00Z'))}</time>}
+      {profile.rol !== 'docente' && section === 'reportes' && <Link to="/portal/descargas">Descargas</Link>}
+    </header><main id="portal-main" tabIndex={-1} key={JSON.stringify([profile.uid,profile.rol,profile.schoolIds,section])}>
+      <Suspense fallback={<p role="status">Cargando sección…</p>}><Outlet context={profile}/></Suspense></main></div>
+  </div>
 }

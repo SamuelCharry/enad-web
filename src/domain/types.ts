@@ -1,5 +1,5 @@
 /** Session role stored in users/{uid}. */
-export type Role = 'docente' | 'coordinador' | 'fundacion' | 'admin'
+export type Role = 'docente' | 'coordinador' | 'fundacion'
 /** Subject key shared by assessments and groups. */
 export type Subject = 'lectura' | 'matematicas'
 /** Evaluation moment stored by both clients. */
@@ -8,9 +8,9 @@ export type Moment = 'linea_base' | 'linea_media_1' | 'linea_media_2' | 'linea_f
 export type AttendanceStatus = 'vino' | 'no_vino' | 'retirado'
 /** School shift. */
 export type Jornada = 'mañana' | 'tarde' | 'única'
-/** Signed-in account and its school or regional scope. */
+/** Signed-in account and its assigned schools. */
 export interface UserProfile { uid: string; rol: Role; activo: boolean; fullName: string; email: string; username?: string;
-  schoolIds: string[]; campusIds: Record<string, string[]>; jornada: Jornada; projectId?: string; regions: string[] }
+  schoolIds: string[]; campusIds: Record<string, string[]>; jornada: Jornada; projectId?: string }
 /** Campus embedded in a school document. */
 export interface Campus { id: string; name: string; jornada: Jornada }
 /** Institution and its program geography. */
@@ -21,9 +21,9 @@ export interface LevelMark { level: string; date: string; moment: Moment }
 /** School roster entry and its current subject levels. */
 export interface Student { id: string; schoolId: string; campus: string; code: string; fullName: string; nameKey: string;
   grade: number; gender: 'F' | 'M' | ''; age: number | null; sample: number | null; retired: boolean; active: boolean;
-  provisional: boolean; levels: Partial<Record<Subject, LevelMark>> }
+  provisional: boolean; needsReview?: boolean; reviewReasons?: string[]; source?: 'manual'|'ocr'|'import'; mergedInto?: string|null; ocrConfidence?: number|null; levels: Partial<Record<Subject, LevelMark>> }
 /** Teaching group and student membership. */
-export interface Group { id: string; name: string; subject: Subject; teacherId: string; teacherName: string; schoolId: string;
+export interface Group { id: string; name: string; subject: Subject; teacherId: string | null; teacherName: string; schoolId: string;
   campus: string; studentIds: string[] }
 /** Student attendance event for one group and date. */
 export interface AttendanceMark { groupId: string; date: string; status: AttendanceStatus; teacherId: string; schoolId: string; studentId: string; savedAt: string }

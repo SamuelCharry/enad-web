@@ -1,14 +1,15 @@
 import { arrayRemove, arrayUnion, doc, runTransaction } from 'firebase/firestore'
 import { nameKey } from '../domain/nameKey'
 import type { Group, School, Student } from '../domain/types'
-import { api, caller, fail, isOffline, now, reportCache } from './core'
+import { api, caller, fail, requireSchool, isOffline, now, reportCache } from './core'
 import { db } from './firebase'
 import { studentFields, type StudentFields } from './studentFields'
 
 /** Apply only the edited membership deltas. A failed transfer leaves the roster and all groups intact. */
 export function saveStudentAssignment(student: Student, fields: StudentFields, before: string[], after: string[]) {
   return api(async () => {
-    await caller('admin')
+    const p = await caller('manager')
+    await requireSchool(p, student.schoolId)
     const patch = studentFields(fields)
     const removed = new Set(before.filter(id => !after.includes(id)))
     const added = new Set(after.filter(id => !before.includes(id)))

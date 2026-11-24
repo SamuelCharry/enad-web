@@ -162,7 +162,7 @@ export function attendanceReport(data: ReportData) {
     const groups = new Map(s.groups.map(g => [g.id, g]))
     return [...grouped(s.attendance, m => m.groupId)].map(([groupId, rows]) => {
       const g = groups.get(groupId)
-      if (g && !names.has(g.teacherId)) names.set(g.teacherId, g.teacherName)
+      if (g?.teacherId && !names.has(g.teacherId)) names.set(g.teacherId, g.teacherName)
       return {
         groupId,
         name: g?.name ?? 'Grupo eliminado',

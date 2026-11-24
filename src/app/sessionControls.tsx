@@ -1,3 +1,4 @@
+import { Icon } from '../ui/Icon'
 import { LoadError } from '../ui/LoadError'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -20,7 +21,7 @@ export function SwitchUser() {
       setBusy(false)
     }
   }
-  return <div className="switch-user"><Button loading={busy} onClick={switchUser}>Cambiar usuario</Button>
+  return <div className="switch-user"><Button aria-label="Cambiar de cuenta" title="Cambiar de cuenta" variant="ghost" loading={busy} onClick={switchUser}><Icon name="enter" size={18}/><span className="switch-label">Cambiar de cuenta</span></Button>
     {error && <p role="alert">No se pudo cerrar la sesión. Intenta de nuevo.</p>}
   </div>
 }

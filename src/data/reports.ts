@@ -70,7 +70,7 @@ function cached<T>(name: string, filters: object, read: (p: ReportCaller, signal
   return api(async () => {
     const p: ReportCaller = { ...await caller() }
     if (p.rol === 'coordinador') p.visibleSchools = await reportSchools(p, 'schoolId' in filters && typeof filters.schoolId === 'string' ? filters.schoolId : undefined)
-    const key = JSON.stringify([p.uid, p.rol, p.schoolIds, p.regions, p.visibleSchools?.map(s => s.id).sort(), colombiaToday(), name,
+    const key = JSON.stringify([p.uid, p.rol, p.schoolIds, p.visibleSchools?.map(s => s.id).sort(), colombiaToday(), name,
     Object.entries(filters).sort(([a], [b]) => compare(a, b))])
     return cachedResult(key, signal => read(p, signal), name !== 'export')
   })
@@ -427,10 +427,45 @@ export function getTeacherDay(uid: string, date: string) {
 
 export function getDataQuality() {
   return cached('quality', {}, async p => {
-    if (p.rol !== 'admin') fail(403, 'Solo administración puede revisar los directorios.')
+    if (p.rol !== 'fundacion') fail(403, 'Solo la fundación puede revisar los directorios.')
     const [students, groups, users, schools] = await Promise.all([
       rows<Student>(collection(db, 'students')), rows<Group>(collection(db, 'groups')),
       rows<UserProfile>(collection(db, 'users')), schoolsOf(p)])
     return qualityIssues(students, groups, users.map(u => ({ ...u, uid: u.id })), schools)
+  })
+}
+
+export function getEvaluationRows(f:ReportFilters) {
+  return cached('evaluation-table',f,async p => {
+    const {visible,from,to} = await context(p,f)
+    return (await Promise.all(visible.map(async school => {
+      const roster = await rows<Student>(scoped('students',school.id,...campusFilter(school,f.campus)))
+      const names = new Map(roster.filter(s => !s.mergedInto).map(s => [s.id,s.fullName]))
+      const events = await rows<Evaluation>(scoped('evaluations',school.id,...dates(from,to)))
+      return events.filter(e => names.has(e.studentId)).map(e => ({...e,student:names.get(e.studentId)!,school:school.name}))
+    }))).flat().sort((a,b) => compare(b.date,a.date))
+  })
+}
+
+export function getAttendanceRows(f:ReportFilters) {
+  return cached('attendance-table',f,async p => {
+    const {visible,from,to} = await context(p,f)
+    return (await Promise.all(visible.map(async school => {
+      const [roster,marks] = await Promise.all([rows<Student>(scoped('students',school.id,...campusFilter(school,f.campus))),
+        rows<AttendanceMark>(scoped('attendance',school.id,...dates(from,to)))])
+      const names = new Map(roster.map(s => [s.id,s.fullName]))
+      return marks.filter(m => names.has(m.studentId)).map(m => ({...m,student:names.get(m.studentId)!,school:school.name}))
+    }))).flat().sort((a,b) => compare(b.date,a.date))
+  })
+}
+export function getHoursRows(f:ReportFilters) {
+  return cached('hours-table',f,async p => {
+    const {visible,from,to} = await context(p,f)
+    return (await Promise.all(visible.map(async school => {
+      const [teachers,entries,groups] = await Promise.all([directory(school),rows<HoursEntry>(scoped('hours',school.id,...dates(from,to))),
+        f.campus ? rows<Group>(scoped('groups',school.id,...campusFilter(school,f.campus))) : []])
+      const names = new Map(teachers.map(t => [t.uid,t.fullName]))
+      return entries.filter(e => !f.campus || groups.some(g => g.teacherId === e.teacherId)).map(e => ({...e,teacher:names.get(e.teacherId) || e.teacherId,school:school.name}))
+    }))).flat().sort((a,b) => compare(b.date,a.date))
   })
 }
