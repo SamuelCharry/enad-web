@@ -1,3 +1,4 @@
+import { Records } from './Records'
 import { LoadError } from '../../ui/LoadError'
 import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
@@ -6,7 +7,7 @@ import { useProgramConfig } from '../../data/scope'
 import { withReadTimeout } from '../../data/reportCache'
 import { reportRange, submissionWindow } from '../../data/reportRange'
 import { getExport, useFilterOptions } from '../../data/reports'
-import { Button, DateInput, Field, PageHeader, Select } from '../../ui/components'
+import { Button, DateInput, Field, Select } from '../../ui/components'
 import { geography, changeFilter, filterChoices } from './model'
 import type { Geography } from './model'
 import { SummaryView, SubmissionsView, HoursView, LevelsView } from './reportViews'
@@ -19,9 +20,9 @@ import { reportFilters } from './navigation'
 
 const fields: Record<Geography, string> = { projectId: 'Proyecto', department: 'Departamento', municipality: 'Municipio', schoolId: 'Institución', campus: 'Sede' }
 const tabs = [
-  { to: '/visualizacion', label: 'Resumen' }, { to: '/visualizacion/seguimiento', label: 'Seguimiento' },
-  { to: '/visualizacion/instituciones', label: 'Instituciones' }, { to: '/visualizacion/horas', label: 'Horas y asistencia' },
-  { to: '/visualizacion/niveles', label: 'Niveles' }, {to:'/visualizacion/docentes',label:'Seguimiento docente'}, {to:'/visualizacion/comparacion',label:'Comparación'},
+  { to: '/portal/reportes', label: 'Resumen' }, { to: '/portal/reportes/seguimiento', label: 'Seguimiento' },
+  { to: '/portal/reportes/instituciones', label: 'Instituciones' }, { to: '/portal/reportes/horas', label: 'Horas y asistencia' },
+  {to:'/portal/reportes/evaluaciones',label:'Evaluaciones'}, {to:'/portal/reportes/asistencias',label:'Registro de asistencia'}, {to:'/portal/reportes/registro-horas',label:'Registro de horas'}, { to: '/portal/reportes/niveles', label: 'Niveles' }, {to:'/portal/reportes/docentes',label:'Seguimiento docente'}, {to:'/portal/reportes/comparacion',label:'Comparación'},
 ]
 
 function FilterBar({ filters, options, onChange }: { filters: ReportFilters; options: ReturnType<typeof useFilterOptions>; onChange: (filters: ReportFilters) => void }) {
@@ -92,16 +93,16 @@ export function Foundation() {
   const options = useFilterOptions(filters)
   const visibility = JSON.stringify(options.schools.map(s => s.id))
   const {pathname} = useLocation(), navigate = useNavigate()
-  const tabPath = pathname.endsWith('/estudiante') ? '/visualizacion/instituciones' : pathname.replace(/\/$/,'')
+  const tabPath = pathname.endsWith('/estudiante') ? '/portal/reportes/instituciones' : pathname.replace(/\/$/,'')
   const target = (to:string) => ({pathname:to,search:new URLSearchParams(filters as Record<string,string>).toString()})
   const invalid = !!(filters.from && filters.to && filters.from > filters.to)
   const calendar = useProgramConfig()
   const validDates = [filters.from,filters.to].every(v => !v || (/^\d{4}-\d{2}-\d{2}$/.test(v) && Number.isFinite(Date.parse(v))))
   const current = validDates && calendar.config && (tabPath.endsWith('/seguimiento')
     ? submissionWindow(calendar.config, filters, Number(params.get('week'))).range
-    : reportRange(calendar.config, filters, tabPath === '/visualizacion' ? 4 : 1))
+    : reportRange(calendar.config, filters, tabPath === '/portal/reportes' ? 4 : 1))
   return <>
-    <PageHeader title="Visualización de datos"><ExportButton key={JSON.stringify([filters,visibility,current])} filters={current ? {...filters,...current} : filters} disabled={!validDates || invalid || (!!current && current.from > current.to) || options.loading || !!options.error} /></PageHeader>
+    <div className="rep-actions"><ExportButton key={JSON.stringify([filters,visibility,current])} filters={current ? {...filters,...current} : filters} disabled={!validDates || invalid || (!!current && current.from > current.to) || options.loading || !!options.error} /></div>
     <nav className="ui-tabs" aria-label="Secciones del informe"><div className="ui-tab-links">{tabs.map(t => <Link key={t.to} to={target(t.to)} aria-current={tabPath===t.to ? 'page':undefined} className={tabPath===t.to ? 'active':undefined}>{t.label}</Link>)}</div>
       <div className="ui-tab-picker"><Field label="Sección"><Select value={tabPath} onChange={e => navigate(target(e.target.value))}>{tabs.map(t => <option key={t.to} value={t.to}>{t.label}</option>)}</Select></Field></div></nav>
     {current && !tabPath.endsWith('/seguimiento') && <p>Período del informe · {current.from} al {current.to}</p>}
@@ -114,7 +115,10 @@ export function Foundation() {
         <Route path="instituciones" element={<Institutions key={JSON.stringify(filters)} filters={filters} schools={options.schools} />} />
         <Route path="horas" element={<HoursView filters={filters} />} />
         <Route path="niveles" element={<LevelsView filters={filters} />} />
-        <Route path="*" element={<Navigate to="/visualizacion" replace />} />
+        <Route path="*" element={<Navigate to="/portal/reportes" replace />} />
+        <Route path="evaluaciones" element={<Records kind="evaluations" filters={filters}/>}/>
+        <Route path="asistencias" element={<Records kind="attendance" filters={filters}/>}/>
+        <Route path="registro-horas" element={<Records kind="hours" filters={filters}/>}/>
         <Route path="docentes" element={<TeacherFollowUp filters={filters}/>} />
         <Route path="comparacion" element={<CompareView filters={filters}/>} />
         <Route path="estudiante" element={<StudentHistory filters={filters}/>} />

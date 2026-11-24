@@ -86,11 +86,27 @@ async function dashboard(schools: School[], cfg: ProgramConfig | null, today: st
       if (counts.some(Boolean)) { moment = m; break }
     }
   }
+  const reporters = new Set<string>()
+  let worked = 0, planned = 0
+  const totals = [{present:0,absent:0},{present:0,absent:0}]
+  const day = new Date(today + 'T12:00:00Z')
+  const offset = (day.getUTCDay()+6)%7
+  const relative = (delta:number) => new Date(day.getTime()+delta*86400000).toISOString().slice(0,10)
+  await Promise.all(ids.flatMap(id => totals.map(async (sum,i) => {
+    const range = dates(relative(-offset-7*i),relative(-7*i))
+    const n = await attendanceTotals(scoped('attendance',id,...range))
+    sum.present += n.present
+    sum.absent += n.absent
+  })))
   const alerts = (await Promise.all(directories.map(async ({ school, groups, teachers }) => {
     const list: Alert[] = [], schoolId = school.id
     function add(category: string, label: string, route: string, params: Record<string, string>, count = 1, subject?: Subject) {
-      list.push({ category, label, path: '/visualizacion/' + route + '?' + new URLSearchParams({ schoolId, ...params }), count, schoolId, subject })
+      list.push({ category, label, path: '/portal/reportes/' + route + '?' + new URLSearchParams({ schoolId, ...params }), count, schoolId, subject })
     }
+    for (const g of groups) if (!g.teacherId) list.push({category:'Grupos sin docente',label:g.name,path:'/portal/grupos?buscar='+encodeURIComponent(g.name),count:1,schoolId})
+    const hours = await hoursTotal(scoped('hours',schoolId,...dates(relative(-offset),today)))
+    worked += hours.worked
+    planned += hours.planned
     if (!cfg || today < cfg.implementationStartDate) return list
     const week = weekOf(today, cfg)
     if (week) {
@@ -98,6 +114,7 @@ async function dashboard(schools: School[], cfg: ProgramConfig | null, today: st
       await Promise.all(teachers.map(async t => {
         const filters = [equal('teacherId', t.uid), ...dates(from, today)]
         const [sent, h] = await Promise.all([total(scoped('attendance', schoolId, ...filters)), hoursTotal(scoped('hours', schoolId, ...filters))])
+        if (sent) reporters.add(t.uid)
         if (!sent) add('Sin asistencia esta semana', t.fullName, 'seguimiento', { week: String(week), teacher: t.uid })
         if ((ratio(h.worked, h.planned) ?? 100) < alertThreshold) add('Horas por debajo del 80 %', t.fullName, 'docentes', { teacher: t.uid, from, to: today })
       }))
@@ -117,10 +134,11 @@ async function dashboard(schools: School[], cfg: ProgramConfig | null, today: st
     }))
     return list
   }))).flat().sort((a, b) => a.category.localeCompare(b.category, 'es') || a.label.localeCompare(b.label, 'es'))
-  return { feed, alerts, moment, students: directories.reduce((n, d) => n + d.active, 0), teachers: new Set(directories.flatMap(d => d.teachers.map(t => t.uid))).size }
+  const insights = {attendance:totals.map(n => ratio(n.present,n.present+n.absent)),worked,planned,reporters:reporters.size}
+  return { insights, feed, alerts, moment, students: directories.reduce((n, d) => n + d.active, 0), teachers: new Set(directories.flatMap(d => d.teachers.map(t => t.uid))).size }
 }
 
 export function readDashboard(profile: UserProfile, schools: School[], config: ProgramConfig | null, today: string, selected?: Moment) {
-  const key = JSON.stringify([profile.uid, profile.rol, profile.regions, 'dashboard', schools, config, today, selected])
+  const key = JSON.stringify([profile.uid, profile.rol, 'dashboard', schools, config, today, selected])
   return cachedResult(key, () => dashboard(schools, config, today, selected))
 }

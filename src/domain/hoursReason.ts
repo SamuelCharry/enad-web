@@ -1,3 +1,4 @@
+export const cleanDetail = (value:string) => value.replace(/(?:[0-9#*]\uFE0F?\u20E3|[\p{Extended_Pictographic}\p{Regional_Indicator}\p{Emoji_Modifier}]|\u200D|\uFE0F)/gu,'')
 /** Categories available when worked hours fall short. */
 export const REASON_CATEGORIES = ['Familiar', 'Personal', 'Salud', 'Transporte', 'Institucional', 'Otro']
 /** Serializes a category and detail in the mobile storage format. */
@@ -12,11 +13,12 @@ export function parseReason(s: string | null) {
 /** Returns a validation message for a teacher's hours form, or null. */
 export function validateHours({ planned, worked, reason }: { planned: number; worked: number; reason?: string | null }) {
   if (![planned, worked].every(n => Number.isFinite(n) && n >= 0 && n <= 24)) return 'Escribe horas entre 0 y 24.'
+  if (![planned,worked].every(n => Number.isInteger(n * 2))) return 'Usa horas enteras o medias horas.'
   if (worked === 0 && planned === 0) return 'Registra horas planeadas o realizadas.'
   if (worked >= planned) return null
   const { category, detail } = parseReason(reason ?? '')
   if (!category) return 'Selecciona un motivo.'
   if (!detail.trim()) return 'Escribe el motivo.'
   if (formatReason(category, detail) !== reason?.trim()) return 'Selecciona un motivo.'
-  return formatReason(category, detail).length > 500 ? 'Acorta el detalle a 480 caracteres.' : null
+  return detail.length > 200 ? 'Usa hasta 200 caracteres.' : null
 }

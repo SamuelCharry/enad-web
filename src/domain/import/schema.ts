@@ -12,7 +12,7 @@ export const importColumns: Record<ImportKind, ImportColumn[]> = {
   students: [school, campus, code, col('fullName', 'Nombre del estudiante', true, ['nombre', 'estudiante', 'nombre completo']),
     col('grade', 'Grado', true, ['curso']), col('gender', 'Sexo', false, ['género']), col('age', 'Edad'), sample],
   teachers: [col('fullName', 'Nombre del docente', true, ['nombre', 'docente', 'nombre completo']),
-  col('email', 'Correo electrónico', true, ['correo', 'e-mail']), school, campus, shift, col('username', 'Usuario')],
+  col('username', 'Usuario'), school, campus, shift, col('email', 'Correo electrónico', false, ['correo', 'e-mail'])],
   groups: [
     school,
     campus,

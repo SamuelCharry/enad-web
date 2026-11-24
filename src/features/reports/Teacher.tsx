@@ -1,12 +1,10 @@
 import { LoadError } from '../../ui/LoadError'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import type { UserProfile } from '../../domain/types'
 import { useGroups } from '../../data/groups'
 import { useMyHours } from '../../data/hours'
-import { signOut } from '../../data/session'
-import { useAction } from '../collect/useAction'
 import { groupLink } from '../teacher/navigation'
 import { updateMyName, useMyProfilePending, useProjectName } from '../../data/profile'
 import { getTeacherDay, getTeacherMetrics } from '../../data/reports'
@@ -14,7 +12,7 @@ import { useProgramConfig, useSchools } from '../../data/scope'
 import { subjectLabel } from '../../domain/levels'
 import { colombiaToday } from '../../domain/weeks'
 import { LineChart } from '../../ui/charts'
-import { Button, Card, DateInput, EmptyState, Field, PageHeader, SyncStatus, TextInput } from '../../ui/components'
+import { Button, Card, DateInput, EmptyState, Field, SyncStatus, TextInput } from '../../ui/components'
 import { number, percent, ratio, shiftDay } from './model'
 import { LiveState, ReportRead } from './ReportState'
 import { Roster } from './Roster'
@@ -95,8 +93,6 @@ function EarlierReports({uid}:{uid:string}) {
 }
 
 export function Teacher({ profile }: { profile: UserProfile }) {
-  const navigate = useNavigate()
-  const logout = useAction()
   const schools = useSchools()
   const program = useProgramConfig()
   const groups = useGroups(undefined, { mine: true })
@@ -104,7 +100,7 @@ export function Teacher({ profile }: { profile: UserProfile }) {
   const mine = groups.groups.filter(g => g.teacherId === profile.uid && profile.schoolIds.includes(g.schoolId))
   const group = mine.find(g => g.id === groupId)
   const schoolNames = new Map(schools.schools.map(s => [s.id, s.name]))
-  return <div className="teacher-report"><PageHeader title="Mis datos" />
+  return <div className="teacher-report">
     <Card><NameEditor profile={profile} /><dl className="rep-facts">
       <div><dt>Correo</dt><dd>{profile.email}</dd></div>
       <div><dt>Proyecto</dt><dd>{profile.projectId ? <ProjectName id={profile.projectId} fallback={program.config?.projectName || 'Sin registrar'} /> : program.config?.projectName || 'Sin registrar'}</dd></div>
@@ -112,13 +108,13 @@ export function Teacher({ profile }: { profile: UserProfile }) {
     </dl><LiveState loading={schools.loading} error={schools.error}>
       {schools.schools.filter(s => profile.schoolIds.includes(s.id)).map(s => <p key={s.id}><strong>{s.name}</strong> · {s.municipality || 'Municipio sin registrar'}{s.campuses.filter(c => profile.campusIds[s.id]?.includes(c.id)).map(c => ' · ' + c.name).join('')}</p>)}
     </LiveState></Card>
-    <Link className="ui-link-button" to="/recoleccion/estudiantes">Gestionar estudiantes</Link>
+    <Link className="ui-link-button" to="/portal/estudiantes">Gestionar estudiantes</Link>
     <Card><h2>Mis grupos</h2><LiveState loading={groups.loading} error={groups.error}>
       {group ? <><Button onClick={() => setGroup('')}>Volver a mis grupos</Button><Link className="ui-link-button" to={groupLink('grupos',group)}>Gestionar grupo</Link><Roster key={group.id} group={group} filters={{}} profiles /></> :
         mine.length ? mine.map(g => <div className="teacher-record" key={g.id}>
           <Button variant="ghost" onClick={() => setGroup(g.id)}>{g.name}</Button>
           <p>{subjectLabel(g.subject)} · {schoolNames.get(g.schoolId) ?? g.schoolId} · {number(g.studentIds.length)} estudiantes</p>
-        </div>) : <EmptyState title="Crea tu primer grupo en Recolección de datos." />}
+        </div>) : <EmptyState title="Crea tu primer grupo en Grupos." />}
     </LiveState></Card>
     <Card><h2>Mis indicadores</h2><ReportRead query={JSON.stringify([profile.uid, mine.map(g => [g.id, g.studentIds])])} load={() => getTeacherMetrics(profile.uid)}>
       {metrics => <><h3>Tasa de asistencia de mis grupos</h3>
@@ -130,7 +126,5 @@ export function Teacher({ profile }: { profile: UserProfile }) {
         </details></>}
     </ReportRead></Card>
     <TeacherHours uid={profile.uid} schoolIds={profile.schoolIds} schoolNames={schoolNames} />
-    <Button loading={logout.busy} onClick={() => logout.run(async () => { await signOut(); navigate('/login',{replace:true}) },'')}>Cerrar sesión</Button>
-    {logout.feedback}
   </div>
 }

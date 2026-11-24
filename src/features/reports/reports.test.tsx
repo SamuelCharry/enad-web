@@ -35,16 +35,16 @@ beforeEach(() => {
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals() })
 
-const profile: UserProfile = { uid: 'd1', rol: 'fundacion', activo: true, fullName: 'Docente de prueba', email: 'prueba@example.test', schoolIds: ['ie1'], campusIds: { ie1: ['s1'] }, jornada: 'mañana', regions: [] }
+const profile: UserProfile = { uid: 'd1', rol: 'fundacion', activo: true, fullName: 'Docente de prueba', email: 'prueba@example.test', schoolIds: ['ie1'], campusIds: { ie1: ['s1'] }, jornada: 'mañana' }
 const school: School = { id: 'ie1', projectId: 'proyecto', name: 'Institución de prueba', zone: 'rural', active: true, department: 'Caldas', municipality: 'Neira', region: 'Centro', campuses: [{ id: 's1', name: 'Sede Uno', jornada: 'mañana' }] }
-const group: Group & { studentCount: number } = { studentCount: 1, id: 'g1', teacherId: 'd1', teacherName: 'Docente de prueba', subject: 'lectura', name: 'Grupo Uno', campus: 's1', schoolId: 'ie1', studentIds: ['e1'] }
+const group: Group & { studentCount: number;teacherId:string } = { studentCount: 1, id: 'g1', teacherId: 'd1', teacherName: 'Docente de prueba', subject: 'lectura', name: 'Grupo Uno', campus: 's1', schoolId: 'ie1', studentIds: ['e1'] }
 const student: Student = { id: 'e1', fullName: 'Estudiante Uno', nameKey: 'estudiante uno', code: '001', schoolId: 'ie1', campus: 's1', grade: 4, gender: 'F', age: 9, sample: null, active: true, retired: false, provisional: false, levels: { lectura: { level: 'parrafo', date: '2026-04-01', moment: 'linea_base' } } }
 const summary = { range: { from: '2026-04-01', to: '2026-04-23' }, students: 12540, teachers: 8, schools: 1, campuses: 3, groupsBySubject: { lectura: 2, matematicas: 4 }, hoursWorked: 42.5, hoursPlanned: 50, attendanceRate: 85, studentsOverTime: [{ week: 1, count: 5 }] }
 const mark: AttendanceMark & { id: string; syncState: 'synced' } = { id: 'g1_2026-04-01', syncState: 'synced', groupId: 'g1', studentId: 'e1', schoolId: 'ie1', teacherId: 'd1', date: '2026-04-01', status: 'vino', savedAt: '' }
 
 function open(path: string, p = profile) {
   vi.spyOn(session, 'useSession').mockReturnValue({ profile: p, user: null, loading: false })
-  return render(<MemoryRouter initialEntries={[path]}><Routes><Route path="/visualizacion/*" element={<ReportRoutes />} /></Routes></MemoryRouter>)
+  return render(<MemoryRouter initialEntries={[p.rol === 'docente' ? '/portal/mis-datos' : path]}><Routes><Route path="/portal/reportes/*" element={<ReportRoutes />} /><Route path="/portal/mis-datos" element={<ReportRoutes/>}/></Routes></MemoryRouter>)
 }
 
 describe('Presentación de informes', () => {
@@ -74,7 +74,7 @@ describe('Presentación de informes', () => {
     vi.spyOn(reportsApi, 'useFilterOptions').mockImplementation(f => ({
       projects: ['p'], departments: f.projectId ? ['Caldas'] : [], municipalities: [], schools: [], campuses: [], error: undefined, loading: false,
     }))
-    open('/visualizacion')
+    open('/portal/reportes')
     expect(await screen.findByText('12.540')).toBeTruthy()
     fireEvent.click(screen.getByText('Filtros', { selector: 'summary' }))
     fireEvent.change(screen.getByLabelText('Proyecto'), { target: { value: 'p' } })
@@ -94,7 +94,7 @@ describe('Presentación de informes', () => {
     const get = vi.spyOn(reportsApi, 'getSubmissions').mockResolvedValue({ week: 2, range: { from: '2026-04-13', to: '2026-04-19' }, total: 1, attendanceSent: 1, hoursSent: 1,
       teachers: [{ uid: 'd1', schoolId: 'ie1', schoolName: 'Primera IE', fullName: 'Docente Uno', attendanceSent: true, hoursSent: true },
         { uid: 'd1', schoolId: 'ie2', schoolName: 'Segunda IE', fullName: 'Docente Uno', attendanceSent: false, hoursSent: true }] })
-    open('/visualizacion/seguimiento')
+    open('/portal/reportes/seguimiento')
     expect(await screen.findByText('Primera IE')).toBeTruthy()
     expect(get).toHaveBeenCalledWith({}, 3)
     fireEvent.click(screen.getByLabelText('Solo pendientes'))
@@ -112,7 +112,7 @@ describe('Presentación de informes', () => {
     vi.spyOn(studentsApi, 'getStudentHistory').mockResolvedValue({ attendance: [mark, { ...mark, date: '2026-04-02', status: 'no_vino' }], evaluations: [] })
     vi.mocked(reportsApi.getGroupRoster).mockResolvedValue([{student:{...student,syncState:'synced'},level:undefined,rate:50}])
     vi.mocked(reportsApi.useFilterOptions).mockReturnValue({projects:[],departments:[],municipalities:[],schools:[school],campuses:school.campuses,loading:false,error:undefined})
-    open('/visualizacion/instituciones')
+    open('/portal/reportes/instituciones')
     expect(groups).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: school.name }))
     fireEvent.click(screen.getByRole('button', { name: 'Sede Uno' }))
@@ -154,7 +154,7 @@ describe('Presentación de informes', () => {
       expect(this.download).toBe('Informe-ENAd.xlsx')
     })
     vi.stubGlobal('URL', class extends URL { static createObjectURL() { return 'blob:fixture' }; static revokeObjectURL() {} })
-    open('/visualizacion')
+    open('/portal/reportes')
     await screen.findByText('12.540')
     fireEvent.change(screen.getByLabelText('Desde'), { target: { value: '2026-04-01' } })
     fireEvent.click(screen.getByRole('button', { name: 'Exportar Excel' }))
@@ -178,7 +178,7 @@ describe('Mis datos y niveles', () => {
       h, { ...h, teacherId: 'd2', workedHours: 99 }, { ...h, date: '2026-03-24', workedHours: 99 },
     ] })
     const save = vi.spyOn(profileApi, 'updateMyName').mockResolvedValue({ ...profile, fullName: 'Nuevo nombre', syncState: 'synced' })
-    open('/visualizacion', { ...profile, rol: 'docente' })
+    open('/portal/reportes', { ...profile, rol: 'docente' })
     expect(await screen.findByText('80 %')).toBeTruthy()
     expect(screen.getByText('75 %')).toBeTruthy()
     expect(hours).toHaveBeenCalledWith('2026-03-25', '2026-04-23')
@@ -199,7 +199,7 @@ describe('Mis datos y niveles', () => {
     const get = vi.spyOn(reportsApi, 'getLevels').mockResolvedValue({
       subject: 'lectura', moments: MOMENTS, overall: block, bySchool: [{ schoolId: 'ie1', name: school.name, ...block }], gender: { F: 2, M: 2 }, age: { '8': 2, '10': 2 },
     })
-    open('/visualizacion/niveles')
+    open('/portal/reportes/niveles')
     const row = await screen.findByRole('row', { name: /Institución de prueba/ })
     expect(within(row).getAllByRole('cell').map(td => td.textContent)).toEqual([school.name, '25 %', 'Sin datos'])
     expect(screen.getByText('9 años')).toBeTruthy()
@@ -209,7 +209,7 @@ describe('Mis datos y niveles', () => {
 
   it('impide consultar o exportar un rango invertido y se recupera al corregirlo', async () => {
     const get = vi.spyOn(reportsApi, 'getSummary').mockResolvedValue(summary)
-    open('/visualizacion')
+    open('/portal/reportes')
     await screen.findByText('12.540')
     fireEvent.change(screen.getByLabelText('Desde'), { target: { value: '2026-04-01' } })
     await waitFor(() => expect(get).toHaveBeenLastCalledWith({ from: '2026-04-01' }))
@@ -223,7 +223,7 @@ describe('Mis datos y niveles', () => {
 
   it('mantiene los datos fuera del árbol de una sesión inactiva', () => {
     const get = vi.spyOn(reportsApi, 'getSummary')
-    open('/visualizacion', { ...profile, activo: false })
+    open('/portal/reportes', { ...profile, activo: false })
     expect(screen.getByRole('alert').textContent).toMatch(/sesión activa/)
     expect(get).not.toHaveBeenCalled()
   })
@@ -239,7 +239,7 @@ it('muestra la tabla semanal y permite consultar las tres agrupaciones de asiste
     byGroup: [{ schoolId: 'ie1', subject: 'lectura', teacherId: 'd1', groupId: 'g1', name: 'Primero', teacherName: 'Docente Uno', rate: 75, sessions: 4 }],
     byTeacher: [{ uid: 'd1', fullName: 'Docente Uno', rate: 0, sessions: 0 }],
   })
-  open('/visualizacion/horas')
+  open('/portal/reportes/horas')
   expect(await screen.findByRole('row', { name: 'Primera IE 60 % 10' })).toBeTruthy()
   fireEvent.click(screen.getByText('Docente Uno · 3 de 4 h'))
   expect(screen.getByRole('row', { name: '3 4 3 3 75 %' })).toBeTruthy()
@@ -253,18 +253,18 @@ it('abre la comparación de una sede desde un enlace compartido y enlaza el grup
   vi.mocked(reportsApi.getComparison).mockResolvedValue([{school,campus:school.campuses[0],students:1,groups:1,evaluated:0,attendance:100}])
   vi.mocked(reportsApi.getFollowup).mockResolvedValue({from:'2026-04-06',to:'2026-04-12',moment:'linea_base',teachers:[{
     uid:group.teacherId,fullName:group.teacherName,school,groups:[{...group,syncState:'synced'}],last:'',weeks:1,expected:1,attendanceRate:100,worked:0,planned:0,evaluated:0,members:1,coverage:0}]})
-  const view = open('/visualizacion/comparacion?schoolId=ie1&campus=s1')
+  const view = open('/portal/reportes/comparacion?schoolId=ie1&campus=s1')
   expect(await screen.findByRole('row',{name:/Institución de prueba · Sede Uno 1 1 0 100 %/})).toBeTruthy()
   expect(reportsApi.getComparison).toHaveBeenCalledWith({schoolId:'ie1',campus:'s1'},true)
   view.unmount()
-  open('/visualizacion/docentes?schoolId=ie1&teacher=d1&orden=asistencia')
+  open('/portal/reportes/docentes?schoolId=ie1&teacher=d1&orden=asistencia')
   expect(await screen.findByRole('row',{name:/1 \/ 1 · 100 %/})).toBeTruthy()
   expect(screen.getByRole('link',{name:'Grupo Uno'}).getAttribute('href')).toContain('campus=s1&group=g1')
 })
 it('abre directamente la ficha de un estudiante y conserva el período al regresar al grupo',async () => {
   vi.mocked(studentsApi.useStudents).mockReturnValue({students:[student],loading:false,error:undefined})
   vi.mocked(reportsApi.getStudentReport).mockResolvedValue({student:{...student,syncState:'synced'},evaluations:[],attendance:[mark]})
-  open('/visualizacion/estudiante?schoolId=ie1&campus=s1&group=g1&student=e1&from=2026-01-01')
+  open('/portal/reportes/estudiante?schoolId=ie1&campus=s1&group=g1&student=e1&from=2026-01-01')
   expect(await screen.findByText('Asistió')).toBeTruthy()
   expect(screen.queryByText('2025-01-01')).toBeNull()
   expect(screen.getByRole('link',{name:'Volver al grupo'}).getAttribute('href')).toContain('from=2026-01-01')

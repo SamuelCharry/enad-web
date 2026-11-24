@@ -29,14 +29,14 @@ export function SchoolScope({ profile, children, withCampus = true, initialSchoo
   const { schools, loading, error } = useSchools()
   const [id, setId] = useState(initialSchool)
   const [site, setSite] = useState<string | null>(initialCampus)
-  const visible = profile.rol === 'admin' ? schools : schools.filter(s => profile.schoolIds.includes(s.id))
+  const visible = profile.rol === 'fundacion' ? schools : schools.filter(s => profile.schoolIds.includes(s.id))
   const school = visible.find(s => s.id === id) ?? visible[0]
   if (error) return <LoadError message={error} />
   if (loading) return <p role="status">Cargando instituciones…</p>
   if (!school) return <p>Solicita a coordinación que asigne una institución a tu cuenta.</p>
   const assigned = profile.campusIds[school.id] ?? []
-  const campuses = profile.rol === 'admin' || !assigned.length ? school.campuses : assigned.map(id => school.campuses.find(c => c.id === id) ?? { id, name: id })
-  const choices = profile.rol === 'admin' ? [...campuses, { id: '', name: 'Sin sede asignada' }] : allSites ? [{ id: '', name: 'Todas las sedes' }, ...campuses] : includeUnassigned && !assigned.length ? [...campuses, { id: '', name: 'Sin sede asignada' }] : campuses
+  const campuses = profile.rol === 'fundacion' || !assigned.length ? school.campuses : assigned.map(id => school.campuses.find(c => c.id === id) ?? { id, name: id })
+  const choices = profile.rol === 'fundacion' ? [...campuses, { id: '', name: 'Sin sede asignada' }] : allSites ? [{ id: '', name: 'Todas las sedes' }, ...campuses] : includeUnassigned && !assigned.length ? [...campuses, { id: '', name: 'Sin sede asignada' }] : campuses
   const campus = choices.find(c => c.id === site)?.id ?? choices[0]?.id ?? ''
   return <>
     <div className="collect-fields">

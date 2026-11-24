@@ -7,6 +7,7 @@ import { signIn, signOut, useSession } from '../data/session'
 
 vi.mock('../data/session', () => ({ signIn: vi.fn(), signOut: vi.fn(), useSession: vi.fn() }))
 vi.mock('../data/scope', () => ({ useSchools: vi.fn(), useProgramConfig: vi.fn() }))
+vi.mock('../data/review', () => ({useReviewQueue:() => ({data:[]})}))
 vi.mock('../features/collect', () => ({ CollectRoutes: () => <p>Contenido de recolección</p> }))
 vi.mock('../features/reports', () => ({ ReportRoutes: () => <p>Contenido del informe</p> }))
 
@@ -14,7 +15,7 @@ const signedOut = { loading: false, user: null, profile: null }
 function signedIn(rol: Role = 'docente', activo = true) {
   const profile: UserProfile = {
     uid: 'test-docente', fullName: 'Ana María', email: 'ana@example.test', rol, activo,
-    schoolIds: [], campusIds: {}, jornada: 'mañana', regions: [],
+    schoolIds: [], campusIds: {}, jornada: 'mañana',
   }
   // The shell reads only the UID from the Firebase User object.
   return { loading: false, user: { uid: profile.uid } as NonNullable<ReturnType<typeof useSession>['user']>, profile }
@@ -51,7 +52,7 @@ describe('Acceso al portal', () => {
     expect(screen.getByRole('heading', { name: 'Tu cuenta está desactivada' })).toBeTruthy()
     expect(screen.queryByText('Contenido del informe')).toBeNull()
     vi.mocked(signOut).mockImplementation(async () => { vi.mocked(useSession).mockReturnValue(signedOut) })
-    fireEvent.click(screen.getByRole('button', { name: 'Cambiar usuario' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Cambiar de cuenta' }))
     expect(await screen.findByLabelText('Usuario o correo electrónico')).toBeTruthy()
   })
 
@@ -66,24 +67,25 @@ describe('Acceso al portal', () => {
   })
 
   it('explica el bloqueo cuando el servicio rechaza un perfil inactivo', async () => {
-    vi.mocked(useSession).mockReturnValue({ ...signedIn(), profile: null, error: 'Tu cuenta está inactiva. Contacta al administrador.' })
+    vi.mocked(useSession).mockReturnValue({ ...signedIn(), profile: null, error: 'Tu cuenta está inactiva. Comunícate con la fundación.' })
     open('/portal')
     expect(await screen.findByText(/Tu cuenta está inactiva/)).toBeTruthy()
     expect(screen.queryByRole('link', { name: /Recolección/ })).toBeNull()
   })
 
-  it.each([
-    ['docente', 'docente', false], ['coordinador', 'coordinación', true],
-    ['fundacion', 'fundación', true], ['admin', 'administración', false],
-  ] as const)('muestra nombre, portal y accesos de %s', async (role, title, readOnly) => {
+  it.each(['docente','coordinador','fundacion'] as const)('muestra las secciones de %s', async role => {
     vi.mocked(useSession).mockReturnValue(signedIn(role))
     open('/portal')
-    expect(await screen.findByText('Ana')).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Portal ' + title + ', inicio' })).toBeTruthy()
-    const collect = await screen.findByRole('link', { name: /Recolección de datos/ })
-    expect(collect.getAttribute('href')).toBe('#/recoleccion')
-    expect(Boolean(within(collect).queryByText('Solo lectura'))).toBe(readOnly)
-    expect(screen.getByRole('link', { name: /Visualización de datos/ }).getAttribute('href')).toBe('#/visualizacion')
+    expect(await screen.findByText('Ana María')).toBeTruthy()
+    await waitFor(() => expect(window.location.hash).toBe(role === 'docente' ? '#/portal/hoy' : '#/portal/inicio'))
+    const nav = within(screen.getByRole('navigation',{name:'Menú principal'}))
+    const labels = role === 'docente' ? ['Hoy','Asistencia','Evaluación','Grupos','Estudiantes','Horas','Actividades','Pendientes','Mis datos','Ayuda']
+      : ['Inicio','Personas','Colegios y sedes','Estudiantes','Revisar nombres','Grupos','Actividades','Reportes','Descargas',...(role === 'fundacion' ? ['Programa'] : [])]
+    expect(nav.getAllByRole('link').map(a => a.textContent)).toEqual(labels)
+    expect(!!nav.queryByRole('link',{name:'Ayuda'})).toBe(role === 'docente')
+    expect(!!nav.queryByRole('link',{name:'Programa'})).toBe(role === 'fundacion')
+    fireEvent.click(screen.getByRole('button',{name:'Contraer barra lateral'}))
+    expect(screen.getByRole('button',{name:'Ampliar barra lateral'})).toBeTruthy()
   })
 
   it.each(['ana', 'ana@example.test'])('admite %s y regresa a la ruta solicitada', async login => {
@@ -95,7 +97,7 @@ describe('Acceso al portal', () => {
     vi.mocked(useSession).mockReturnValue(signedIn())
     view.rerender(<App />)
     expect(await screen.findByText('Contenido del informe')).toBeTruthy()
-    expect(window.location.hash).toBe('#/visualizacion/niveles')
+    expect(window.location.hash).toBe('#/portal/mis-datos')
   })
 
   it('valida el formulario, muestra el mensaje del servicio y lo borra al corregir', async () => {
@@ -125,42 +127,36 @@ it('permite explorar las dos escalas e ingresar desde la portada pública', asyn
   expect(await screen.findByLabelText('Contraseña')).toBeTruthy()
 })
 
-it('muestra el calendario colombiano y conserva los accesos de clase durante un receso', async () => {
+it('conserva el grupo y la fecha al redirigir un enlace de clase',async () => {
   vi.mocked(useSession).mockReturnValue(signedIn())
-  vi.spyOn(Date, 'now').mockReturnValue(Date.UTC(2026, 3, 14, 3))
-  const config = { projectName: 'ENAd', year: 2026, implementationStartDate: '2026-04-06', breaks: [] }
-  vi.mocked(useProgramConfig).mockReturnValue({ config, loading: false, error: undefined })
-  const view = open('/portal')
-  expect(await screen.findByText('Semana 2 de implementación')).toBeTruthy()
-  expect(screen.getByText('2026-04-13').tagName).toBe('TIME')
-  vi.mocked(useProgramConfig).mockReturnValue({ config: { ...config, breaks: [{ from: '2026-04-14', to: '2026-04-14', label: 'Receso' }] }, loading: false, error: undefined })
-  view.rerender(<App />)
-  expect(screen.getByText('Semana de receso')).toBeTruthy()
-  for (const [label, path] of [['Asistencia','asistencia'], ['Evaluación formativa','evaluacion'], ['Horas','horas']]) {
-    expect(screen.getByRole('link', { name: label }).getAttribute('href')).toBe('#/recoleccion/' + path)
-  }
-  expect(useSchools).not.toHaveBeenCalled()
+  open('/recoleccion/asistencia?school=s&group=g&date=2026-09-04')
+  await waitFor(() => expect(window.location.hash).toBe('#/portal/asistencia?school=s&group=g&date=2026-09-04'))
 })
 
-it('actualiza la cobertura con las instituciones visibles y distingue carga, vacío y error', async () => {
-  vi.mocked(useSession).mockReturnValue(signedIn('coordinador'))
-  vi.mocked(useSchools).mockReturnValue({ schools: [], loading: true, error: undefined })
-  const view = open('/portal')
-  expect(await screen.findByText('Cargando instituciones y sedes…')).toBeTruthy()
-  expect(screen.queryByRole('definition')).toBeNull()
-  const school = { id: 'ie', name: 'Escuela de prueba', active: true, region: 'Centro', department: 'Caldas', municipality: 'Neira',
-    projectId: 'p', zone: 'rural', campuses: [{ id: 's', name: 'Sede', jornada: 'única' }] } as const
-  vi.mocked(useSchools).mockReturnValue({ schools: [{ ...school, campuses: [...school.campuses] }], loading: false, error: undefined })
-  view.rerender(<App />)
-  expect(screen.getAllByRole('definition').map(count => count.textContent)).toEqual(['1', '1'])
-  vi.mocked(useSchools).mockReturnValue({ schools: [], loading: false, error: undefined })
-  view.rerender(<App />)
-  expect(screen.getByText(/Aún no hay instituciones/)).toBeTruthy()
-  vi.mocked(useSchools).mockReturnValue({ schools: [], loading: false, error: 'No pudimos cargar las instituciones.' })
-  view.rerender(<App />)
-  expect(screen.getByRole('alert').textContent).toContain('No pudimos cargar')
-  fireEvent.click(screen.getByRole('link', { name: 'Seguimiento de envíos' }))
-  expect(await screen.findByText('Contenido del informe')).toBeTruthy()
-  fireEvent.click(within(screen.getByRole('navigation', { name: 'Ruta de navegación' })).getByRole('link', { name: 'Volver al inicio' }))
-  expect(await screen.findByRole('heading', { name: 'Inicio del portal' })).toBeTruthy()
+it('contiene el foco del menú móvil y lo devuelve al cerrar',async () => {
+  vi.stubGlobal('matchMedia',() => ({matches:true,addEventListener:vi.fn(),removeEventListener:vi.fn()}))
+  Object.defineProperties(HTMLDialogElement.prototype,{
+    showModal:{configurable:true,value:function(this:HTMLDialogElement){this.open=true}},
+    close:{configurable:true,value:function(this:HTMLDialogElement){this.open=false}},
+  })
+  try {
+    vi.mocked(useSession).mockReturnValue(signedIn())
+    open('/portal/hoy')
+    const trigger = await screen.findByRole('button',{name:'Abrir menú'})
+    fireEvent.click(trigger)
+    const drawer = screen.getByRole('dialog',{name:'Menú de navegación'})
+    const links = within(drawer), first = links.getByRole('link',{name:'ENAd, inicio'}), last = links.getByRole('button',{name:'Cambiar de cuenta'})
+    last.focus()
+    fireEvent.keyDown(last,{key:'Tab'})
+    expect(document.activeElement).toBe(first)
+    fireEvent.keyDown(first,{key:'Tab',shiftKey:true})
+    expect(document.activeElement).toBe(last)
+    fireEvent(drawer,new Event('cancel',{cancelable:true}))
+    expect(document.activeElement).toBe(trigger)
+    expect(screen.queryByRole('dialog')).toBeNull()
+   } finally {
+    Reflect.deleteProperty(HTMLDialogElement.prototype,'showModal')
+    Reflect.deleteProperty(HTMLDialogElement.prototype,'close')
+    vi.unstubAllGlobals()
+  }
 })

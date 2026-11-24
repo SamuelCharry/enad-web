@@ -2,7 +2,6 @@ import { useContext, createContext, useEffect, useId, useRef } from 'react'
 import type { ComponentProps, PropsWithChildren, ReactNode } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import type { Subject } from '../domain/types'
-import { Icon } from './Icon'
 import { levelScale } from './levels'
 
 function classes(base: string, extra?: string) {
@@ -128,8 +127,8 @@ export function LevelChip({ subject, level }: { subject: Subject; level?: string
 export function PageHeader({ title, description, children }: PropsWithChildren<{ title: string; description?: string }>) {
   return <header className="ui-page-header"><h1>{title}</h1>{description && <p>{description}</p>}{children}</header>
 }
-export function SyncStatus({ pending }: { pending: boolean }) {
-  return <span role="status" className="ui-badge ui-sync" data-pending={pending}>
-    <Icon name={pending ? 'clock' : 'check'} size={16} />{pending ? 'Pendiente de envío' : 'Guardado'}
+export function SyncStatus({ pending, dirty = false }: { pending: boolean; dirty?: boolean }) {
+  return <span role="status" className="ui-sync" data-pending={pending} data-dirty={dirty}>
+    {dirty ? 'Sin guardar' : pending ? 'Pendiente de envío' : 'Guardado'}
   </span>
 }

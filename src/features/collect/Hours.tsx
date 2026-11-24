@@ -3,7 +3,7 @@ import { useState } from 'react'
 import type { HoursEntry, ProgramConfig } from '../../domain/types'
 import { saveHours, useMyHours } from '../../data/hours'
 import { useProgramConfig } from '../../data/scope'
-import { formatReason, parseReason, REASON_CATEGORIES, validateHours } from '../../domain/hoursReason'
+import { cleanDetail, formatReason, parseReason, REASON_CATEGORIES, validateHours } from '../../domain/hoursReason'
 import { colombiaToday, rangeOf, weekOf } from '../../domain/weeks'
 import { Button, Card, Dialog, SyncStatus, Field, NumberInput, TextInput } from '../../ui/components'
 import { useAction } from './useAction'
@@ -46,6 +46,9 @@ function WeeklyHours({ date, schoolId, week, from, to, today, setDate, config }:
     {loading ? <p>Cargando horas…</p> : <>
       <p>Total semanal: <strong>{total('workedHours')} h realizadas</strong> de {total('plannedHours')} h planeadas.</p>
       <HoursForm key={date} {...{ date, schoolId }} entry={entries.find(h => h.date === date)} />
+      <h3>Historial de horas</h3>
+      {hours.filter(h => h.schoolId === schoolId).map(h => <p key={h.date}>{h.date} · {h.workedHours} h realizadas de {h.plannedHours} h planeadas</p>)}
+      {!hours.some(h => h.schoolId === schoolId) && <p>Todavía no has registrado horas en estas semanas.</p>}
       <BarChart label="Horas realizadas por día" data={series.days} />
       <BarChart label="Horas acumuladas por semana de implementación" data={series.weeks} />
     </>}</Card>
@@ -81,19 +84,19 @@ function HoursForm({ date, schoolId, entry }: { date: string; schoolId: string; 
     e.preventDefault()
     if (!invalid) { if (current) setConfirm(true); else save() }
   }}>
-    {current && <SyncStatus pending={'syncState' in current && current.syncState === 'pending'} />}
+    {(current || Object.keys(draft).length > 0) && <SyncStatus dirty={Object.keys(draft).length > 0} pending={!!current && 'syncState' in current && current.syncState === 'pending'} />}
     <fieldset disabled={action.busy}>
       <div className="collect-fields">
         <Field label="Horas planeadas">
-          <NumberInput data-guide="planned" required min="0" max="24" step="any" value={planned} onChange={e => change('planned', e.target.value)} />
+          <NumberInput data-guide="planned" required min="0" max="24" step="0.5" value={planned} onChange={e => change('planned', e.target.value)} />
         </Field>
         <Field label="Horas realizadas">
-          <NumberInput data-guide="worked" required min="0" max="24" step="any" value={worked} onChange={e => change('worked', e.target.value)} />
+          <NumberInput data-guide="worked" required min="0" max="24" step="0.5" value={worked} onChange={e => change('worked', e.target.value)} />
         </Field>
         {short && <>
           <Choice label="Motivo" value={category} placeholder="Selecciona un motivo" options={REASON_CATEGORIES.map(id => ({ id, name: id }))} onChange={v => change('category', v)} />
-          <Field label="Detalle del motivo">
-            <TextInput data-guide="reason" data-complete={!!category && !!detail.trim()} required maxLength={480} value={detail} onChange={e => change('detail', e.target.value)} />
+          <Field label="Detalle del motivo" hint={detail.length + " de 200 caracteres"}>
+            <TextInput data-guide="reason" data-complete={!!category && !!detail.trim()} required maxLength={200} value={detail} onChange={e => change('detail', cleanDetail(e.target.value))} />
           </Field>
         </>}</div>
       {invalid && <p>{invalid}</p>}<div className="teacher-save"><Button data-guide="save" type="submit" variant="primary" disabled={Boolean(invalid)}>Guardar horas</Button></div>

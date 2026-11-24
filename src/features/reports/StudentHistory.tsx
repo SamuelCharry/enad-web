@@ -23,7 +23,7 @@ export function GroupRoster({ group, filters }: { group: Group; filters: ReportF
 }
 export function StudentHistory({ filters }: { filters: ReportFilters }) {
   const { params } = useReportQuery()
-  if (!filters.schoolId || !params.get('student')) return <Link to="/visualizacion/instituciones">Selecciona una institución y un estudiante</Link>
+  if (!filters.schoolId || !params.get('student')) return <Link to="/portal/reportes/instituciones">Selecciona una institución y un estudiante</Link>
   return <History schoolId={filters.schoolId} id={params.get('student')!} filters={filters} group={params.get('group')} />
 }
 function History({ schoolId, id, filters, group }: { schoolId: string; id: string; filters: ReportFilters; group: string | null }) {

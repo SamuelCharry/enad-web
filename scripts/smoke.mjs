@@ -9,14 +9,18 @@ if (Boolean(username) !== Boolean(password)) {
   throw new Error('Para probar el ingreso, define ENAD_USER y ENAD_PASS juntos.')
 }
 
+if (username && !['localhost','127.0.0.1','[::1]'].includes(base.hostname)) {
+  throw new Error('Prueba el ingreso en una vista previa local conectada a los emuladores.')
+}
+
 const shots = new URL('../shots/', import.meta.url)
 await mkdir(shots, { recursive: true })
 const browser = await chromium.launch()
 try {
   const context = await browser.newContext({ serviceWorkers: 'block' })
-  if (!username) {
+  {
     await context.route('**/*', route =>
-      new URL(route.request().url()).origin === base.origin
+      (new URL(route.request().url()).origin === base.origin || (username && ['localhost','127.0.0.1','[::1]'].includes(new URL(route.request().url()).hostname)))
         ? route.continue()
         : route.abort(),
     )
@@ -25,11 +29,12 @@ try {
   const page = await context.newPage()
   page.setDefaultTimeout(10_000)
   async function capture(name, controls) {
-    for (const width of [375, 1440]) {
+    for (const width of [375, 768, 1440]) {
       await page.setViewportSize({ width, height: width === 375 ? 812 : 900 })
       for (const control of controls) {
         await control.waitFor({ state: 'visible' })
       }
+      if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)) throw new Error(name+' se desborda a '+width+' px.')
       await page.screenshot({
         path: fileURLToPath(new URL(`${name}-${width}.png`, shots)),
         animations: 'disabled',
@@ -53,11 +58,26 @@ try {
     await userField.fill(username)
     await passwordField.fill(password)
     await submit.click()
-    await page.waitForURL(url => url.hash === '#/portal')
-    const entries = ['Recolección de datos', 'Visualización de datos'].map(name =>
-      page.getByRole('link', { name }).or(page.getByRole('button', { name })),
-    )
-    await capture('portal', entries)
+    await page.waitForURL(url => ['#/portal/hoy','#/portal/inicio'].includes(url.hash))
+    await capture('portal',[page.locator('.workspace-top h1')])
+    for (const width of [375,768]) {
+      await page.setViewportSize({width,height:812})
+      const toggle = page.getByRole('button',{name:'Abrir menú'})
+      await toggle.click()
+      const drawer = page.getByRole('dialog',{name:'Menú de navegación'})
+      await drawer.waitFor({state:'visible'})
+      for (let i=0;i<16;i++) {
+        await page.keyboard.press('Tab')
+        if (!await drawer.evaluate(el => el.contains(document.activeElement))) throw new Error('El foco salió del menú.')
+      }
+      await page.keyboard.press('Escape')
+      await toggle.waitFor({state:'visible'})
+    }
+    await page.setViewportSize({width:1440,height:900})
+    await page.getByRole('button',{name:'Contraer barra lateral'}).click()
+    await page.getByRole('button',{name:'Ampliar barra lateral'}).click()
+    await page.getByRole('link',{name:'Grupos',exact:true}).click()
+    await page.getByRole('heading',{name:'Grupos',level:1}).waitFor()
   }
 
   console.log('Prueba completada. Las capturas están en shots/.')

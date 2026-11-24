@@ -98,7 +98,9 @@ function validate(kind: ImportKind, data: Record<string, unknown>, errors: strin
       else if (!errors.length) codes.add(key)
     }
   } else if (kind === 'teachers') {
-    if (data.email && !/^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/.test(str(data.email))) errors.push('Correo electrónico inválido.')
+    const username = str(data.username || str(data.email).toLowerCase().replace(/@enad\.app$/, '')).toLowerCase()
+    if (!/^[a-z0-9.]{3,30}$/.test(username)) errors.push('Indica un usuario de 3 a 30 letras minúsculas, números o puntos.')
+    data.username = username
     data.schoolIds = data.schoolId ? [data.schoolId] : []
     data.campusIds = data.schoolId && data.campus ? { [str(data.schoolId)]: [data.campus] } : {}
     delete data.schoolId

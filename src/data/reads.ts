@@ -12,7 +12,7 @@ export function scoped(path: string, schoolId: string, ...filters: QueryConstrai
   return query(source, equal('schoolId', schoolId), ...filters)
 }
 export async function rows<T>(q: Query) {
-  return (await getDocs(q)).docs.map(d => recordOf<T>(d))
+  return (await getDocs(q)).docs.filter(d => !d.data().mergedInto).map(d => recordOf<T>(d))
 }
 export async function total(q: Query) {
   return (await getCountFromServer(q)).data().count

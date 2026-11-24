@@ -6,41 +6,23 @@ El contador suma los documentos que devuelve cada consulta, al menos una lectura
 
 ## Lecturas por página
 
-Se ejecutaron las pantallas anteriores y las actuales sobre los mismos datos de prueba. La reapertura de los informes incluye las lecturas del portal para cargar la sesión, los permisos y los filtros. La caché evita repetir las consultas del informe.
+El presupuesto se mide con las rutas antiguas para cubrir también sus redirecciones. La columna de reapertura incluye las lecturas de la sesión, los filtros y el contador de nombres por revisar. La caché evita repetir las consultas del informe.
 
-| Página | Antes en frío | Después en frío | Reapertura |
-| --- | ---: | ---: | ---: |
-| Inicio · coordinación | 18.362 | 242 | — |
-| Inicio · fundación | 18.362 | 242 | — |
-| Inicio · administración | 18.362 | 242 | — |
-| Docente · Hoy | 308 | 62 | — |
-| Docente · Mis datos | 2.259 | 177 | — |
-| Docente · Asistencia | 125 | 77 | — |
-| Docente · Evaluación | 305 | 77 | — |
-| Docente · Horas | 125 | 65 | — |
-| Docente · Grupos | 69 | 69 | — |
-| Docente · Estudiantes | 64 | 64 | — |
-| Informe · Resumen | 16.363 | 1.375 | 8 |
-| Informe · Seguimiento | 16.039 | 89 | 8 |
-| Informe · Instituciones | 11 | 7 | 7 |
-| Informe · Horas y asistencia | 16.095 | 754 | 9 |
-| Informe · Niveles | 1.274 | 149 | 8 |
-| Informe · Seguimiento docente | 18.363 | 819 | 8 |
-| Informe · Comparación | 18.363 | 644 | 8 |
-| Administración · Instituciones | 11 | 11 | — |
-| Administración · Docentes | 23 | 23 | — |
-| Administración · Estudiantes | 358 | 316 | — |
-| Administración · Grupos | 358 | 41 | — |
-| Administración · Evaluaciones | 71 | 71 | — |
-| Administración · Configuración | 2 | 2 | — |
-| Administración · Calidad | 354 | 345 | — |
-| Administración · Importaciones | 15 | 15 | — |
+| Página | Tope en frío | Tope de reapertura |
+| --- | ---: | ---: |
+| Hoy docente | 5 | — |
+| Inicio de coordinación o fundación | 300 | — |
+| Asistencia, Evaluación, Horas, Grupos, Estudiantes o Mis datos | 400 | — |
+| Directorios, datos históricos e importaciones | 400 | — |
+| Reportes de resumen, seguimiento, instituciones, horas, niveles, docentes y comparación | 1.500 | 15 |
+
+En los datos de prueba, Hoy cuesta una lectura. El número de pendientes proviene del dispositivo. Al reabrir con escrituras pendientes se observan únicamente los documentos sin acuse. En Asistencia se carga la lista del grupo elegido. Inicio consulta por colegio las marcas presentes y ausentes de ambas semanas y el total de horas. El historial de movimiento de niveles se consulta al abrir ese detalle. La barra lateral escucha la cola de nombres del perfil. Las descargas completas leen las entidades solicitadas cuando la persona pulsa descargar.
 
 En Resumen, una semana con pocas marcas de asistencia se resuelve con una consulta de documentos. Para las semanas con muchas marcas, el informe lee el padrón de la institución una sola vez y usa sus identificadores para dividir la búsqueda en hasta 30 rangos simultáneos. Los rangos también cubren a estudiantes que ya salieron del padrón. La prueba de latencia usa un reloj simulado, con 250 ms por consulta de documentos y 7 s para la suma de horas. Comprueba que el informe completo está disponible a los 8 s.
 
 ## Índices para el despliegue
 
-El manifiesto contiene 61 índices compuestos. En cada fila los campos siguen el orden del índice. El equipo de despliegue debe aplicar el manifiesto y esperar a que los índices estén listos antes de publicar el portal.
+La tabla recoge los índices base de los informes. Para v2, la cola de nombres usa `needsReview` y `schoolId`, la lista de docentes combina `rol` con `schoolIds array-contains` y la descarga de planes por colegio usa `schoolId` y `date` en el grupo de colecciones `plan`. En cada fila los campos siguen el orden del índice. El equipo de despliegue debe aplicar el manifiesto y esperar a que los índices estén listos antes de publicar el portal.
 
 | Colección | Ámbito | Campos y dirección |
 | --- | --- | --- |

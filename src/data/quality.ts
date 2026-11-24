@@ -33,14 +33,14 @@ export function qualityIssues(students: Student[], groups: Group[], users: UserP
     add('Posibles duplicados', s.id, s.fullName, (schoolNames.get(s.schoolId) ?? s.schoolId) + ' · Códigos ' + list.map(v => v.code).join(', '), 'estudiantes', s.code)
   }
   for (const g of groups) {
-    const owner = teacher.get(g.teacherId), school = schoolNames.get(g.schoolId) ?? g.schoolId
+    const owner = g.teacherId ? teacher.get(g.teacherId) : undefined, school = schoolNames.get(g.schoolId) ?? g.schoolId
     if (!owner?.activo || !owner.schoolIds?.includes(g.schoolId)) add('Grupos sin docente asignado', g.id, g.name, school, 'grupos', g.name)
     if (!g.studentIds?.some(id => byStudent.has(id))) add('Grupos sin estudiantes activos', g.id, g.name, school, 'grupos', g.name)
   }
   for (const u of users) {
     const schools = u.schoolIds ?? []
     if (u.rol === 'docente' && !schools.length) add('Docentes sin institución', u.uid, u.fullName, u.email, 'docentes', u.email)
-    if (!u.activo && (schools.length || (u.regions ?? []).length || Object.values(u.campusIds ?? {}).some(ids => ids.length) || groups.some(g => g.teacherId === u.uid))) {
+    if (!u.activo && (schools.length || Object.values(u.campusIds ?? {}).some(ids => ids.length) || groups.some(g => g.teacherId === u.uid))) {
       add('Usuarios inactivos con asignaciones', u.uid, u.fullName, u.email, u.rol === 'docente' ? 'docentes' : '', u.email)
     }
   }

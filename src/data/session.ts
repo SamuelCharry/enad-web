@@ -67,5 +67,5 @@ export async function signOut(): Promise<void> {
 export function useSession(): Session { return useSyncExternalStore(subscribe, () => state) }
 /** Whether this active user may collect data. */
 export function canWrite(profile: UserProfile | null): boolean {
-  return profile?.activo === true && (profile.rol === 'docente' || profile.rol === 'admin')
+  return profile?.activo === true
 }

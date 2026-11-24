@@ -33,6 +33,7 @@ export function readCounter() {
       const v = field(row, name)
       switch (op) {
         case '==': return v === value
+        case 'array-contains': return Array.isArray(v) && v.includes(value)
         case 'in': return (value as unknown[]).includes(v)
         case '>=': return v !== undefined && compare(v, value) >= 0
         case '<=': return v !== undefined && compare(v, value) <= 0
@@ -93,13 +94,13 @@ export function semester(store: ReturnType<typeof readCounter>, role: string) {
   const school = (i: number) => 'ie' + (i % 5), teacher = (i: number) => 't' + (i % 12), group = (i: number) => 'g' + (i % 25)
   const day = (i: number) => new Date(Date.UTC(2026, 8, 14 + Math.floor(i / 5) * 7 + i % 5)).toISOString().slice(0, 10)
   const config = { implementationStartDate: day(0), breaks: [], year: 2026, projectName: 'ENAd' }
-  const profile = { uid: role === 'docente' ? 't0' : 'manager', rol: role, activo: true, fullName: 'Perfil de prueba', email: 'prueba@example.test', regions: ['Centro'], schoolIds: role === 'docente' ? ['ie0', 'ie2', 'ie4'] : [], campusIds: {}, jornada: 'única' }
+  const profile = { uid: role === 'docente' ? 't0' : 'manager', rol: role, activo: true, fullName: 'Perfil de prueba', email: 'prueba@example.test', schoolIds: role === 'docente' ? ['ie0', 'ie2', 'ie4'] : role === 'coordinador' ? ['ie0'] : [], campusIds: {}, jornada: 'única' }
   put('users/' + profile.uid, profile); put('program/config', config)
   for (let i = 0; i < 5; i++) put('schools/' + school(i), { name: 'Institución ' + i, region: 'Centro', department: 'Caldas', municipality: 'Neira', zone: 'rural', projectId: 'enad', active: true, campuses: [{ id: 'c', name: 'Central', jornada: 'única' }] })
   for (let i = 0; i < 12; i++) {
     if (teacher(i) === profile.uid) continue
     const assignments = Array.from({ length: 25 }, (_, g) => g).filter(g => teacher(g) === teacher(i)).map(school)
-    put('users/' + teacher(i), { ...profile, uid: teacher(i), rol: 'docente', fullName: 'Docente ' + i, schoolIds: assignments, regions: [] })
+    put('users/' + teacher(i), { ...profile, uid: teacher(i), rol: 'docente', fullName: 'Docente ' + i, schoolIds: assignments })
   }
   const directories = new Set<string>()
   for (let i = 0; i < 25; i++) {

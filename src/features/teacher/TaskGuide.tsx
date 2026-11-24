@@ -22,7 +22,7 @@ const steps: Record<string, Step[]> = {
   evaluacion: [
     { instruction: 'Elige el área que vas a evaluar.', target: 'subject' },
     { instruction: 'Selecciona el momento de evaluación.', target: 'moment' },
-    { instruction: 'Abre la ficha de un estudiante, completa sus datos, selecciona el nivel y guarda la evaluación.', target: 'student' },
+    { instruction: 'Abre la ficha de un estudiante, elige el nivel y guarda la evaluación.', target: 'student' },
   ],
 }
 

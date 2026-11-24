@@ -1,8 +1,9 @@
+import { trackSubmission, type Mutation } from './pending'
 import { useMemo } from 'react'
 import { collectionGroup, doc, onSnapshot, query, where, writeBatch } from 'firebase/firestore'
 import type { AttendanceMark, AttendanceStatus } from '../domain/types'
 import { db } from './firebase'
-import { api, caller, chunks, commit, fail, now, requireDate } from './core'
+import { api, caller, chunks, fail, now, requireDate } from './core'
 import { groupDoc } from './groups'
 import { listenMany, useLive, withSession } from './live'
 
@@ -57,12 +58,17 @@ export function saveGroupAttendance(groupId: string, date: string, marks: Record
     const operations = entries.length + entries.filter(([, status]) => status === 'retirado').length
     if (operations > 400) fail(400, 'Esta lista supera el límite de 400 operaciones por guardado.')
     const batch = writeBatch(db)
+    const writes: Mutation[] = []
     for (const [studentId, status] of entries) {
       const ref = doc(db, 'students', studentId), savedAt = now()
-      batch.set(doc(ref, 'attendance', groupId + '_' + date), { groupId, date, status, teacherId: p.uid, savedAt, schoolId, studentId })
+      const target = doc(ref,'attendance',groupId + '_' + date)
+      const data = { groupId, date, status, teacherId:p.uid, savedAt, schoolId, studentId }
+      writes.push({path:target.path,data})
+      batch.set(target,data)
+      if (status === 'retirado') writes.push({path:ref.path,data:{retired:true,updatedAt:savedAt},update:true})
       if (status === 'retirado') batch.update(ref, { retired: true, updatedAt: savedAt })
     }
-    const syncState = await commit(batch.commit())
+    const syncState = await trackSubmission({uid:p.uid,schoolId,date,label:'Asistencia · ' + d.data().name,writes},() => batch.commit())
     return { groupId, date, saved: entries.length, syncState }
   })
 }

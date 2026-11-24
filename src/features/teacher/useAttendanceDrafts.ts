@@ -1,9 +1,10 @@
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useEffect, useId, useSyncExternalStore } from 'react'
 import type { AttendanceStatus } from '../../domain/types'
 
 type Marks = Record<string, AttendanceStatus>
 type Sessions = Record<string, Marks>
 // Only keep unsaved marks for this tab. Never share a draft across teaching accounts or schools.
+const empty:Sessions = {}
 const draftsByScope = new Map<string,Sessions>()
 const subscribe = (listener: () => void) => {
   window.addEventListener('enad-attendance-drafts', listener)
@@ -26,8 +27,9 @@ export function draftDates(uid: string, schoolId: string, groupId: string): stri
     .filter(([group]) => group === groupId).map(([,date]) => date).sort()
 }
 export function useAttendanceDrafts(uid: string | undefined, schoolId: string) {
-  const scope = JSON.stringify([uid, schoolId])
-  const [drafts, setDrafts] = useState<Sessions>(() => uid ? draftsByScope.get(scope) ?? {} : {})
+  const fallbackId = useId()
+  const scope = JSON.stringify([uid ?? fallbackId, schoolId])
+  const drafts = useSyncExternalStore(subscribe,() => draftsByScope.get(scope) ?? empty)
   const dirty = Object.values(drafts).some(marks => Object.keys(marks).length > 0)
   useEffect(() => {
     if (!uid || !dirty) return
@@ -50,12 +52,9 @@ export function useAttendanceDrafts(uid: string | undefined, schoolId: string) {
     const next = { ...drafts }
     if (Object.keys(marks).length) next[session] = marks
     else delete next[session]
-    if (uid) {
-      if (Object.keys(next).length) draftsByScope.set(scope,next)
-      else draftsByScope.delete(scope)
-      window.dispatchEvent(new Event('enad-attendance-drafts'))
-    }
-    setDrafts(next)
+    if (Object.keys(next).length) draftsByScope.set(scope,next)
+    else draftsByScope.delete(scope)
+    window.dispatchEvent(new Event('enad-attendance-drafts'))
   }
   return { drafts, update }
 }

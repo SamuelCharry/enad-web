@@ -21,7 +21,7 @@ vi.mock('../../../data/scope', () => ({ useSchools: vi.fn() }))
 vi.mock('../../../data/students', () => ({ useStudents: vi.fn() }))
 const school: School = { id: 's', name: 'Escuela', region: 'Centro', department: 'Caldas', municipality: 'Neira', projectId: 'p', zone: 'rural', active: true, campuses: [{ id: 'c', name: 'Central', jornada: 'única' }] }
 const student: Student = { id: 's_001', schoolId: 's', code: '001', campus: 'c', fullName: 'Ana Paz', nameKey: 'ana paz', grade: 3, age: null, sample: null, gender: '', retired: false, active: true, provisional: false, levels: {} }
-const teacher: UserProfile = { uid: 't', fullName: 'Luz', email: 'l@example.test', activo: true, rol: 'docente', jornada: 'única', campusIds: { s: ['c'] }, regions: [], schoolIds: ['s'] }
+const teacher: UserProfile = { uid: 't', fullName: 'Luz', email: 'l@example.test', activo: true, rol: 'docente', jornada: 'única', campusIds: { s: ['c'] }, schoolIds: ['s'] }
 const ready = { loading: false, error: undefined }
 beforeEach(() => {
   vi.resetAllMocks()

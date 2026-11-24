@@ -12,7 +12,7 @@ function loginError(error: unknown) {
   switch (code) {
     case 'auth/invalid-credential': case 'auth/invalid-email': case 'auth/wrong-password': case 'auth/user-not-found':
       return 'Usuario o contraseña incorrectos.'
-    case 'auth/user-disabled': return 'Tu cuenta está desactivada. Contacta al administrador.'
+    case 'auth/user-disabled': return 'Tu cuenta está desactivada. Comunícate con la fundación.'
     case 'auth/too-many-requests': return 'Demasiados intentos. Espera unos minutos e intenta de nuevo.'
     case 'auth/network-request-failed': return 'No pudimos conectar. Revisa tu conexión.'
     default: return 'No pudimos abrir la sesión. Revisa tus datos e intenta de nuevo.'

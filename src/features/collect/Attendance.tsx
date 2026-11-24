@@ -1,5 +1,5 @@
 import { LoadError } from '../../ui/LoadError'
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { AttendanceStatus, Group, School, Student } from '../../domain/types'
 import { saveGroupAttendance, useSchoolAttendance } from '../../data/attendance'
@@ -9,6 +9,8 @@ import { colombiaToday } from '../../domain/weeks'
 import { Button, Card, Dialog, SyncStatus } from '../../ui/components'
 import { useAction } from './useAction'
 import { validDay } from './formValues'
+import { Field, TextInput } from '../../ui/components'
+import { useSchools } from '../../data/scope'
 import { Choice, SessionDate } from './common'
 import { StudentEditor } from './Students'
 import { collectLink } from '../teacher/navigation'
@@ -17,25 +19,40 @@ import { useAttendanceDrafts } from '../teacher/useAttendanceDrafts'
 import { shiftDay } from '../reports/model'
 
 type Marks = Record<string, AttendanceStatus>
-export function Attendance({ schoolId, initialGroup = '', initialDate, school, uid }: { initialDate?: string | null; uid?: string; schoolId: string; initialGroup?: string; school?: School }) {
+interface AttendanceProps { initialDate?:string|null; uid?:string; schoolId?:string; initialGroup?:string; school?:School }
+export function TeacherAttendance(props:AttendanceProps) {
+  const schools = useSchools()
+  if (schools.error) return <LoadError message={schools.error}/>
+  if (schools.loading) return <p role="status">Cargando colegios…</p>
+  return <Attendance {...props} schools={schools.schools}/>
+}
+export function Attendance({ schoolId, initialGroup = '', initialDate, school, schools = [], uid }: AttendanceProps & {schools?:School[]}) {
   const { groups, loading, error } = useGroups(schoolId, { mine: true })
-  const { students, loading: loadingStudents, error: studentError } = useStudents(schoolId)
   const today = colombiaToday()
   const [date, setDate] = useState(() => {
     if (!initialDate || !validDay(initialDate, today)) return today
     const parsed = new Date(initialDate + 'T00:00:00Z')
     return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0,10) === initialDate ? initialDate : today
   })
+  const [typed,setTyped] = useState<string>()
+  const list = useId()
   const [id, setId] = useState(initialGroup)
   const [saving, setSaving] = useState(false)
-  const { drafts, update } = useAttendanceDrafts(uid, schoolId)
   const group = groups.find(g => g.id === id)
+  const optionText = (g:Group) => [g.name,schools.find(s => s.id === g.schoolId)?.name,g.campus].filter(Boolean).join(' · ')
+  const labels = groups.map(g => optionText(g))
+  const options = groups.map((g,i) => ({id:g.id,name:labels.indexOf(labels[i]) === labels.lastIndexOf(labels[i]) ? labels[i] : labels[i]+' · '+g.id}))
+  const activeSchool = school || schools.find(s => s.id === group?.schoolId)
+  const { drafts, update } = useAttendanceDrafts(uid,group?.schoolId || '')
   const key = JSON.stringify([id, date])
   const valid = validDay(date, today)
-  if (error || studentError) return <LoadError message={error || studentError} />
+  if (error) return <LoadError message={error} />
   return <>
     <fieldset disabled={saving} className="collect-fields">
-      <Choice guide="group" label="Grupo" placeholder="Selecciona un grupo" options={groups} value={group?.id ?? ''} onChange={setId} />
+      {groups.length > 5 ? <Field label="Grupo"><TextInput data-guide="group" list={list} type="search" placeholder="Busca tu grupo" value={typed ?? options.find(o => o.id === id)?.name ?? ''}
+        onChange={e => {setTyped(e.target.value);setId(options.find(o => o.name === e.target.value)?.id || '')}} data-complete={!!group}/>
+        <datalist id={list}>{options.map(o => <option key={o.id} value={o.name}/>)}</datalist></Field> :
+        <Choice guide="group" label="Grupo" placeholder="Selecciona un grupo" options={options} value={group?.id || ''} onChange={setId}/>}
       <SessionDate {...{ date, today, setDate }} />
     </fieldset>
     <div className="teacher-tools">
@@ -43,9 +60,15 @@ export function Attendance({ schoolId, initialGroup = '', initialDate, school, u
       <Button disabled={saving || !valid || date >= today} onClick={() => setDate(shiftDay(date,1))}>Día siguiente</Button>
       {date !== today && <Button disabled={saving} onClick={() => setDate(today)}>Volver a hoy</Button>}
     </div>
-    {loading || loadingStudents ? <p>Cargando lista…</p> : !valid ? <p>Selecciona una fecha entre el primero de enero y hoy.</p> : group ?
-      <AttendanceSheet key={key} {...{ date, group, students, setSaving, school }} draft={drafts[key] ?? {}} setDraft={v => update(key, v)} /> :
+    {loading ? <p>Cargando lista…</p> : !valid ? <p>Selecciona una fecha entre el primero de enero y hoy.</p> : group ?
+      <RosterSheet key={key} {...{ date, group, setSaving }} school={activeSchool} draft={drafts[key] ?? {}} setDraft={v => update(key, v)} /> :
       <p>{groups.length ? 'Selecciona el grupo para tomar asistencia.' : 'Crea un grupo y añade estudiantes para tomar asistencia.'}</p>}</>
+}
+function RosterSheet(props:Omit<Parameters<typeof AttendanceSheet>[0],'students'>) {
+  const roster = useStudents(props.group.schoolId)
+  if (roster.loading) return <p role="status">Cargando estudiantes…</p>
+  if (roster.error) return <LoadError message={roster.error}/>
+  return <AttendanceSheet {...props} students={roster.students}/>
 }
 function AttendanceSheet({ date, group, students, draft, setDraft, setSaving, school }: { date: string; group: Group; students: Student[]; draft: Marks; setDraft: (v: Marks) => void; setSaving: (v: boolean) => void; school?: School }) {
   const live = useSchoolAttendance(group.schoolId, date, [group.id])
@@ -105,7 +128,7 @@ function AttendanceSheet({ date, group, students, draft, setDraft, setSaving, sc
     }}>Marcar a todos presentes</Button>}
     {roster.map(s => <div className="collect-row" key={s.id}>
       <div><Button variant="ghost" disabled={action.busy} aria-label={'Alternar asistencia de ' + s.fullName} onClick={() => mark(s.id, status(s.id) === 'vino' ? 'no_vino' : 'vino')}>{s.fullName}</Button><small>{s.code} · Grado {s.grade}°</small>
-        {changes[s.id] ? <small>Sin guardar</small> : baseline[s.id] ? <SyncStatus pending={pending.has(s.id)} /> : <small>Sin registrar</small>}
+        {changes[s.id] ? <small className="ui-sync" data-dirty="true">Sin guardar</small> : baseline[s.id] ? <SyncStatus pending={pending.has(s.id)} /> : <small>Sin registrar</small>}
         {school && <Link to={collectLink('estudiantes', { school: s.schoolId, campus: s.campus, student: s.id })}>Ver perfil</Link>}</div>
       <div className="collect-actions" role="group" aria-label={'Asistencia de ' + s.fullName}>
         {(['vino', 'no_vino', 'retirado'] as const).map((id,i) => <Button key={id} aria-pressed={status(s.id) === id} disabled={action.busy} onClick={() =>

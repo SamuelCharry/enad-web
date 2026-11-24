@@ -3,7 +3,7 @@ import { readCounter } from './testing/readCounter'
 import type { School, UserProfile } from '../domain/types'
 import { getAttendanceReport, getLevels, getComparison, getMovement, getSummary, refreshReports } from './reports'
 const source = vi.hoisted(() => ({
-  profile: { uid: 'p', rol: 'coordinador', activo: true, regions: ['Centro'], schoolIds: [], campusIds: {}, fullName: 'Sol', email: 's@example.test', jornada: 'única' } as UserProfile,
+  profile: { uid: 'p', rol: 'coordinador', activo: true, schoolIds: [], campusIds: {}, fullName: 'Sol', email: 's@example.test', jornada: 'única' } as UserProfile,
  }))
 let store:ReturnType<typeof readCounter>
 const school: School = { id: 'ie', name: 'Escuela', campuses: [{ id: 'c', name: 'Central', jornada: 'única' }], zone: 'rural', region: 'Centro', projectId: 'p', municipality: 'Neira', department: 'Caldas', active: true }
