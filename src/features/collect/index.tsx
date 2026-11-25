@@ -6,7 +6,7 @@ import { Review } from '../manage/Review'
 import { Activities } from '../manage/Activities'
 import { Downloads } from '../manage/Downloads'
 import { LoadError } from '../../ui/LoadError'
-import { useState } from 'react'
+import { lazy, useState } from 'react'
 import { Link, Navigate, Route, Routes, useSearchParams } from 'react-router-dom'
 import { useSession } from '../../data/session'
 import type { UserProfile } from '../../domain/types'
@@ -29,6 +29,8 @@ import '../teacher/teacher.css'
 import { DataQuality, ImportHistory } from './admin/Audit'
 import { Rosters } from './admin/Rosters'
 import './collect.css'
+
+const DeploymentGuide = lazy(() => import('../manage/DeploymentGuide'))
 
 const teacherSections = [['asistencia', 'Asistencia'], ['evaluacion', 'Evaluación formativa'], ['horas', 'Horas'], ['grupos', 'Grupos'], ['estudiantes', 'Estudiantes']] as const
 const managementSections = ['colegios','personas','estudiantes','grupos','historicas','programa','calidad','importaciones'] as const
@@ -98,6 +100,7 @@ export function CollectRoutes() {
   const imports = {colegios:'schools',personas:'teachers',estudiantes:'students',grupos:'groups',historicas:'evaluations'} as const
   return <section className="collect" key={profile.uid}><Routes>
     <Route path={teacher ? 'hoy' : 'inicio'} element={<Home/>}/>
+    <Route path="despliegue" element={foundation ? <DeploymentGuide/> : home}/>
     <Route path="actividades" element={<Activities role={profile.rol}/>}/>
     {teacher ? <>
       {teacherSections.map(([section]) => <Route key={section} path={section} element={<div className="teacher-screen"><TeacherRoute section={section} profile={profile}/></div>}/>)}

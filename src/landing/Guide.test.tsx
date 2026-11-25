@@ -1,12 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import type { Role } from '../domain/types'
 import { App } from '../app/App'
 import { useSession } from '../data/session'
-import { monthlyCost } from './deploymentCost'
+import { monthlyCost } from '../features/manage/deploymentCost'
 
 vi.mock('../data/session', () => ({
   useSession: vi.fn(() => ({ user: null, profile: null, loading: false })),
 }))
+
+vi.mock('../app/Home', () => ({ Home: () => <p>Inicio del portal</p> }))
+vi.mock('../data/review', () => ({ useReviewQueue: () => ({ data: [] }) }))
+
+function signIn(rol: Role) {
+  const profile = { uid: 'test', fullName: 'Ana', email: '', rol, activo: true, schoolIds: [], campusIds: {}, jornada: 'mañana' as const }
+  vi.mocked(useSession).mockReturnValue({loading:false, profile, user:{uid:profile.uid} as NonNullable<ReturnType<typeof useSession>['user']>})
+}
 
 function open(path: string) {
   window.history.replaceState(null, '', '#' + path)
@@ -15,6 +24,7 @@ function open(path: string) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.mocked(useSession).mockReturnValue({ user:null, profile:null, loading:false })
   vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
 })
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
@@ -36,15 +46,36 @@ describe('Portada y guía pública', () => {
     expect(descriptions[1].textContent).toMatch(/sus colegios/)
     expect(descriptions[2].textContent).toMatch(/todo el programa/)
 
-    const preview = screen.getByRole('region', { name: 'Guía de despliegue' })
-    fireEvent.click(within(preview).getByRole('link', { name: /Consultar la guía/ }))
-    expect(await screen.findByRole('heading', { name: 'Calcula un mes de clases' })).toBeTruthy()
+    const preview = screen.getByRole('region', { name: 'Guía de uso' })
+    fireEvent.click(within(preview).getByRole('link', { name: /^Docente/ }))
+    expect(await screen.findByRole('heading', { name: 'Ingresar con tu cuenta' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', {name:'Siguiente'}))
+    expect(screen.getByRole('heading', {name:'Empezar desde Hoy'})).toBe(document.activeElement)
+    fireEvent.click(screen.getByLabelText('Coordinación'))
+    expect(screen.getByRole('heading',{name:'Consultar tus colegios'})).toBeTruthy()
+    fireEvent.click(screen.getByLabelText('Fundación'))
+    fireEvent.change(screen.getByLabelText('Ir al paso'), {target:{value:'3'}})
+    expect(screen.getByRole('heading',{name:'Importar registros'})).toBeTruthy()
+    expect(screen.queryByText('Calcula un mes de clases')).toBeNull()
     expect(useSession).not.toHaveBeenCalled()
   })
 
+  it.each(['docente', 'coordinador'] as const)('impide que %s abra los costos por URL', async rol => {
+    signIn(rol)
+    open('/portal/despliegue')
+    await waitFor(() => expect(window.location.hash).toBe(rol === 'docente' ? '#/portal/hoy' : '#/portal/inicio'))
+    expect(screen.queryByText('Calcula un mes de clases')).toBeNull()
+  })
+  it('redirige el enlace técnico al ingreso sin sesión', async () => {
+    open('/portal/despliegue')
+    expect(await screen.findByRole('heading',{name:'Ingresar al portal'})).toBeTruthy()
+  })
+
   it('recalcula los tres tamaños y muestra los campos inválidos', async () => {
-    open('/guia')
-    const photos = await screen.findByLabelText('Fotos por docente al día')
+    signIn('fundacion')
+    open('/portal/despliegue')
+    fireEvent.click(await screen.findByText('Ajustar días de clase, registros y fotos'))
+    const photos = screen.getByLabelText('Fotos por docente al día')
     expect(screen.getByText('14,22')).toBeTruthy()
     fireEvent.change(photos, { target: { value: '0' } })
     expect(screen.queryByText('14,22')).toBeNull()
@@ -52,7 +83,6 @@ describe('Portada y guía pública', () => {
     fireEvent.change(photos, { target: { value: '-1' } })
     expect(photos.getAttribute('aria-invalid')).toBe('true')
     expect(screen.getAllByText('—')).toHaveLength(9)
-    expect(useSession).not.toHaveBeenCalled()
   })
 })
 

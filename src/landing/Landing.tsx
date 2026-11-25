@@ -54,11 +54,13 @@ export function Landing() {
         <dl>{roles.map(([role, description]) => <div key={role}><dt>{role}</dt><dd>{description}</dd></div>)}</dl>
       </div></section>
       <section id="guia" className="shell-width guide-invitation" tabIndex={-1} aria-labelledby="guide-invitation-title">
-        <div><h2 id="guide-invitation-title">Guía de despliegue</h2>
-          <p>Compara los costos para 20, 100 y 500 docentes y consulta los pasos para publicar ENAd.</p>
+        <div><h2 id="guide-invitation-title">Guía de uso</h2>
+          <p>Sigue los pasos de tu rol en ENAd Móvil.</p>
         </div>
         <div className="guide-entry-links">
-          <Link to="/guia"><strong>Consultar la guía</strong><span>Servicios, costos y publicación</span><Icon name="arrow" /></Link>
+          <Link to="/guia"><strong>Docente</strong><span>Tomar asistencia, evaluar y registrar horas</span><Icon name="arrow" /></Link>
+          <Link to="/guia?rol=coordinador"><strong>Coordinación</strong><span>Revisar nombres y seguir los envíos de tus colegios</span><Icon name="arrow" /></Link>
+          <Link to="/guia?rol=fundacion"><strong>Fundación</strong><span>Consultar el programa, importar registros y configurar el calendario</span><Icon name="arrow" /></Link>
         </div>
       </section>
     </main>
