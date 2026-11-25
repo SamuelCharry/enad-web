@@ -29,7 +29,7 @@ try {
   const page = await context.newPage()
   page.setDefaultTimeout(10_000)
   async function capture(name, controls) {
-    for (const width of [375, 768, 1440]) {
+    for (const width of [375, 768, 1440, 1920]) {
       await page.setViewportSize({ width, height: width === 375 ? 812 : 900 })
       for (const control of controls) {
         await control.waitFor({ state: 'visible' })
@@ -62,7 +62,7 @@ try {
     const teacher = new URL(page.url()).hash === '#/portal/hoy'
     const homeContent = teacher ? page.getByRole('navigation',{name:'Registro de clase'})
       : page.getByRole('group',{name:'Mapa interactivo de Colombia'})
-    await capture('portal',[homeContent])
+    await capture('portal', teacher ? [homeContent] : [homeContent, page.getByRole('heading',{name:'Esta semana',exact:true})])
     for (const width of [375,768]) {
       await page.setViewportSize({width,height:812})
       const toggle = page.getByRole('button',{name:'Abrir menú'})
