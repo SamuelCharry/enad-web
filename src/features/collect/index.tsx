@@ -93,6 +93,7 @@ function TeacherScreen({ section, profile }: { section: typeof teacherSections[n
   }}>{content}</TaskGuide>
 }
 export function CollectRoutes() {
+  const [params] = useSearchParams()
   const {profile} = useSession()
   if (!profile?.activo) return <p role="alert">Ingresa con una cuenta activa.</p>
   const teacher = profile.rol === 'docente', foundation = profile.rol === 'fundacion'
@@ -112,7 +113,7 @@ export function CollectRoutes() {
           {section === 'colegios' ? <Schools restricted={!foundation}/> : section === 'personas' ? <Teachers profile={profile}/> :
            section === 'programa' ? <Program/> : section === 'importaciones' ? <ImportHistory/> : section === 'calidad' ? <DataQuality/> :
            section === 'historicas' ? <HistoryDirectory/> : <Rosters kind={section}/>}
-          {foundation && section in imports && <details><summary>Importar registros</summary><ImportButton kind={imports[section as keyof typeof imports]}/></details>}
+          {foundation && section in imports && !(section === 'colegios' && (params.has('school') || params.has('crear'))) && <details><summary>Importar registros</summary><ImportButton kind={imports[section as keyof typeof imports]}/></details>}
         </div>}/>)}
     </>}
     <Route path="*" element={home}/>

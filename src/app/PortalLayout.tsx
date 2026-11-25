@@ -19,10 +19,12 @@ function ReviewCount() {
 }
 export function PortalLayout() {
   const profile = useOutletContext<UserProfile>()
-  const {pathname} = useLocation()
+  const {pathname, search} = useLocation()
   const entries = roleNav(profile.rol)
   const section = pathname.split('/')[2]
   const {primary,title,children,label:groupLabel} = navigationState(profile.rol,section)
+  const params = new URLSearchParams(search)
+  const schoolDetail = section === 'colegios' && (params.has('school') || params.has('crear'))
   const [collapsed,setCollapsed] = useState(() => preference('sidebar') === 'collapsed')
   const [drawer,setDrawer] = useState(false)
   const dialog = useRef<HTMLDialogElement>(null)
@@ -63,8 +65,8 @@ export function PortalLayout() {
       <h1>{title}</h1>{section === 'hoy' && <time>{classDate(colombiaToday())}</time>}
       {profile.rol !== 'docente' && <NavLink className="shell-icon" to="/portal/descargas" aria-label="Descargas" title="Descargas"><Icon name="download"/></NavLink>}
     </header><main id="portal-main" tabIndex={-1} key={JSON.stringify([profile.uid,profile.rol,profile.schoolIds,section])}>
-      {sectionPurpose[section] && <p className="section-purpose">{sectionPurpose[section]}</p>}
-      {children.length > 0 && <nav className="section-nav" aria-label={groupLabel}>{children.map(([slug,label]) =>
+      {!schoolDetail && sectionPurpose[section] && <p className="section-purpose">{sectionPurpose[section]}</p>}
+      {!schoolDetail && children.length > 0 && <nav className="section-nav" aria-label={groupLabel}>{children.map(([slug,label]) =>
         <NavLink key={slug} to={'/portal/' + slug}>{label}{slug === 'revision' && <ReviewCount/>}</NavLink>)}</nav>}
       <Suspense fallback={<p role="status">Cargando sección…</p>}><Outlet context={profile}/></Suspense></main></div>
   </div>

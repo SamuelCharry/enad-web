@@ -17,3 +17,27 @@
   .admin-directory .admin-table td:first-child {font-weight:600;}
   .admin-directory .admin-table .admin-expanded td {font-weight:400;}
 }
+
+.school-workspace { display:grid; gap:1rem; min-width:0; }
+.school-workspace > button { justify-self:start; }
+.school-workspace header h2 { margin:0; overflow-wrap:anywhere; }
+.school-workspace header p { margin:.25rem 0 0; color:var(--soft-ink); }
+.school-workspace nav { display:flex; flex-wrap:wrap; border-bottom:1px solid var(--line); gap:.25rem; }
+.school-workspace nav button { background:transparent; border:0; border-bottom:3px solid transparent; color:var(--soft-ink); font:inherit; padding:.65rem .75rem; cursor:pointer; }
+.school-workspace nav button[aria-current] { border-color:var(--primary,#e52228); color:var(--ink); font-weight:600; }
+.school-section-heading,.campus-list li { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.5rem 1rem; }
+.school-section-heading h3 {margin:0;}
+.campus-list { list-style:none; padding:0; margin:0; }
+.campus-list li { padding:.75rem 0; border-bottom:1px solid var(--line); }
+.campus-list li span { color:var(--soft-ink); }
+.campus-editor {padding:.65rem 0; border-bottom:1px solid var(--line);}
+.campus-editor summary { cursor:pointer; font-weight:600; }
+.school-editor { max-width:48rem; }
+.school-editor .collect-fields { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.school-editor .collect-fields > :first-child { grid-column:1/-1; }
+.school-editor .collect-actions {margin-top:1rem;}
+@media(max-width:36rem) {
+  .school-editor .collect-fields {grid-template-columns:minmax(0,1fr);}
+  .school-workspace nav {gap:0;}
+  .school-workspace nav button {padding:.65rem .45rem;}
+}

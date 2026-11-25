@@ -1,8 +1,8 @@
 import { useMemo } from 'react'
-import { collection, collectionGroup, deleteDoc, getDocs, doc, getDoc, query, limit, orderBy, documentId, startAfter, setDoc, where, type WriteBatch } from 'firebase/firestore'
+import { collection, collectionGroup, runTransaction, arrayUnion, deleteDoc, getDocs, doc, getDoc, query, limit, orderBy, documentId, startAfter, setDoc, where, type WriteBatch } from 'firebase/firestore'
 import { ApiError, type ProgramConfig, type Role, type School, type UserProfile } from '../domain/types'
 import { db } from './firebase'
-import { api, caller, commit, requireSchool, compare, fail, requireDate, schoolsOf, slug, str } from './core'
+import { api, caller, commit, reportCache, requireSchool, compare, fail, requireDate, schoolsOf, slug, str } from './core'
 import { batched, campusIds, provisionTeacher, schoolFields, shift, stringList } from './adminRecords'
 import { listenMany, useLive, withSession } from './live'
 
@@ -53,23 +53,45 @@ export function createTeacher(input: Record<string, unknown>) {
   })
 }
 /** Live admin directory, optionally restricted to one role. */
-export function useUsers(role?: Role) {
+export function useUsers(role?: Role, schoolId?: string) {
   const source = useMemo(() => withSession<UserProfile[]>([], (p, next, error) => {
     if (p.rol === 'docente') {
       error(new ApiError(403, 'No tienes acceso al directorio de personas.'));
       return () => { }
     }
     const users = collection(db, 'users')
-    const queries = p.rol === 'coordinador'
+    if (schoolId && p.rol === 'coordinador' && !p.schoolIds.includes(schoolId)) {
+      error(new ApiError(403, 'Esta institución no está asignada a tu cuenta.'))
+      return () => {}
+    }
+    const queries = schoolId
+      ? [query(users, where('schoolIds', 'array-contains', schoolId), ...(p.rol === 'coordinador' ? [where('rol', '==', 'docente')] : []))]
+      : p.rol === 'coordinador'
       ? p.schoolIds.map(id => query(users, where('rol', '==', 'docente'), where('schoolIds', 'array-contains', id)))
       : [role ? query(users, where('rol', '==', role)) : users]
     return listenMany<UserProfile & { id: string }>(queries, pages => {
       const rows = [...new Map(pages.map(row => [row.id, row])).values()]
-      next(rows.map(r => ({ ...r, uid: r.id })).sort((a, b) => compare(a.fullName, b.fullName)))
+      next(rows.filter(r => !role || r.rol === role).map(r => ({ ...r, uid: r.id })).sort((a, b) => compare(a.fullName, b.fullName)))
     }, error)
-  }), [role])
+  }), [role, schoolId])
   const { data: users, loading, error } = useLive(source, [])
   return { users, loading, error }
+}
+/** Adds a school without overwriting the teacher's other assignments. */
+export function linkSchoolTeacher(uid:string, schoolId:string) {
+  return api(async () => {
+    await caller('fundacion')
+    const user = doc(db,'users',uid), school = doc(db,'schools',schoolId)
+    await runTransaction(db, async tx => {
+      const [person,institution] = await Promise.all([tx.get(user),tx.get(school)])
+      const teacher = person.data()
+      if (!institution.exists()) fail(404,'La institución ya no existe.')
+      if (!teacher || teacher.rol !== 'docente' || !teacher.activo) fail(400,'Selecciona un docente activo.')
+      tx.update(user,{schoolIds:arrayUnion(schoolId)})
+      tx.set(doc(school,'teachers',uid),{uid,fullName:teacher.fullName || '',email:teacher.email || ''})
+    })
+    reportCache.clear()
+  })
 }
 /** Updates profile fields and synchronizes the active docente directory. */
 export function patchUser(uid: string, fields: Partial<UserProfile>) {

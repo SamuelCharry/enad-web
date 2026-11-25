@@ -28,12 +28,13 @@ export function Rosters({ kind }: { kind: 'estudiantes' | 'grupos' }) {
   return <><Choice label="Filtrar institución" value={selection?.id || ''} placeholder="Todas las instituciones" options={directory.schools} onChange={setSchool} />
     <Records key={kind + (selection?.id ?? '')} kind={kind} schools={directory.schools} schoolId={selection?.id} /></>
 }
-function Records({ kind, schools, schoolId }: { kind: 'estudiantes' | 'grupos'; schools: School[]; schoolId?: string }) {
+export function Records({ kind, schools, schoolId }: { kind: 'estudiantes' | 'grupos'; schools: School[]; schoolId?: string }) {
   const schoolById = new Map(schools.map(s => [s.id, s]))
   const options = schoolId ? schools.filter(s => s.id === schoolId) : schools
   const place = (v: { schoolId: string; campus: string }) => {
     const s = schoolById.get(v.schoolId)
-    return [s?.name || v.schoolId, s?.campuses.find(c => c.id === v.campus || c.name === v.campus)?.name || v.campus || 'Sin sede'].join(' · ')
+    const campus = s?.campuses.find(c => c.id === v.campus || c.name === v.campus)?.name || v.campus || 'Sin sede'
+    return schoolId ? campus : [s?.name || v.schoolId, campus].join(' · ')
   }
   return kind === 'grupos' ? <GroupDirectory schools={options} schoolId={schoolId} place={place}/> :
     <StudentDirectory schools={options} schoolId={schoolId} place={place}/>
@@ -42,12 +43,12 @@ type DirectoryScope = { schools:School[]; schoolId?:string; place:(v:{schoolId:s
 function GroupDirectory({schools,schoolId,place}:DirectoryScope) {
   const teams=useGroups(schoolId)
   if(teams.error) return <LoadError message={teams.error}/>
-  return <Directory title="Grupos" headers={['Grupo', 'Institución y sede', 'Docente', 'Estudiantes']} create="Crear grupo" loading={teams.loading}
+  return <Directory title="Grupos" headers={['Grupo', schoolId ? 'Sede' : 'Institución y sede', 'Docente', 'Estudiantes']} create="Crear grupo" loading={teams.loading}
     rows={teams.groups.map(g => ({ id: g.id, search: [g.name, g.teacherName, place(g), subjectLabel(g.subject)].join(' '), cells: [g.name, place(g), g.teacherId ? g.teacherName : <strong key="vacante" className="unassigned">Sin docente</strong>, g.studentIds.length] }))}
     editor={(id, close) => <GroupEditor key={id} group={teams.groups.find(g=>g.id===id)} schools={schools} close={close}/>}/>
 }
 function GroupEditor({group,schools,close}:{group?:Group;schools:School[];close:Close}) {
-  const staff=useUsers('docente')
+  const staff=useUsers('docente', schools.length === 1 ? schools[0].id : undefined)
   if(staff.error) return <LoadError message={staff.error}/>
   if(staff.loading) return <p role="status">Consultando docentes…</p>
   return <><GroupForm group={group} schools={schools} users={staff.users} close={close}/>{group && <Members group={group}/>}</>
@@ -61,7 +62,7 @@ function Members({group}:{group:Group}) {
 function StudentDirectory({schools,schoolId,place}:DirectoryScope) {
   const roster=useStudents(schoolId ?? '')
   if(roster.error) return <LoadError message={roster.error}/>
-  return <Directory title="Estudiantes" headers={['Estudiante','Código', 'Institución y sede', 'Estado']} create="Añadir estudiante" loading={roster.loading}
+  return <Directory title="Estudiantes" headers={['Estudiante','Código', schoolId ? 'Sede' : 'Institución y sede', 'Estado']} create="Añadir estudiante" loading={roster.loading}
     rows={roster.students.map(s => ({ id: s.id, search: [s.fullName, s.code, s.grade, place(s)].join(' '), cells: [s.fullName, s.code, place(s), s.retired ? 'Retirado' : s.active === false ? 'Inactivo' : 'Activo'] }))}
     editor={(id, close) => <StudentEditor key={id} student={roster.students.find(s=>s.id===id)} schoolId={schoolId} schools={schools} close={close}/>}/>
 }
@@ -98,7 +99,7 @@ function StudentForm({ student, groups, schools, close }: { student?: Student; g
   }}><fieldset disabled={action.busy}><legend>{initial ? 'Editar estudiante' : 'Añadir estudiante'}</legend>
       <div className="collect-fields"><Field label="Nombre completo"><TextInput required value={name} onChange={e => setName(e.target.value)} /></Field>
         <Field label="Código"><TextInput required disabled={!!initial} value={code} onChange={e => setCode(e.target.value)} /></Field>
-        <Choice label="Institución" disabled={!!initial} value={schoolId} options={schools} onChange={id => { setSchool(id); setSite('') }} />
+        {schools.length > 1 && <Choice label="Institución" disabled={!!initial} value={schoolId} options={schools} onChange={id => { setSchool(id); setSite('') }} />}
         <Choice label="Sede" value={site} placeholder="Sin asignar" options={school.campuses} onChange={id => { setSite(id); setSelected(selected.filter(k => groups.some(g => g.id === k && campusId(school, g.campus) === id))) }} />
         <Choice label="Grado" required value={grade} placeholder="Selecciona el grado" options={numbers(3, 5)} onChange={setGrade} />
         <Choice label="Sexo" value={gender} placeholder="Sin registrar" options={genders} onChange={setGender} />
@@ -126,7 +127,7 @@ function GroupForm({ group, schools, users, close }: { group?: Group; schools: S
     })
   }}><fieldset disabled={action.busy}><legend>{group ? 'Editar grupo' : 'Crear grupo'}</legend>
       <div className="collect-fields"><Field label="Nombre del grupo"><TextInput maxLength={60} value={name} required onChange={e => setName(e.target.value)} /></Field>
-        <Choice label="Institución" value={schoolId} disabled={!!group} options={schools} onChange={id => { setSchool(id); setCampus(''); setTeacher('') }} />
+        {schools.length > 1 && <Choice label="Institución" value={schoolId} disabled={!!group} options={schools} onChange={id => { setSchool(id); setCampus(''); setTeacher('') }} />}
         <Choice label="Sede" disabled={!!group} value={campus} placeholder="Sin asignar" options={school.campuses} onChange={setCampus} />
         <SubjectField value={subject} disabled={!!group} onChange={setSubject} />
         <Choice label="Docente" value={teacher} required placeholder="Selecciona un docente activo" options={options} onChange={setTeacher} /></div>
