@@ -84,6 +84,13 @@ try {
     const directory = teacher ? primary : page.getByRole('navigation',{name:'Colegios y personas'})
     await directory.getByRole('link',{name:'Grupos',exact:true}).click()
     await page.getByRole('heading',{name:'Grupos',level:1}).waitFor()
+    if (!teacher) {
+      await primary.getByRole('link',{name:'Reportes y alertas'}).click()
+      await capture('informes',[page.locator('.rep-metrics'),page.getByRole('button',{name:'Descargar informe filtrado en Excel'})])
+      await page.setViewportSize({width:1440,height:900})
+      await primary.getByRole('link',{name:'Actividades de clase'}).click()
+      await capture('actividades',[page.locator('.activity-row').first().or(page.getByText('Todavía no hay actividades disponibles.'))])
+    }
   }
 
   console.log('Prueba completada. Las capturas están en shots/.')
