@@ -62,3 +62,13 @@ it('mantiene el foco geográfico al seleccionar y regresar desde una región sin
   fireEvent.click(back,{detail:0})
   expect(document.activeElement).toBe(region)
 })
+
+it('muestra por defecto una escala de colegios con el mismo tono para cantidades iguales', () => {
+  render(<MemoryRouter><Territory schools={[school, {...school,id:'c2'}, {...school,id:'q',department:'Quindío'}, {...school,id:'a',department:'Antioquia'}]}/></MemoryRouter>)
+  const map = within(screen.getByRole('group',{name:'Mapa interactivo de Colombia'}))
+  const shade = (name:string) => map.getByRole('button',{name}).getAttribute('fill')
+  expect(screen.getByText('Colegios por departamento')).toBeTruthy()
+  expect(shade('Quindío, 1 colegio')).toEqual(shade('Antioquia, 1 colegio'))
+  expect(shade('Caldas, 2 colegios')).not.toEqual(shade('Quindío, 1 colegio'))
+  expect(shade('Amazonas, 0 colegios')).not.toEqual(shade('Quindío, 1 colegio'))
+})

@@ -36,7 +36,7 @@ function SchoolDetails({ school }: { school: School }) {
 }
 
 export function Territory({schools}: {schools: School[]}) {
-  const [mode, setMode] = useState<Mode>('presence')
+  const [mode, setMode] = useState<Mode>('schools')
   const [selected, setSelected] = useState('')
   const [schoolId, setSchoolId] = useState('')
   const [hover, setHover] = useState('')
@@ -89,10 +89,10 @@ export function Territory({schools}: {schools: School[]}) {
       </svg>
       {hover && <span className="map-hint">{regionName(hover)} · {unit(count(hover))}</span>}
       <div className="territory-legend">{mode==='presence' ? <><span><i style={{background:scale[3]}}/>Con colegios</span><span><i style={{background:scale[0]}}/>Sin colegios</span></> :
-        <><span><i style={{background:scale[0]}}/>0</span>{scale.slice(1).map((c,i) => {
+        <><strong>{mode==='schools' ? 'Colegios por departamento' : 'Sedes por departamento'}</strong><span><i style={{background:scale[0]}}/>0</span>{scale.slice(1).map((c,i) => {
           const lo=Math.floor(i*max/4)+1, hi=Math.floor((i+1)*max/4)
           return hi>=lo && <span key={c}><i style={{background:c}}/>{lo===hi ? hi : lo+'–'+hi}</span>
-        })}<span>{mode==='schools'?'colegios':'sedes'}</span></>}</div>
+        })}</>}</div>
     </div><aside ref={directory} className="territory-directory" aria-label="Explorar comunidad por departamento">
       {selected && <button className="territory-back" onClick={back}>‹ {school ? regionName(selected) : 'Departamentos'}</button>}
       {school ? <SchoolDetails key={school.id} school={school}/> : selected ? <><h3 tabIndex={-1}>{regionName(selected)}</h3><p className="territory-note">{plural(local.length,'colegio','colegios')}</p>

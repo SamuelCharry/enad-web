@@ -34,7 +34,20 @@ function Declines({ schools, moment, from, to }: { schools: School[]; moment: Mo
       {SUBJECTS.map(s => <option key={s} value={s}>{subjectLabel(s)}</option>)}</Select></Field>
       <StudentAlerts {...{ school, subject, moment, from, to }} declines /></>}</>
 }
+function AttendanceDial({ values }: { values: (number | null | undefined)[] }) {
+  return <svg className="attendance-dial" viewBox="0 0 120 120" aria-hidden="true">
+    {values.map((value, i) => {
+      const radius = i === 0 ? 48 : 34
+      return <g key={radius} fill="none" strokeWidth="9">
+        <circle cx="60" cy="60" r={radius} stroke="#e4e4df" />
+        {value != null && <circle cx="60" cy="60" r={radius} pathLength="100" stroke={i === 0 ? 'var(--red)' : '#525651'}
+          strokeDasharray={Math.max(0, Math.min(value, 100)) + ' 100'} transform="rotate(-90 60 60)" />}
+      </g>
+    })}
+  </svg>
+}
 function FollowUp({ profile, config, today, schools }: { profile: UserProfile; config: ProgramConfig | null; today: string; schools: School[] }) {
+  const [allActivity, setAllActivity] = useState(false)
   const [selected, setSelected] = useState<Moment>()
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   return <ReportRead query={JSON.stringify([schools, config, today, selected])} load={() => readDashboard(profile, schools, config, today, selected)}>{data => {
@@ -43,25 +56,30 @@ function FollowUp({ profile, config, today, schools }: { profile: UserProfile; c
     return <>
       {data.unavailable.length > 0 && <p role="alert">No disponible · {data.unavailable.join(', ')}</p>}
       <section className="foundation-totals" aria-label="Comunidad del programa">
-        <dl>{[['Colegios',schools.length],['Sedes',schools.reduce((n,s) => n+s.campuses.length,0)],['Docentes',missing('Docentes') ? '—' : data.teachers],['Estudiantes activos',missing('Estudiantes activos') ? '—' : data.students]].map(([name,count]) =>
-          <div key={name}><dt>{name}</dt><dd>{count}</dd></div>)}</dl>
+        <h2>Comunidad del programa</h2>
+        <dl>{[['Estudiantes activos',missing('Estudiantes activos') ? '—' : data.students],['Docentes',missing('Docentes') ? '—' : data.teachers],['Colegios',schools.length],['Sedes',schools.reduce((n,s) => n+s.campuses.length,0)]].map(([name,count]) =>
+          <div key={name}><dt>{name}</dt><dd>{count.toLocaleString('es-CO')}</dd></div>)}</dl>
       </section>
       <section className="foundation-week"><h2>Esta semana</h2>
-        <div className="week-insights"><div className="week-attendance">{['Asistencia hasta hoy','Mismos días de la semana pasada'].map((label,i) => {
-          const value = data.insights.attendance[i]
-          return <div key={label}><span>{label}</span><strong>{missing('Asistencia') ? 'No disponible' : percent(value)}</strong>
-            {!missing('Asistencia') && value != null && <meter min="0" max="100" value={value} aria-label={label}/>}</div>
-        })}</div>
-        <dl><div><dt>Horas realizadas / planeadas</dt><dd>{missing('Horas') ? 'No disponible' : data.insights.planned || data.insights.worked ? data.insights.worked.toLocaleString('es-CO')+' / '+data.insights.planned.toLocaleString('es-CO') : 'Sin registros'}</dd></div>
-        <div><dt>Docentes que enviaron asistencia</dt><dd>{missing('Envíos') || missing('Docentes') ? 'No disponible' : percent(config && weekOf(today,config) && data.teachers ? 100*data.insights.reporters/data.teachers : null)}</dd></div></dl></div>
+        <div className="week-insights">
+          <div className="week-attendance">
+            {!missing('Asistencia') && data.insights.attendance.some(value => value != null) && <AttendanceDial values={data.insights.attendance} />}
+            <dl>{['Asistencia hasta hoy','Mismos días de la semana pasada'].map((label,i) =>
+              <div key={label}><dt>{label}</dt><dd>{missing('Asistencia') ? 'No disponible' : percent(data.insights.attendance[i])}</dd></div>)}</dl>
+          </div>
+          <dl className="week-operations"><div><dt>Horas realizadas / planeadas</dt><dd>{missing('Horas') ? 'No disponible' : data.insights.planned || data.insights.worked ? data.insights.worked.toLocaleString('es-CO')+' / '+data.insights.planned.toLocaleString('es-CO') : 'Sin registros'}</dd></div>
+          <div><dt>Docentes que enviaron asistencia</dt><dd>{missing('Envíos') || missing('Docentes') ? 'No disponible' : percent(config && weekOf(today,config) && data.teachers ? 100*data.insights.reporters/data.teachers : null)}</dd></div></dl>
+        </div>
       </section>
-      {config && moment !== 'linea_base' && <details onToggle={e => {const open=e.currentTarget.open;setExpanded(v => ({...v,movement:open}))}}>
-        <summary>Cambios de nivel · {momentLabel(moment)}</summary>{expanded.movement && SUBJECTS.map(subject => {
+      {config && moment !== 'linea_base' && <section className="movement-summary">
+        <div><h2>Cambios de nivel</h2><p>{momentLabel(milestones[milestones.indexOf(moment)-1])} a {momentLabel(moment)}</p></div>
+        <button className="dashboard-disclosure" aria-expanded={!!expanded.movement} onClick={() => setExpanded(v => ({...v,movement:!v.movement}))}>{expanded.movement ? 'Ocultar comparación' : 'Comparar niveles'}</button>
+        {expanded.movement && <div className="movement-results">{SUBJECTS.map(subject => {
           const prior = milestones[milestones.indexOf(moment)-1]
-          return <ReportRead key={subject} query={subject+moment} load={() => getMovement({from:config.implementationStartDate,to:today},subject,prior,moment)}>{([m]) =>
-            <p>{subjectLabel(subject)} · {m?.total ? m.up+' subieron, '+m.stable+' conservaron su nivel y '+m.down+' bajaron desde '+momentLabel(prior)+'.' : 'Sin estudiantes evaluados en ambos momentos.'}</p>}</ReportRead>
-        })}</details>}
-      <div className="manage-columns"><section><h2>Alertas de seguimiento</h2>
+          return <section key={subject}><h3>{subjectLabel(subject)}</h3><ReportRead query={subject+moment} load={() => getMovement({from:config.implementationStartDate,to:today},subject,prior,moment)}>{([m]) =>
+            m?.total ? <dl>{[['Subieron',m.up],['Conservaron su nivel',m.stable],['Bajaron',m.down]].map(([label,count]) => <div key={label}><dt>{label}</dt><dd>{count}</dd></div>)}</dl> : <p>Sin estudiantes evaluados en ambos momentos.</p>}</ReportRead></section>
+        })}</div>}</section>}
+      <div className="manage-columns followup-columns"><section><h2>Alertas de seguimiento</h2>
         {config ? <><Field label="Momento de evaluación"><Select value={moment} onChange={e => setSelected(e.target.value as Moment)}>
           {milestones.map(m => <option key={m} value={m}>{momentLabel(m)}</option>)}</Select></Field>
           {[...new Set(alerts.map(a => a.category))].map(category => {
@@ -76,9 +94,9 @@ function FollowUp({ profile, config, today, schools }: { profile: UserProfile; c
           {moment !== 'linea_base' && <details onToggle={e => { const open = e.currentTarget.open; setExpanded(v => ({ ...v, declines: open })) }}>
             <summary>Consultar descensos de nivel</summary>{expanded.declines && <Declines schools={schools} moment={moment} from={config.implementationStartDate} to={today} />}</details>}
         </> : <p>Configura la fecha de inicio y las pausas para calcular las alertas del programa.</p>}
-      </section><section><h2>Actividad reciente</h2>{missing('Actividad reciente') && <p>No se pudo cargar toda la actividad.</p>}{feed.length ? <ol className="manage-feed">{feed.map(e => <li key={e.key}><strong>{e.kind} · {e.detail}</strong>
+      </section><section><h2>Actividad reciente</h2>{missing('Actividad reciente') && <p>No se pudo cargar toda la actividad.</p>}{feed.length ? <ol className="manage-feed">{(allActivity ? feed : feed.slice(0,4)).map(e => <li key={e.key}><strong>{e.kind} · {e.detail}</strong>
         <span>{e.author} · {e.school}</span><time dateTime={e.savedAt}>{savedTime(e.savedAt)}</time></li>)}</ol>
-        : !missing('Actividad reciente') && <p>Los registros aparecerán aquí cuando se guarden asistencias, evaluaciones u horas.</p>}</section></div>
+        : !missing('Actividad reciente') && <p>Los registros aparecerán aquí cuando se guarden asistencias, evaluaciones u horas.</p>}{feed.length > 4 && <button className="dashboard-disclosure" aria-expanded={allActivity} onClick={() => setAllActivity(v => !v)}>{allActivity ? 'Ver menos actividad' : 'Ver ' + (feed.length - 4) + ' registros más'}</button>}</section></div>
     </>
   }}</ReportRead>
 }
