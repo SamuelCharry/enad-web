@@ -22,5 +22,5 @@ export function TeacherHome({profile}:{profile:UserProfile}) {
 export function Help() {
   return <nav className="shortcut-list" aria-label="Guías de clase">{actions.map(([label,path]) =>
     <Link key={path} to={'/portal/'+path+'?guide=1'}>{label}<Icon name="arrow"/></Link>)}<details><summary>Añadir un estudiante</summary><p>En Estudiantes, elige Añadir estudiante y busca su nombre. Para escanear una lista, usa la app ENAd Móvil.</p><Link to="/portal/estudiantes">Ver estudiantes</Link></details>
-    <details><summary>Crear un grupo</summary><p>En Grupos, pulsa Crear grupo. Elige el área, guarda el nombre y añade los estudiantes.</p><Link to="/portal/grupos">Ver grupos</Link></details><Link to="/guia">Guía pública de ENAd<Icon name="book"/></Link></nav>
+    <details><summary>Crear un grupo</summary><p>En Grupos, pulsa Crear grupo. Elige el área, guarda el nombre y añade los estudiantes.</p><Link to="/portal/grupos">Ver grupos</Link></details><Link to="/guia">Guía de despliegue<Icon name="book"/></Link></nav>
 }
