@@ -93,3 +93,6 @@
 .workspace-top .shell-icon[aria-current=page] { background:var(--neutral); }
 @media (max-width:540px) { .section-nav { column-gap:12px; } }
 @media print { .section-nav { display:none; } }
+
+.section-purpose { margin:0 0 16px; color:var(--soft-ink); max-width:68ch; }
+.technical-link { display:inline-flex; align-items:center; gap:8px; min-height:44px; color:var(--soft-ink); font-size:var(--text-sm); }

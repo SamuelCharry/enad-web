@@ -80,11 +80,11 @@ describe('Acceso al portal', () => {
     expect(await screen.findByText('Ana María')).toBeTruthy()
     await waitFor(() => expect(window.location.hash).toBe(role === 'docente' ? '#/portal/hoy' : '#/portal/inicio'))
     const nav = within(screen.getByRole('navigation',{name:'Menú principal'}))
-    const labels = role === 'docente' ? ['Hoy','Asistencia','Evaluación','Grupos','Estudiantes','Horas','Actividades','Pendientes','Mis datos','Ayuda']
-      : ['Inicio','Comunidad','Seguimiento','Actividades',...(role === 'fundacion' ? ['Programa'] : [])]
+    const labels = role === 'docente' ? ['Hoy','Asistencia','Evaluación','Grupos','Estudiantes','Horas','Actividades de clase','Pendientes','Mis datos','Ayuda']
+      : ['Inicio','Colegios y personas','Reportes y alertas','Actividades de clase',...(role === 'fundacion' ? ['Calendario'] : [])]
     expect(nav.getAllByRole('link').map(a => a.textContent)).toEqual(labels)
     expect(!!nav.queryByRole('link',{name:'Ayuda'})).toBe(role === 'docente')
-    expect(!!nav.queryByRole('link',{name:'Programa'})).toBe(role === 'fundacion')
+    expect(!!nav.queryByRole('link',{name:'Calendario'})).toBe(role === 'fundacion')
     fireEvent.click(screen.getByRole('button',{name:'Contraer barra lateral'}))
     expect(screen.getByRole('button',{name:'Ampliar barra lateral'})).toBeTruthy()
   })
@@ -172,9 +172,9 @@ it('recuerda la barra contraída al reabrir el portal',async () => {
 })
 
 it.each([
-  ['/recoleccion/docentes?school=s','/portal/personas?school=s','Comunidad','Personas'],
-  ['/visualizacion/niveles','/portal/reportes/niveles','Seguimiento','Reportes'],
-  ['/recoleccion/evaluaciones','/portal/historicas','Programa','Evaluaciones históricas'],
+  ['/recoleccion/docentes?school=s','/portal/personas?school=s','Colegios y personas','Personas'],
+  ['/visualizacion/niveles','/portal/reportes/niveles','Reportes y alertas','Reportes'],
+  ['/recoleccion/evaluaciones','/portal/historicas','Reportes y alertas','Evaluaciones históricas'],
 ])('conserva el destino y ubica la sección al entrar por %s', async (legacy,path,group,title) => {
   vi.mocked(useSession).mockReturnValue(signedIn('fundacion'))
   open(legacy)

@@ -29,7 +29,7 @@ export function Program() {
     </Card> :
       <Button onClick={() => setForm(blank())}>Crear configuración</Button>}
     {notice && <p role="status">{notice}</p>}
-    {form && <Dialog title="Configuración del programa" onClose={() => setForm(null)} busy={action.busy}>
+    {form && <Dialog title="Editar calendario" onClose={() => setForm(null)} busy={action.busy}>
       <form noValidate onSubmit={e => {
         e.preventDefault()
         void action.run(async () => {

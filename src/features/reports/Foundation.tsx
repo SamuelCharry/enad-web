@@ -1,4 +1,5 @@
 import { validCalendarDay } from '../../domain/weeks'
+import { Icon } from '../../ui/Icon'
 import { Records } from './Records'
 import { LoadError } from '../../ui/LoadError'
 import { useEffect, useRef, useState } from 'react'
@@ -76,7 +77,10 @@ function ExportButton({ filters, disabled }: { filters: ReportFilters; disabled:
     } catch { if (active.current) setError(true) }
     finally { if (active.current) setBusy(false) }
   }
-  return <div><Button variant="primary" loading={busy} disabled={disabled} onClick={download}>{busy ? 'Esto puede tardar…' : 'Exportar Excel'}</Button>
+  const label = 'Descargar informe filtrado en Excel'
+  return <div><button className="shell-icon" type="button" aria-label={label} title={label} aria-busy={busy}
+    disabled={busy || disabled} onClick={download}><Icon name="download"/></button>
+    {busy && <span role="status">Preparando el archivo…</span>}
     {error && <p role="alert">No se pudo exportar el informe. Intenta de nuevo.</p>}
   </div>
 }
@@ -103,7 +107,6 @@ export function Foundation() {
     ? submissionWindow(calendar.config, filters, Number(params.get('week'))).range
     : reportRange(calendar.config, filters))
   return <>
-    <div className="rep-actions"><ExportButton key={JSON.stringify([filters,visibility,current])} filters={current ? {...filters,...current} : filters} disabled={!validDates || invalid || (!!current && current.from > current.to) || options.loading || !!options.error} /></div>
     <nav className="ui-tabs" aria-label="Secciones del informe"><div className="ui-tab-links">{tabs.map(t => <Link key={t.to} to={target(t.to)} aria-current={tabPath===t.to ? 'page':undefined} className={tabPath===t.to ? 'active':undefined}>{t.label}</Link>)}</div>
       <div className="ui-tab-picker"><Field label="Sección"><Select value={tabPath} onChange={e => navigate(target(e.target.value))}>{tabs.map(t => <option key={t.to} value={t.to}>{t.label}</option>)}</Select></Field></div></nav>
     {current && !tabPath.endsWith('/seguimiento') && <p>Período del informe · {current.from} al {current.to}</p>}
@@ -124,6 +127,7 @@ export function Foundation() {
         <Route path="comparacion" element={<CompareView filters={filters}/>} />
         <Route path="estudiante" element={<StudentHistory filters={filters}/>} />
       </Routes>}</div>
-    {!invalid && <div className="rep-actions"><Print report={content}/></div>}
+    <div className="rep-actions">{!invalid && <Print report={content}/>}
+      <ExportButton key={JSON.stringify([filters,visibility,current])} filters={current ? {...filters,...current} : filters} disabled={!validDates || invalid || (!!current && current.from > current.to) || options.loading || !!options.error} /></div>
   </>
 }
