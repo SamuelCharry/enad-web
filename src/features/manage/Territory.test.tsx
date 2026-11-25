@@ -2,7 +2,8 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { afterEach, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import type { School } from '../../domain/types'
-import { departmentId, Territory } from './Territory'
+import { Territory } from './Territory'
+import { departmentId } from './territoryGeography'
 
 vi.mock('../../data/firebase', () => ({db:{}, auth:{}}))
 vi.mock('../../data/students', () => ({useStudents: () => ({students:[{id:'ana',fullName:'Ana Rivera',grade:3}],loading:false})}))

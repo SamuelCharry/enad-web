@@ -9,14 +9,9 @@ import { subjectLabel } from '../../domain/levels'
 import type { School } from '../../domain/types'
 import { LiveState, ReportRead } from '../reports/ReportState'
 import departments from './colombia-departments.json'
+import { departmentId, unknown } from './territoryGeography'
 import './territory.css'
 
-const normalize = (name: string) => name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '')
-const ids = new Map(departments.flatMap(d => [[normalize(d.name), d.id], [normalize('CO-' + d.id), d.id]] as [string, string][]))
-for (const name of ['Bogotá', 'Bogotá Distrito Capital', 'Distrito Capital de Bogotá', 'Bogotá Distrito Capital de Colombia']) ids.set(normalize(name), 'DC')
-for (const name of ['San Andrés', 'San Andrés, Providencia y Santa Catalina', 'Archipiélago de San Andrés, Providencia y Santa Catalina']) ids.set(normalize(name), 'SAP')
-const unknown = 'sin-departamento'
-export const departmentId = (name: string) => ids.get(normalize(name || '')) ?? unknown
 const regionName = (id: string) => departments.find(d => d.id === id)?.name ?? 'Sin departamento identificado'
 const scale = ['#d8d9d3', '#f9aea8', '#f27169', '#db302f', '#971e29']
 const plural = (n: number, one: string, many: string) => n + ' ' + (n === 1 ? one : many)
