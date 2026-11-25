@@ -62,3 +62,4 @@
   .deployment-modes { gap: 0 12px; }
   .deployment-budget { overflow-wrap: anywhere; }
 }
+.deployment-budget td { white-space: nowrap; }
