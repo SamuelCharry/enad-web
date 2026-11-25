@@ -7,7 +7,7 @@ import { departmentId } from './territoryGeography'
 
 vi.mock('../../data/firebase', () => ({db:{}, auth:{}}))
 vi.mock('../../data/students', () => ({useStudents: () => ({students:[{id:'ana',fullName:'Ana Rivera',grade:3}],loading:false})}))
-vi.mock('../../data/groups', () => ({useGroups: () => ({groups:[{id:'g',name:'Lectores',subject:'lectura',studentIds:['ana']}],loading:false})}))
+vi.mock('../../data/groups', () => ({useGroups: () => ({groups:[{id:'g',name:'Lectores',campus:'Centro',subject:'lectura',studentIds:['ana']}],loading:false})}))
 vi.mock('firebase/firestore', async original => ({...await original<typeof import('firebase/firestore')>(),collection:vi.fn()}))
 vi.mock('../../data/reads',async original => ({...await original<typeof import('../../data/reads')>(),rows:() => Promise.resolve([{id:'d',uid:'d',fullName:'Sol Ruiz'}])}))
 afterEach(cleanup)
@@ -31,5 +31,5 @@ it('explora colegios desde el mapa con teclado y ofrece los tres directorios de 
   fireEvent.click(screen.getByRole('button',{name:'Estudiantes'}))
   expect(screen.getByRole('link',{name:'Ana Rivera'}).getAttribute('href')).toContain('schoolId=s&student=ana')
   fireEvent.click(screen.getByRole('button',{name:'Grupos'}))
-  expect(screen.getByText('Lectores')).toBeTruthy()
+  expect(screen.getByRole('link',{name:'Lectores'}).getAttribute('href')).toContain('schoolId=s&campus=c&group=g')
 })

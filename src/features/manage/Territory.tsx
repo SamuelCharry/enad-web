@@ -7,6 +7,7 @@ import { useStudents } from '../../data/students'
 import { useGroups } from '../../data/groups'
 import { subjectLabel } from '../../domain/levels'
 import type { School } from '../../domain/types'
+import { reportLink } from '../reports/navigation'
 import { LiveState, ReportRead } from '../reports/ReportState'
 import departments from './colombia-departments.json'
 import { departmentId, unknown } from './territoryGeography'
@@ -21,15 +22,15 @@ function Students({schoolId}: {schoolId: string}) {
   const { students, ...state } = useStudents(schoolId)
   return <LiveState {...state}>{students.length ? <ul>{students.map(s => <li key={s.id}><Link to={'/portal/reportes/estudiante?' + new URLSearchParams({schoolId, student:s.id})}>{s.fullName}</Link><small>{s.retired ? 'Retirado' : s.grade ? 'Grado ' + s.grade : 'Grado sin registrar'}</small></li>)}</ul> : <p>Sin estudiantes registrados.</p>}</LiveState>
 }
-function Groups({schoolId}: {schoolId: string}) {
-  const { groups, ...state } = useGroups(schoolId)
-  return <LiveState {...state}>{groups.length ? <ul>{groups.map(g => <li key={g.id}><strong>{g.name}</strong><small>{subjectLabel(g.subject)} · {plural(g.studentIds.length,'estudiante','estudiantes')}</small></li>)}</ul> : <p>Sin grupos registrados.</p>}</LiveState>
+function Groups({school}: {school: School}) {
+  const { groups, ...state } = useGroups(school.id)
+  return <LiveState {...state}>{groups.length ? <ul>{groups.map(g => <li key={g.id}><Link to={reportLink('instituciones', {schoolId:school.id, campus:school.campuses.find(c => c.name === g.campus)?.id ?? g.campus ?? ''}, {group:g.id})}>{g.name}</Link><small>{subjectLabel(g.subject)} · {plural(g.studentIds.length,'estudiante','estudiantes')}</small></li>)}</ul> : <p>Sin grupos registrados.</p>}</LiveState>
 }
 function SchoolDetails({ school }: { school: School }) {
   const [tab, setTab] = useState<Community>('Docentes')
   return <><h3>{school.name}</h3><p className="territory-note">{[school.municipality, plural(school.campuses.length,'sede','sedes')].filter(Boolean).join(' · ')}</p>
     <div className="territory-tabs" role="group" aria-label="Comunidad del colegio">{(['Docentes','Estudiantes','Grupos'] as const).map(item => <button key={item} aria-pressed={item === tab} onClick={() => setTab(item)}>{item}</button>)}</div>
-    <div className="territory-members">{tab === 'Estudiantes' ? <Students schoolId={school.id}/> : tab === 'Grupos' ? <Groups schoolId={school.id}/> :
+    <div className="territory-members">{tab === 'Estudiantes' ? <Students schoolId={school.id}/> : tab === 'Grupos' ? <Groups school={school}/> :
       <ReportRead query={school.id} load={() => rows<{fullName:string; uid:string}>(collection(db,'schools',school.id,'teachers'))}>{teachers => teachers.length ? <ul>{[...teachers].sort((a,b) => a.fullName.localeCompare(b.fullName,'es')).map(t => <li key={t.id}><Link to={'/portal/reportes/docentes?' + new URLSearchParams({schoolId:school.id,teacher:t.uid || t.id})}>{t.fullName}</Link></li>)}</ul> : <p>Sin docentes registrados.</p>}</ReportRead>}</div></>
 }
 
