@@ -10,6 +10,10 @@
 .collect-toolbar, .collect-actions, .collect-row, .collect-heading { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2, 8px); }
 .collect-toolbar { align-items: end; margin-block: var(--space-4, 16px); }
 .collect-toolbar > label, .collect-toolbar > .ui-field { flex: 1 1 13rem; margin-block: 0; }
+.student-toolbar { gap: var(--space-4); }
+@media (max-width: 480px) {
+  .student-toolbar { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); }
+}
 .collect-row, .collect-heading { justify-content: space-between; }
 .collect-row { padding-block: var(--space-3, 12px); border-block-end: 1px solid var(--line, #dedbd7); }
 .collect-row:last-child { border-block-end: 0; }

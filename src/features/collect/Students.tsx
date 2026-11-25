@@ -29,7 +29,7 @@ export function Students({ school, campus, admin, uid, initialStudent }: { schoo
     {detail && !admin ? <>{'syncState' in detail && <SyncStatus pending={detail.syncState === 'pending'} />}<p>{school.name} · {school.campuses.find(c => c.id === campus)?.name || 'Sin sede asignada'}</p>
       <Button onClick={() => setEdit(detail.id)}>Editar estudiante</Button>
       <StudentDetail student={detail} onBack={() => select(null)} backLabel="Volver a estudiantes" /></> : <>
-    <div className="collect-toolbar">
+    <div className="collect-toolbar student-toolbar">
       <Search value={search} onChange={setSearch} />
       <Button variant="primary" onClick={() => setAdding(true)}>Añadir estudiante</Button>
     </div>

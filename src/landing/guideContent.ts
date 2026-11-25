@@ -31,12 +31,11 @@ export const stepsByRole: Record<GuideRole, GuideStep[]> = {
     {
       title: 'Empezar desde Hoy',
       actions: [
-        'Revisa la fecha y la semana de implementación. Toca el botón principal para abrir la siguiente tarea pendiente. Verás Registrar asistencia o Evaluar junto al nombre del grupo.',
-        'Elige el Momento de evaluación. En la fila de cada grupo, consulta cuántos estudiantes tienen marca en Asistencia de hoy y cuántos tienen nivel en Evaluación.',
-        'En ENAd Móvil, usa los accesos Evaluación formativa, Reportar horas o Escanear lista según la tarea. Toca Ayuda para abrir una guía paso a paso.',
+        'En ENAd Móvil, consulta la fecha y la semana de implementación.',
+        'Toca Evaluación formativa, Reportar asistencia o Reportar horas según la tarea que vayas a registrar.',
+        'Para cargar una lista desde una foto, toca Escanear lista de estudiantes y revisa los nombres antes de guardarla.',
       ],
-      portal: 'En Hoy, busca tu grupo o elige una tarea en Registro de clase.',
-      image: { file: '02_docente_hoy', alt: 'Hoy muestra el botón Registrar asistencia · Abejitas, el momento de evaluación y los conteos de asistencia y evaluación de cada grupo.' },
+      portal: 'En Hoy puedes evaluar, reportar asistencia o registrar horas. También puedes consultar los registros por enviar y abrir Actividad de hoy.',
     },
     {
       title: 'Guardar la asistencia',
