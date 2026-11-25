@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import fixtures from '../../../../docs/name_rules_vectors.json'
+import fixtures from '../../../test/fixtures/name_rules_vectors.json'
 import { cleanName, rosterMatches, validateName } from './studentNameRules'
 import { candidatesFromLines } from '../ocr/namePage'
 import { reviewName, type ReviewName } from '../ocr/reviewNames'

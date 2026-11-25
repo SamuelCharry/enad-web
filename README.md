@@ -6,7 +6,7 @@ Ambos clientes usan las mismas cuentas de Firebase Auth, el mismo modelo de docu
 
 ## Desarrollo local
 
-Usa Node.js 22. En el repositorio principal, ejecuta los comandos desde `web-portal/`. En el repositorio público, ejecútalos desde la raíz.
+Usa Node.js 24.12.0 o posterior de la serie 24 (`nvm install` desde la carpeta del portal). En el repositorio principal, ejecuta los comandos desde `web-portal/`. En el repositorio público, ejecútalos desde la raíz.
 
 ```sh
 npm ci

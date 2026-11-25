@@ -1,0 +1,973 @@
+{
+  "names": [
+    {
+      "input": "  Ana  María   Pérez ",
+      "clean": "Ana María Pérez",
+      "flags": [],
+      "confidence": null
+    },
+    {
+      "input": "mArÍa del mar",
+      "clean": "María del Mar",
+      "flags": [],
+      "confidence": null
+    },
+    {
+      "input": "rosa DE LA cruz",
+      "clean": "Rosa de la Cruz",
+      "flags": [],
+      "confidence": null
+    },
+    {
+      "input": "Juan de los Ríos",
+      "clean": "Juan de los Ríos",
+      "flags": [],
+      "confidence": null
+    },
+    {
+      "input": "Flor de las Nieves",
+      "clean": "Flor de las Nieves",
+      "flags": [],
+      "confidence": null
+    },
+    {
+      "input": "Sol y Luna",
+      "clean": "Sol y Luna",
+      "flags": [
+        "solo_iniciales"
+      ],
+      "confidence": null
+    },
+    {
+      "input": "martín-pérez cruz",
+      "clean": "Martín-Pérez Cruz",
+      "flags": [],
+      "confidence": null
+    },
+    {
+      "input": "ana o'neill",
+      "clean": "Ana O'Neill",
+      "flags": [],
+      "confidence": null
+    },
+    {
+      "input": "ana d’ávila",
+      "clean": "Ana D'Ávila",
+      "flags": [],
+      "confidence": null
+    },
+    {
+      "input": "Óscar Núñez",
+      "clean": "Óscar Núñez",
+      "flags": [],
+      "confidence": null
+    },
+    {
+      "input": "Sara Argüello",
+      "clean": "Sara Argüello",
+      "flags": [],
+      "confidence": null
+    },
+    {
+      "input": "Niña Muñoz",
+      "clean": "Niña Muñoz",
+      "flags": [],
+      "confidence": null
+    },
+    {
+      "input": "Ana\n\tRuiz",
+      "clean": "Ana Ruiz",
+      "flags": [],
+      "confidence": null
+    },
+    {
+      "input": "Ana🎒 Pérez",
+      "clean": "Ana Pérez",
+      "flags": [],
+      "confidence": null
+    },
+    {
+      "input": "13Ana Luisa9",
+      "clean": "Ana Luisa",
+      "flags": [],
+      "confidence": null
+    },
+    {
+      "input": "Ana Mar1a",
+      "clean": "Ana Mara",
+      "flags": [],
+      "confidence": null
+    },
+    {
+      "input": "|uan Pérez",
+      "clean": "Uan Pérez",
+      "flags": [],
+      "confidence": null
+    },
+    {
+      "input": "   -Ana-  Pérez.",
+      "clean": "Ana Pérez",
+      "flags": [],
+      "confidence": null
+    },
+    {
+      "input": "Ana 'Paz'",
+      "clean": "Ana Paz",
+      "flags": [],
+      "confidence": null
+    },
+    {
+      "input": "aNa 123 Sol",
+      "clean": "Ana Sol",
+      "flags": [],
+      "confidence": null
+    },
+    {
+      "input": "Ana   /   Rosa",
+      "clean": "Ana Rosa",
+      "flags": [],
+      "confidence": null
+    },
+    {
+      "input": "Ana Mária",
+      "clean": "Ana Mária",
+      "flags": [],
+      "confidence": null
+    },
+    {
+      "input": "Jo Li",
+      "clean": "Jo Li",
+      "flags": [],
+      "confidence": null
+    },
+    {
+      "input": "y Li",
+      "clean": "y Li",
+      "flags": [
+        "solo_iniciales"
+      ],
+      "confidence": null
+    },
+    {
+      "input": "Luz María",
+      "clean": "Luz María",
+      "flags": [],
+      "confidence": null
+    },
+    {
+      "input": "José Luis de la Cruz León",
+      "clean": "José Luis de la Cruz León",
+      "flags": [],
+      "confidence": null
+    },
+    {
+      "input": "ana-maría de jesús",
+      "clean": "Ana-María de Jesús",
+      "flags": [],
+      "confidence": null
+    },
+    {
+      "input": "ANA MARÍA PÉREZ",
+      "clean": "Ana María Pérez",
+      "flags": [
+        "mayusculas"
+      ],
+      "confidence": null
+    },
+    {
+      "input": "ÁNGELA DEL RÍO",
+      "clean": "Ángela del Río",
+      "flags": [
+        "mayusculas"
+      ],
+      "confidence": null
+    },
+    {
+      "input": "N. Pérez",
+      "clean": "N Pérez",
+      "flags": [
+        "formato_nombre",
+        "solo_iniciales"
+      ],
+      "confidence": null
+    },
+    {
+      "input": "N P",
+      "clean": "N P",
+      "flags": [
+        "formato_nombre",
+        "solo_iniciales",
+        "mayusculas"
+      ],
+      "confidence": null
+    },
+    {
+      "input": "M. A. Pérez",
+      "clean": "M A Pérez",
+      "flags": [
+        "formato_nombre",
+        "solo_iniciales"
+      ],
+      "confidence": null
+    },
+    {
+      "input": "y. Paz",
+      "clean": "y Paz",
+      "flags": [
+        "solo_iniciales"
+      ],
+      "confidence": null
+    },
+    {
+      "input": "A",
+      "clean": "A",
+      "flags": [
+        "formato_nombre",
+        "solo_iniciales",
+        "mayusculas"
+      ],
+      "confidence": null
+    },
+    {
+      "input": "Ana",
+      "clean": "Ana",
+      "flags": [
+        "formato_nombre"
+      ],
+      "confidence": null
+    },
+    {
+      "input": "|uan",
+      "clean": "Uan",
+      "flags": [
+        "formato_nombre"
+      ],
+      "confidence": null
+    },
+    {
+      "input": "Pérez .",
+      "clean": "Pérez",
+      "flags": [
+        "formato_nombre"
+      ],
+      "confidence": null
+    },
+    {
+      "input": "",
+      "clean": "",
+      "flags": [
+        "formato_nombre"
+      ],
+      "confidence": null
+    },
+    {
+      "input": "  \t\n",
+      "clean": "",
+      "flags": [
+        "formato_nombre"
+      ],
+      "confidence": null
+    },
+    {
+      "input": "💫✨",
+      "clean": "",
+      "flags": [
+        "formato_nombre"
+      ],
+      "confidence": null
+    },
+    {
+      "input": "0123456789",
+      "clean": "",
+      "flags": [
+        "formato_nombre"
+      ],
+      "confidence": null
+    },
+    {
+      "input": "Ana de la Luz María del Río",
+      "clean": "Ana de la Luz María del Río",
+      "flags": [
+        "formato_nombre"
+      ],
+      "confidence": null
+    },
+    {
+      "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "clean": "Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "flags": [
+        "formato_nombre"
+      ],
+      "confidence": null
+    },
+    {
+      "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "clean": "Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "flags": [],
+      "confidence": null
+    },
+    {
+      "input": "ANA RUIZ",
+      "clean": "Ana Ruiz",
+      "flags": [
+        "mayusculas",
+        "ocr_baja_confianza"
+      ],
+      "confidence": 0.8499
+    },
+    {
+      "input": "Ana Ruiz",
+      "clean": "Ana Ruiz",
+      "flags": [],
+      "confidence": 0.85
+    },
+    {
+      "input": "Ana Ruiz",
+      "clean": "Ana Ruiz",
+      "flags": [
+        "ocr_baja_confianza"
+      ],
+      "confidence": 0
+    },
+    {
+      "input": "Ana Ruiz",
+      "clean": "Ana Ruiz",
+      "flags": [],
+      "confidence": 1
+    }
+  ],
+  "pages": [
+    {
+      "title": "vacía",
+      "lines": [],
+      "names": [],
+      "omitted": 0
+    },
+    {
+      "title": "basura",
+      "lines": [
+        {
+          "text": "1234"
+        },
+        {
+          "text": "|"
+        },
+        {
+          "text": "9/10/2026"
+        },
+        {
+          "text": "Nombres"
+        },
+        {
+          "text": "Lista de asistencia"
+        },
+        {
+          "text": "Grado cuarto"
+        },
+        {
+          "text": "Nota: traer papel"
+        },
+        {
+          "text": "- falta firma"
+        },
+        {
+          "text": "23 de junio de 2026"
+        },
+        {
+          "text": "Pedro"
+        }
+      ],
+      "names": [],
+      "omitted": 0
+    },
+    {
+      "title": "nombres y duplicados",
+      "lines": [
+        {
+          "text": "1. ANA MARÍA"
+        },
+        {
+          "text": "maría ana"
+        },
+        {
+          "text": "José de la"
+        },
+        {
+          "text": "Cruz"
+        },
+        {
+          "text": "Luz Acosta"
+        },
+        {
+          "text": "Luz Acosta"
+        }
+      ],
+      "names": [
+        "Ana María",
+        "José de la Cruz",
+        "Luz Acosta"
+      ],
+      "omitted": 0
+    },
+    {
+      "title": "lectura dudosa",
+      "lines": [
+        {
+          "text": "Ana Mar1a"
+        },
+        {
+          "text": "|uan Pérez"
+        },
+        {
+          "text": "M. Gómez"
+        }
+      ],
+      "names": [
+        "Ana Mara",
+        "Uan Pérez",
+        "M Gómez"
+      ],
+      "omitted": 0
+    },
+    {
+      "title": "una línea partida",
+      "lines": [
+        {
+          "text": "Ana",
+          "box": {
+            "x": 0,
+            "y": 1,
+            "w": 24,
+            "h": 10
+          }
+        },
+        {
+          "text": "Pérez",
+          "box": {
+            "x": 28,
+            "y": 2,
+            "w": 35,
+            "h": 10
+          }
+        }
+      ],
+      "names": [
+        "Ana Pérez"
+      ],
+      "omitted": 0
+    },
+    {
+      "title": "repetidos",
+      "lines": [
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        },
+        {
+          "text": "Pedro Pérez"
+        }
+      ],
+      "names": [
+        "Pedro Pérez"
+      ],
+      "omitted": 0
+    },
+    {
+      "title": "sesenta nombres",
+      "lines": [
+        {
+          "text": "Ana Aa"
+        },
+        {
+          "text": "Ana Ab"
+        },
+        {
+          "text": "Ana Ac"
+        },
+        {
+          "text": "Ana Ad"
+        },
+        {
+          "text": "Ana Ae"
+        },
+        {
+          "text": "Ana Af"
+        },
+        {
+          "text": "Ana Ag"
+        },
+        {
+          "text": "Ana Ah"
+        },
+        {
+          "text": "Ana Ai"
+        },
+        {
+          "text": "Ana Aj"
+        },
+        {
+          "text": "Ana Ba"
+        },
+        {
+          "text": "Ana Bb"
+        },
+        {
+          "text": "Ana Bc"
+        },
+        {
+          "text": "Ana Bd"
+        },
+        {
+          "text": "Ana Be"
+        },
+        {
+          "text": "Ana Bf"
+        },
+        {
+          "text": "Ana Bg"
+        },
+        {
+          "text": "Ana Bh"
+        },
+        {
+          "text": "Ana Bi"
+        },
+        {
+          "text": "Ana Bj"
+        },
+        {
+          "text": "Ana Ca"
+        },
+        {
+          "text": "Ana Cb"
+        },
+        {
+          "text": "Ana Cc"
+        },
+        {
+          "text": "Ana Cd"
+        },
+        {
+          "text": "Ana Ce"
+        },
+        {
+          "text": "Ana Cf"
+        },
+        {
+          "text": "Ana Cg"
+        },
+        {
+          "text": "Ana Ch"
+        },
+        {
+          "text": "Ana Ci"
+        },
+        {
+          "text": "Ana Cj"
+        },
+        {
+          "text": "Ana Da"
+        },
+        {
+          "text": "Ana Db"
+        },
+        {
+          "text": "Ana Dc"
+        },
+        {
+          "text": "Ana Dd"
+        },
+        {
+          "text": "Ana De"
+        },
+        {
+          "text": "Ana Df"
+        },
+        {
+          "text": "Ana Dg"
+        },
+        {
+          "text": "Ana Dh"
+        },
+        {
+          "text": "Ana Di"
+        },
+        {
+          "text": "Ana Dj"
+        },
+        {
+          "text": "Ana Ea"
+        },
+        {
+          "text": "Ana Eb"
+        },
+        {
+          "text": "Ana Ec"
+        },
+        {
+          "text": "Ana Ed"
+        },
+        {
+          "text": "Ana Ee"
+        },
+        {
+          "text": "Ana Ef"
+        },
+        {
+          "text": "Ana Eg"
+        },
+        {
+          "text": "Ana Eh"
+        },
+        {
+          "text": "Ana Ei"
+        },
+        {
+          "text": "Ana Ej"
+        },
+        {
+          "text": "Ana Fa"
+        },
+        {
+          "text": "Ana Fb"
+        },
+        {
+          "text": "Ana Fc"
+        },
+        {
+          "text": "Ana Fd"
+        },
+        {
+          "text": "Ana Fe"
+        },
+        {
+          "text": "Ana Ff"
+        },
+        {
+          "text": "Ana Fg"
+        },
+        {
+          "text": "Ana Fh"
+        },
+        {
+          "text": "Ana Fi"
+        },
+        {
+          "text": "Ana Fj"
+        }
+      ],
+      "names": [
+        "Ana Aa",
+        "Ana Ab",
+        "Ana Ac",
+        "Ana Ad",
+        "Ana Ae",
+        "Ana Af",
+        "Ana Ag",
+        "Ana Ah",
+        "Ana Ai",
+        "Ana Aj",
+        "Ana Ba",
+        "Ana Bb",
+        "Ana Bc",
+        "Ana Bd",
+        "Ana Be",
+        "Ana Bf",
+        "Ana Bg",
+        "Ana Bh",
+        "Ana Bi",
+        "Ana Bj",
+        "Ana Ca",
+        "Ana Cb",
+        "Ana Cc",
+        "Ana Cd",
+        "Ana Ce",
+        "Ana Cf",
+        "Ana Cg",
+        "Ana Ch",
+        "Ana Ci",
+        "Ana Cj",
+        "Ana Da",
+        "Ana Db",
+        "Ana Dc",
+        "Ana Dd",
+        "Ana de",
+        "Ana Df",
+        "Ana Dg",
+        "Ana Dh",
+        "Ana Di",
+        "Ana Dj",
+        "Ana Ea",
+        "Ana Eb",
+        "Ana Ec",
+        "Ana Ed",
+        "Ana Ee"
+      ],
+      "omitted": 15
+    },
+    {
+      "title": "viñetas y notas del cuaderno",
+      "lines": [
+        {
+          "text": "- Luz Pérez"
+        },
+        {
+          "text": "• Lina Ríos"
+        },
+        {
+          "text": "- traer la tarea"
+        },
+        {
+          "text": "5 abril 2025"
+        },
+        {
+          "text": "Nombre completo"
+        },
+        {
+          "text": "Diana - Sol"
+        },
+        {
+          "text": "Xxx Zzz"
+        }
+      ],
+      "names": [
+        "Luz Pérez",
+        "Lina Ríos",
+        "Diana Sol",
+        "Xxx Zzz"
+      ],
+      "omitted": 0
+    },
+    {
+      "title": "columnas de la lista impresa",
+      "lines": [
+        {
+          "text": "Código nombre edad sexo"
+        },
+        {
+          "text": "302100 Ana María F 9 4"
+        },
+        {
+          "text": "2.Juan Pérez 10 M"
+        },
+        {
+          "text": "Lina M."
+        }
+      ],
+      "names": [
+        "Ana María",
+        "Juan Pérez",
+        "Lina M"
+      ],
+      "omitted": 0
+    }
+  ],
+  "write": {
+    "input": {
+      "fullName": "ANA  R.",
+      "schoolId": "s1",
+      "clientId": "c-123",
+      "gender": "",
+      "grade": 3,
+      "source": "ocr",
+      "ocrConfidence": 0.4,
+      "reviewReasons": [
+        "posible_duplicado:s1_A1"
+      ]
+    },
+    "id": "s1_P_C123",
+    "fields": {
+      "code": "P-0C123",
+      "fullName": "Ana R",
+      "nameKey": "ana r",
+      "grade": 3,
+      "gender": "",
+      "provisional": true,
+      "needsReview": true,
+      "source": "ocr",
+      "mergedInto": null,
+      "ocrConfidence": 0.4,
+      "reviewReasons": [
+        "nuevo_docente",
+        "formato_nombre",
+        "solo_iniciales",
+        "mayusculas",
+        "ocr_baja_confianza",
+        "posible_duplicado:s1_A1"
+      ]
+    }
+  }
+}

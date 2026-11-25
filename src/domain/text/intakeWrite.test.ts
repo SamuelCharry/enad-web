@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest'
-import vector from '../../../../docs/name_rules_vectors.json'
+import vector from '../../../test/fixtures/name_rules_vectors.json'
 import { createStudent, importStudents } from '../../data/students'
 import { insertPage } from '../../data/inserts'
 import { getDoc, getDocs } from 'firebase/firestore'
