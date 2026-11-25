@@ -59,7 +59,10 @@ try {
     await passwordField.fill(password)
     await submit.click()
     await page.waitForURL(url => ['#/portal/hoy','#/portal/inicio'].includes(url.hash))
-    await capture('portal',[page.locator('.workspace-top h1')])
+    const teacher = new URL(page.url()).hash === '#/portal/hoy'
+    const homeContent = teacher ? page.getByRole('navigation',{name:'Registro de clase'})
+      : page.getByRole('group',{name:'Mapa interactivo de Colombia'})
+    await capture('portal',[homeContent])
     for (const width of [375,768]) {
       await page.setViewportSize({width,height:812})
       const toggle = page.getByRole('button',{name:'Abrir menú'})
@@ -76,7 +79,10 @@ try {
     await page.setViewportSize({width:1440,height:900})
     await page.getByRole('button',{name:'Contraer barra lateral'}).click()
     await page.getByRole('button',{name:'Ampliar barra lateral'}).click()
-    await page.getByRole('link',{name:'Grupos',exact:true}).click()
+    const primary = page.getByRole('navigation',{name:'Menú principal'})
+    if (!teacher) await primary.getByRole('link',{name:'Comunidad'}).click()
+    const directory = teacher ? primary : page.getByRole('navigation',{name:'Comunidad'})
+    await directory.getByRole('link',{name:'Grupos',exact:true}).click()
     await page.getByRole('heading',{name:'Grupos',level:1}).waitFor()
   }
 

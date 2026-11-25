@@ -81,7 +81,7 @@ describe('Acceso al portal', () => {
     await waitFor(() => expect(window.location.hash).toBe(role === 'docente' ? '#/portal/hoy' : '#/portal/inicio'))
     const nav = within(screen.getByRole('navigation',{name:'Menú principal'}))
     const labels = role === 'docente' ? ['Hoy','Asistencia','Evaluación','Grupos','Estudiantes','Horas','Actividades','Pendientes','Mis datos','Ayuda']
-      : ['Inicio','Personas','Colegios y sedes','Estudiantes','Revisar nombres','Grupos','Actividades','Reportes','Descargas',...(role === 'fundacion' ? ['Programa'] : [])]
+      : ['Inicio','Comunidad','Seguimiento','Actividades',...(role === 'fundacion' ? ['Programa'] : [])]
     expect(nav.getAllByRole('link').map(a => a.textContent)).toEqual(labels)
     expect(!!nav.queryByRole('link',{name:'Ayuda'})).toBe(role === 'docente')
     expect(!!nav.queryByRole('link',{name:'Programa'})).toBe(role === 'fundacion')
@@ -169,4 +169,23 @@ it('recuerda la barra contraída al reabrir el portal',async () => {
   view.unmount()
   open('/portal/hoy')
   expect(await screen.findByRole('button',{name:'Ampliar barra lateral'})).toBeTruthy()
+})
+
+it.each([
+  ['/recoleccion/docentes?school=s','/portal/personas?school=s','Comunidad','Personas'],
+  ['/visualizacion/niveles','/portal/reportes/niveles','Seguimiento','Reportes'],
+  ['/recoleccion/evaluaciones','/portal/historicas','Programa','Evaluaciones históricas'],
+])('conserva el destino y ubica la sección al entrar por %s', async (legacy,path,group,title) => {
+  vi.mocked(useSession).mockReturnValue(signedIn('fundacion'))
+  open(legacy)
+  await waitFor(() => expect(window.location.hash).toBe('#' + path))
+  expect(screen.getByRole('heading',{level:1,name:title})).toBeTruthy()
+  expect(within(screen.getByRole('navigation',{name:group})).getByRole('link',{name:title}).getAttribute('aria-current')).toBe('page')
+  const primary = within(screen.getByRole('navigation',{name:'Menú principal'}))
+  expect(primary.getByRole('link',{name:group}).hasAttribute('aria-current')).toBe(true)
+  expect(primary.queryByRole('link',{name:'Descargas'})).toBeNull()
+  const download = screen.getByRole('link',{name:'Descargas'})
+  expect(download.textContent).toBe('')
+  fireEvent.click(download)
+  expect(await screen.findByRole('heading',{level:1,name:'Descargas'})).toBeTruthy()
 })

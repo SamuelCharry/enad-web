@@ -5,7 +5,7 @@ import { Suspense, useEffect, useRef, useState } from 'react'
 import type { UserProfile } from '../domain/types'
 import { Icon } from '../ui/Icon'
 import { SwitchUser } from './sessionControls'
-import { homePath, legacyPath, roleNav } from './navigation'
+import { homePath, legacyPath, navigationState, roleNav } from './navigation'
 import { useReviewQueue } from '../data/review'
 
 export function LegacyRedirect() {
@@ -22,7 +22,7 @@ export function PortalLayout() {
   const {pathname} = useLocation()
   const entries = roleNav(profile.rol)
   const section = pathname.split('/')[2]
-  const title = entries.find(([slug]) => slug === section)?.[1] || ({historicas:'Evaluaciones históricas', calidad:'Calidad de datos', importaciones:'Importaciones'} as Record<string,string>)[section] || entries[0][1]
+  const {primary,title,children,label:groupLabel} = navigationState(profile.rol,section)
   const [collapsed,setCollapsed] = useState(() => preference('sidebar') === 'collapsed')
   const [drawer,setDrawer] = useState(false)
   const dialog = useRef<HTMLDialogElement>(null)
@@ -43,8 +43,8 @@ export function PortalLayout() {
       <img src={import.meta.env.BASE_URL + 'branding/enad_logo.png'} alt="ENAd" /></Link>
       <button type="button" className="shell-icon" aria-label={mobile ? 'Cerrar menú' : collapsed ? 'Ampliar barra lateral' : 'Contraer barra lateral'}
         onClick={mobile ? close : () => { remember('sidebar',collapsed ? 'open' : 'collapsed'); setCollapsed(!collapsed) }}><Icon name={collapsed && !mobile ? 'arrow' : 'back'} /></button></div>
-    <nav aria-label="Menú principal">{entries.map(([slug,label,icon]) => <NavLink key={slug} aria-label={label} title={label} to={'/portal/' + slug} onClick={mobile ? close : undefined}>
-      <Icon name={icon} size={20}/><span>{label}</span>{slug === 'revision' && <ReviewCount/>}</NavLink>)}</nav>
+    <nav aria-label="Menú principal">{entries.map(([slug,label,icon]) => <Link key={slug} className={primary === slug ? 'active' : undefined} aria-current={primary === slug ? (slug === section ? 'page' : 'location') : undefined} aria-label={label} title={label} to={'/portal/' + slug} onClick={mobile ? close : undefined}>
+      <Icon name={icon} size={20}/><span>{label}</span></Link>)}</nav>
     <footer><strong>{profile.fullName}</strong><span>{{ docente:'Docente',coordinador:'Coordinación',fundacion:'Fundación' }[profile.rol]}</span><SwitchUser /></footer>
   </>
   return <div className="workspace" data-collapsed={collapsed}>
@@ -61,8 +61,10 @@ export function PortalLayout() {
     <div className="workspace-body"><header className="workspace-top">
       <button ref={toggle} className="shell-icon menu-toggle" aria-label="Abrir menú" aria-expanded={drawer} onClick={() => setDrawer(true)}><Icon name="menu"/></button>
       <h1>{title}</h1>{section === 'hoy' && <time>{classDate(colombiaToday())}</time>}
-      {profile.rol !== 'docente' && section === 'reportes' && <Link to="/portal/descargas">Descargas</Link>}
+      {profile.rol !== 'docente' && <NavLink className="shell-icon" to="/portal/descargas" aria-label="Descargas" title="Descargas"><Icon name="download"/></NavLink>}
     </header><main id="portal-main" tabIndex={-1} key={JSON.stringify([profile.uid,profile.rol,profile.schoolIds,section])}>
+      {children.length > 0 && <nav className="section-nav" aria-label={groupLabel}>{children.map(([slug,label]) =>
+        <NavLink key={slug} to={'/portal/' + slug}>{label}{slug === 'revision' && <ReviewCount/>}</NavLink>)}</nav>}
       <Suspense fallback={<p role="status">Cargando sección…</p>}><Outlet context={profile}/></Suspense></main></div>
   </div>
 }

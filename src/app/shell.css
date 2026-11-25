@@ -85,3 +85,11 @@
 @media print { .workspace {display:block;} .side-panel,.workspace-top,.skip-link {display:none;} .workspace main {max-width:none;padding:0;} }
 
 .switch-label { white-space: nowrap; }
+
+.section-nav { display:flex; flex-wrap:wrap; gap:0 20px; margin-bottom:24px; border-bottom:1px solid var(--line); }
+.section-nav a { display:inline-flex; align-items:center; gap:6px; min-height:44px; color:var(--soft-ink); text-decoration:none; border-bottom:2px solid transparent; }
+.section-nav a.active { color:var(--ink); border-color:currentColor; font-weight:600; }
+.section-nav a:hover { color:var(--ink); text-decoration:underline; }
+.workspace-top .shell-icon[aria-current=page] { background:var(--neutral); }
+@media (max-width:540px) { .section-nav { column-gap:12px; } }
+@media print { .section-nav { display:none; } }
