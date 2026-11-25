@@ -8,8 +8,8 @@ import { TableExport } from '../../reports/TableExport'
 import './admin.css'
 
 export interface DirectoryRow { id: string; cells: ReactNode[]; search: string }
-export function Directory({ showExport = true, title, headers, rows, create, editor, editLabel = 'Editar', loading = false }: {
-  showExport?: boolean; title: string; headers: string[]; rows: DirectoryRow[]; create?: string; editLabel?: string; loading?: boolean
+export function Directory({ onOpen, onCreate, showExport = true, title, headers, rows, create, editor, editLabel = 'Editar', loading = false }: {
+  onOpen?: (id: string) => void; onCreate?: () => void; showExport?: boolean; title: string; headers: string[]; rows: DirectoryRow[]; create?: string; editLabel?: string; loading?: boolean
   editor?: (id: string | null, close: (message?: string) => void) => ReactNode
 }) {
   const container = useRef<HTMLDivElement>(null)
@@ -26,7 +26,7 @@ export function Directory({ showExport = true, title, headers, rows, create, edi
   const page = Math.min(requested, Math.max(0, Math.ceil(filtered.length / 20) - 1))
   function close(message?: string) { setSelected(undefined); setNotice(message || '') }
   return <div className="admin-directory"><div className="collect-toolbar"><Search value={query} onChange={q => { setQuery(q); setPage(0); close() }} />
-    {create && <Button variant="primary" onClick={() => { setSelected(null); setNotice('') }}>{create}</Button>}</div>
+    {create && <Button variant="primary" onClick={() => { if (onCreate) onCreate(); else setSelected(null); setNotice('') }}>{create}</Button>}</div>
     {notice && <p role="status">{notice}</p>}
     {selected === null && editor && <Card>{editor(null, close)}</Card>}
     {loading ? <p role="status">Cargando registros…</p> : filtered.length ? <>
@@ -36,9 +36,9 @@ export function Directory({ showExport = true, title, headers, rows, create, edi
         setPage(0)
       }}><option value="">Orden inicial</option>{headers.flatMap((h,i) => [1,-1].map(n => <option key={i+'/'+n} value={i+'/'+n}>{h} · {n === 1 ? 'ascendente' : 'descendente'}</option>))}</Select></Field></div>
       <div ref={container} className="ui-table admin-table"><table><caption className="sr-only">{title}</caption><thead><tr>{headers.map((h,i) => <th scope="col" key={h} aria-sort={sort?.col === i ? sort.direction === 1 ? 'ascending' : 'descending' : undefined}>
-        <button className="sort-heading" type="button" onClick={() => {setSort({col:i,direction:sort?.col === i ? -sort.direction : 1});setPage(0)}}>{h}</button></th>)}{editor && <th scope="col" data-export-ignore>Acciones</th>}</tr></thead>
-        <tbody>{filtered.slice(page * 20, page * 20 + 20).map(r => <Fragment key={r.id}><tr>{r.cells.map((cell, i) => <td key={headers[i]} data-label={headers[i]}>{cell}</td>)}{editor &&
-          <td data-export-ignore><Button aria-expanded={selected === r.id} onClick={() => { setNotice(''); setSelected(selected === r.id ? undefined : r.id) }}>{editLabel}</Button></td>}</tr>
+        <button className="sort-heading" type="button" onClick={() => {setSort({col:i,direction:sort?.col === i ? -sort.direction : 1});setPage(0)}}>{h}</button></th>)}{(editor || onOpen) && <th scope="col" data-export-ignore>Acciones</th>}</tr></thead>
+        <tbody>{filtered.slice(page * 20, page * 20 + 20).map(r => <Fragment key={r.id}><tr>{r.cells.map((cell, i) => <td key={headers[i]} data-label={headers[i]}>{cell}</td>)}{(editor || onOpen) &&
+          <td data-export-ignore><Button aria-expanded={onOpen ? undefined : selected === r.id} onClick={() => { setNotice(''); if (onOpen) onOpen(r.id); else setSelected(selected === r.id ? undefined : r.id) }}>{editLabel}</Button></td>}</tr>
           {editor && selected === r.id && <tr className="admin-expanded" data-export-ignore><td colSpan={headers.length + 1}>{editor(r.id, close)}</td></tr>}</Fragment>)}</tbody></table></div>
       {showExport && <TableExport container={container} label="Exportar página a Excel" />}
       <Pager page={page} count={filtered.length} setPage={p => { setPage(p); close() }} /></> :
