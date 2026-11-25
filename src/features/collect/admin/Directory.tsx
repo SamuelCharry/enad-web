@@ -40,7 +40,7 @@ export function Directory({ onOpen, onCreate, showExport = true, title, headers,
         <tbody>{filtered.slice(page * 20, page * 20 + 20).map(r => <Fragment key={r.id}><tr>{r.cells.map((cell, i) => <td key={headers[i]} data-label={headers[i]}>{cell}</td>)}{(editor || onOpen) &&
           <td data-export-ignore><Button aria-expanded={onOpen ? undefined : selected === r.id} onClick={() => { setNotice(''); if (onOpen) onOpen(r.id); else setSelected(selected === r.id ? undefined : r.id) }}>{editLabel}</Button></td>}</tr>
           {editor && selected === r.id && <tr className="admin-expanded" data-export-ignore><td colSpan={headers.length + 1}>{editor(r.id, close)}</td></tr>}</Fragment>)}</tbody></table></div>
-      {showExport && <TableExport container={container} label="Exportar página a Excel" />}
+      {showExport && <TableExport container={container} label={'Exportar página a Excel · ' + title} />}
       <Pager page={page} count={filtered.length} setPage={p => { setPage(p); close() }} /></> :
       <p>{query ? 'No hay coincidencias. Prueba otro nombre o código.' : create ? 'Todavía no hay registros. Usa «' + create + '» para comenzar.' : 'No hay registros para esta selección. Revisa los filtros o vuelve después del próximo registro.'}</p>}
   </div>

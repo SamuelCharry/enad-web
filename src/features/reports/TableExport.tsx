@@ -1,4 +1,5 @@
 import { useState, useRef, type ComponentProps, type RefObject } from 'react'
+import { Icon } from '../../ui/Icon'
 import { Button, Table } from '../../ui/components'
 
 /** Export displayed columns, links and chips as literal text, retaining codes with leading zeros. */
@@ -25,7 +26,7 @@ export function TableExport({ container, label }: { container: RefObject<HTMLDiv
     } catch { setMessage('No se pudo descargar el archivo. Intenta de nuevo.') }
     finally { setBusy(false) }
   }
-  return <><Button onClick={download} loading={busy} variant="ghost">{label}</Button>{message && <p role="status">{message}</p>}</>
+  return <><Button onClick={download} loading={busy} variant="ghost" aria-label={label} title={label}><Icon name="download" size={18}/></Button>{message && <p role="status">{message}</p>}</>
 }
 
 
