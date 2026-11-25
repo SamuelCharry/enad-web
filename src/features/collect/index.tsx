@@ -81,7 +81,7 @@ function TeacherScreen({ section, profile }: { section: typeof teacherSections[n
       case 'evaluacion': return <Evaluations schoolId={school.id} campus={campus} initialGroup={groupId} initialSubject={params.get('subject')} initialMoment={params.get('moment')} school={school} studentId={params.get('student')} />
       case 'horas': return <Hours schoolId={school.id} />
       case 'grupos': return <Groups schoolId={school.id} initialGroup={groupId} campuses={school.campuses.filter(c => !profile.campusIds[school.id]?.length || profile.campusIds[school.id].includes(c.id))} {...{ campus, profile }} />
-      case 'estudiantes': return <Students {...{ school, campus }} admin={false} uid={profile.uid} initialStudent={params.get('student')} scanOnOpen={params.has('scan')} />
+      case 'estudiantes': return <Students {...{ school, campus }} admin={false} uid={profile.uid} initialStudent={params.get('student')} />
     }
   }}</SchoolScope></>
   return <TaskGuide enabled={params.has('guide')} section={section} onClose={() => {

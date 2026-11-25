@@ -37,3 +37,7 @@
 .teacher-dashboard .shortcut-list > button { width: 100%; justify-content: space-between; padding-inline: 0; border-radius: 0; border-bottom: 1px solid var(--line); font-weight: 400; }
 .teacher-work .shortcut-list { padding-top: 0; }
 .teacher-screen [data-guide]:focus-visible { scroll-margin-block: 16px 144px; }
+
+@media (min-width: 820px) {
+  .day-actions.teacher-class-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}

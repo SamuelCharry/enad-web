@@ -1,7 +1,7 @@
 import { cleanName, rosterMatches } from '../../domain/text/studentNameRules'
 import { addStudentsToGroup } from '../../data/groups'
 import { LoadError } from '../../ui/LoadError'
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { School, Student } from '../../domain/types'
 import { createStudent, patchStudent, useStudents } from '../../data/students'
 import { Button, Card, Dialog, Field, Segmented, SyncStatus, TextInput } from '../../ui/components'
@@ -9,18 +9,13 @@ import { useAction } from './useAction'
 import { genders, matches, numbers } from './formValues'
 import { Choice, Search } from './common'
 import { StudentDetail } from '../reports/Roster'
-import { groupLink } from '../teacher/navigation'
-import { Link } from 'react-router-dom'
-import type { Group } from '../../domain/types'
-const Scanner = lazy(() => import('./Scanner').then(m => ({ default: m.Scanner })))
 
-export function Students({ school, campus, admin, uid, initialStudent, scanOnOpen }: { school: School; campus: string; admin: boolean; uid?: string; initialStudent?: string | null; scanOnOpen?: boolean }) {
+export function Students({ school, campus, admin, uid, initialStudent }: { school: School; campus: string; admin: boolean; uid?: string; initialStudent?: string | null }) {
   const { students, loading, error } = useStudents(school.id)
   const [search, setSearch] = useState('')
-  const [open, setOpen] = useState<'new' | 'scan' | null>(scanOnOpen ? 'scan' : null)
+  const [adding, setAdding] = useState(false)
   const [edit, setEdit] = useState<string | null>(null)
   const [selected, select] = useState(initialStudent)
-  const [scannedGroup, setScannedGroup] = useState<Group>()
   const [notice, setNotice] = useState('')
   const [receiptId, setReceiptId] = useState('')
   const receipt = students.find(s => s.id === receiptId)
@@ -31,17 +26,13 @@ export function Students({ school, campus, admin, uid, initialStudent, scanOnOpe
   return <>
     {notice && <p role="status">{notice}</p>}
     {receipt && 'syncState' in receipt && <SyncStatus pending={receipt.syncState === 'pending'} />}
-    {scannedGroup && <Link className="ui-link-button" to={groupLink('asistencia', scannedGroup)}>Tomar asistencia de este grupo</Link>}
     {detail && !admin ? <>{'syncState' in detail && <SyncStatus pending={detail.syncState === 'pending'} />}<p>{school.name} · {school.campuses.find(c => c.id === campus)?.name || 'Sin sede asignada'}</p>
       <Button onClick={() => setEdit(detail.id)}>Editar estudiante</Button>
       <StudentDetail student={detail} onBack={() => select(null)} backLabel="Volver a estudiantes" /></> : <>
     <div className="collect-toolbar">
       <Search value={search} onChange={setSearch} />
-      <Button variant="primary" onClick={() => setOpen('new')}>Añadir estudiante</Button>
-      {!admin && <>
-        <Button disabled={loading} onClick={() => setOpen('scan')}>Escanear lista</Button>
-
-      </>}</div>
+      <Button variant="primary" onClick={() => setAdding(true)}>Añadir estudiante</Button>
+    </div>
     {loading ? <p>Cargando estudiantes…</p> : visible.length ? visible.map(s => <Card key={s.id}>
       <div className="collect-row">
         <div>
@@ -49,16 +40,14 @@ export function Students({ school, campus, admin, uid, initialStudent, scanOnOpe
           <small>{s.code} · Grado {s.grade}°{s.retired ? ' · Retirado' : ''}</small>
         </div>{!admin && 'syncState' in s && s.syncState === 'pending' && <SyncStatus pending />}{admin && <Button onClick={() => setEdit(s.id)}>Editar estudiante</Button>}</div>
     </Card>) : <p>Cambia la búsqueda o añade el primer estudiante de la sede.</p>}</>}
-    {(open === 'new' || existing) && <StudentEditor {...{ school, campus, admin }} student={existing} canEditIdentity={!!existing?.provisional && 'createdBy' in existing && existing.createdBy === uid} onSaved={(id,_pending,change) => {
+    {(adding || existing) && <StudentEditor {...{ school, campus, admin }} student={existing} canEditIdentity={!!existing?.provisional && 'createdBy' in existing && existing.createdBy === uid} onSaved={(id,_pending,change) => {
       setReceiptId(change === 'selected' ? '' : id)
       setNotice({selected:'Estudiante seleccionado.',created:'Estudiante registrado.',updated:'Cambios guardados.'}[change])
     }} onClose={() => {
-      setOpen(null)
+      setAdding(false)
       setEdit(null)
     }} />}
-    {open === 'scan' && !loading && <Suspense fallback={<p role="status">Cargando escáner…</p>}>
-      <Scanner campusName={school.campuses.find(c => c.id === campus)?.name} onSaved={group => { setScannedGroup(group); setNotice('') }} schoolId={school.id} {...{ students, campus }} onClose={() => setOpen(null)} />
-    </Suspense>}</>
+  </>
 }
 type StudentChange = 'created' | 'selected' | 'updated'
 interface EditorProps {

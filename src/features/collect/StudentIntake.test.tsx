@@ -1,17 +1,15 @@
 import '@testing-library/jest-dom/vitest'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import type { Group, School, Student } from '../../domain/types'
+import type { School, Student } from '../../domain/types'
 import { StudentEditor } from './Students'
-import { Scanner } from './Scanner'
 import { createStudent, useStudents } from '../../data/students'
-import { addStudentsToGroup, useGroups } from '../../data/groups'
+import { addStudentsToGroup } from '../../data/groups'
 
 vi.mock('../../data/students', () => ({ useStudents: vi.fn(), createStudent: vi.fn() }))
-vi.mock('../../data/groups', () => ({ useGroups: vi.fn(), addStudentsToGroup: vi.fn() }))
+vi.mock('../../data/groups', () => ({ addStudentsToGroup: vi.fn() }))
 const school = { id: 's', campuses: [] } as unknown as School
 const ana = { id: 'a', fullName: 'Ana Gómez', schoolId: 's', campus: 'b', grade: 5, code: '01', gender: 'F' } as Student
-const group = { id: 'g', name: 'Lectura', studentIds: ['a'], schoolId: 's', campus: 'b' } as Group
 const pick = (name: string) => fireEvent.click(screen.getByRole('button', { name }))
 const type = (label: string, value: string) => fireEvent.change(screen.getByLabelText(label), { target: { value } })
 beforeEach(() => {
@@ -19,7 +17,6 @@ beforeEach(() => {
   Object.defineProperty(HTMLDialogElement.prototype, 'showModal', { configurable: true, value: function(this: HTMLDialogElement) { this.open = true } })
   Object.defineProperty(HTMLDialogElement.prototype, 'close', { configurable: true, value: function(this: HTMLDialogElement) { this.open = false } })
   vi.mocked(useStudents).mockReturnValue({ students: [ana], loading: false, error: undefined })
-  vi.mocked(useGroups).mockReturnValue({ groups: [{ ...group, studentCount: 1 }], loading: false, error: undefined })
 })
 afterEach(cleanup)
 it('busca antes de crear y conserva la identidad de un estudiante de otra sede', async () => {
@@ -49,23 +46,6 @@ it('envía el vecino débil y reintenta la membresía sin repetir el alta', asyn
   await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(2))
   expect(createStudent).toHaveBeenCalledOnce()
 })
-it('guarda nombres dudosos, respeta el grado del grupo y conserva la selección al reintentar', async () => {
-  vi.mocked(createStudent).mockResolvedValue({ ...ana, id: 'p', syncState: 'synced' })
-  vi.mocked(addStudentsToGroup).mockRejectedValueOnce(new Error('Intenta de nuevo.'))
-  render(<Scanner schoolId="s" campus="b" students={[ana]} onClose={vi.fn()} />)
-  pick('Añadir una fila omitida')
-  type('Nombre · fila 1', 'Ana Gómez')
-  type('Añadir al grupo', 'g')
-  pick('Añadir una fila omitida')
-  type('Nombre · fila 2', 'R. Paz')
-  pick('Guardar lista')
-  await screen.findByRole('alert')
-  expect(createStudent).toHaveBeenCalledWith(expect.objectContaining({ source: 'ocr', grade: 5, gender: '', reviewReasons: expect.arrayContaining(['solo_iniciales', 'formato_nombre']) }))
-  pick('Reintentar guardado')
-  await screen.findByText(/1 ya .*1 nuevo/)
-  expect(addStudentsToGroup).toHaveBeenLastCalledWith('g', ['a', 'p'])
-  expect(createStudent).toHaveBeenCalledOnce()
-})
 
 it('permite registrar un homónimo después de ofrecer la coincidencia', async () => {
   vi.mocked(createStudent).mockResolvedValue({...ana,id:'nuevo',syncState:'synced'})
@@ -79,15 +59,4 @@ it('permite registrar un homónimo después de ofrecer la coincidencia', async (
   fireEvent.click(screen.getByLabelText('5°'))
   pick('Crear nuevo')
   await waitFor(() => expect(createStudent).toHaveBeenCalledWith(expect.objectContaining({reviewReasons:expect.arrayContaining(['posible_duplicado:a'])})))
-})
-it('identifica los estudiantes de otra sede antes de guardar una lista en el grupo', () => {
-  render(<Scanner schoolId="s" campus="b" students={[{...ana,campus:'otra'}]} onClose={vi.fn()}/>)
-  pick('Añadir una fila omitida')
-  type('Nombre · fila 1','Ana Gómez')
-  type('Añadir al grupo','g')
-  expect(screen.getByRole('alert')).toHaveTextContent('Ana Gómez')
-  expect(screen.getByRole('button',{name:'Guardar lista'})).toBeDisabled()
-  type('Añadir al grupo','')
-  expect(screen.getByRole('button',{name:'Guardar lista'})).toBeEnabled()
-  expect(addStudentsToGroup).not.toHaveBeenCalled()
 })

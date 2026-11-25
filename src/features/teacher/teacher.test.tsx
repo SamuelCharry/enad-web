@@ -7,7 +7,6 @@ import { CollectRoutes } from '../collect'
 import { GroupDetail } from './GroupDetail'
 import { useTodayPlans } from '../../data/activities'
 import { TeacherHome } from './TeacherHome'
-import { Scanner } from '../collect/Scanner'
 import { useSchoolAttendance, saveGroupAttendance } from '../../data/attendance'
 import { useSchoolEvaluations, saveEvaluation } from '../../data/evaluations'
 import { createGroup, useGroups, addStudentsToGroup, removeStudentFromGroup } from '../../data/groups'
@@ -17,7 +16,6 @@ import { useMyHours } from '../../data/hours'
 import { useSession } from '../../data/session'
 import type { UserProfile, School, Group, Student } from '../../domain/types'
 import { hourSeries } from './hourSeries'
-import { qualityWarning } from './photoQuality'
 
 vi.mock('../../data/session', () => ({ useSession: vi.fn(), signOut: vi.fn() }))
 vi.mock('../../data/scope', () => ({ useSchools: vi.fn(), useProgramConfig: vi.fn() }))
@@ -96,10 +94,10 @@ it('usa el historial del momento y permite corregir una verificación sin reempl
   click('Guardar evaluación')
   await waitFor(() => expect(saveEvaluation).toHaveBeenCalledWith({studentId:'s',subject:'lectura',moment:'verificacion',level:'comprension',groupId:'g'}))
 })
-it('ofrece cuatro tareas en Hoy y lleva los registros pendientes a su lista', () => {
+it('ofrece tres tareas en Hoy y lleva los registros pendientes a su lista', () => {
   show('/portal/hoy')
-  expect(within(screen.getByRole('navigation',{name:'Registro de clase'})).getAllByRole('link')).toHaveLength(4)
-  expect(screen.getByRole('link',{name:'Escanear lista'})).toHaveAttribute('href','/portal/estudiantes?scan=1')
+  expect(within(screen.getByRole('navigation',{name:'Registro de clase'})).getAllByRole('link')).toHaveLength(3)
+  expect(screen.queryByRole('link',{name:'Escanear lista'})).toBeNull()
   expect(screen.getByRole('link',{name:'0 registros por enviar'})).toHaveAttribute('href','/portal/pendientes')
   expect(screen.queryByLabelText('Momento de evaluación')).toBeNull()
 })
@@ -140,22 +138,6 @@ it('edita datos y confirma el retiro de un estudiante oficial sin enviar campos 
   await waitFor(() => expect(patchStudent).toHaveBeenCalledWith('s',expect.objectContaining({ retired:true, gender:'M' })))
   expect(vi.mocked(patchStudent).mock.calls[0][1]).not.toHaveProperty('fullName')
 })
-it('permite cámara y galería, coteja una fila omitida y añade un estudiante existente sin duplicarlo', async () => {
-  const saved = vi.fn()
-  render(<Scanner schoolId="second" campus="b" students={[student]} onClose={vi.fn()} onSaved={saved} />)
-  expect(screen.getByLabelText('Tomar foto de la lista')).toHaveAttribute('capture','environment')
-  expect(screen.getByLabelText('Elegir imagen')).toHaveAttribute('accept','image/*')
-  click('Añadir una fila omitida')
-  const save = screen.getByRole('button',{name:/Guardar lista|Importar lista revisada/})
-  expect(save).toBeDisabled()
-  select('Nombre · fila 1',student.fullName)
-
-  expect(screen.getByLabelText('Identidad · fila 1')).toHaveValue('s')
-  select('Añadir al grupo','g')
-  fireEvent.click(save)
-  await waitFor(() => expect(addStudentsToGroup).toHaveBeenCalledWith('g',['s']))
-  expect(saved).toHaveBeenCalledWith(group)
-})
 it('guía el registro sobre el formulario y exige seleccionar un grupo antes de avanzar', () => {
   show('/portal/asistencia?school=second&guide=1')
   const guide = screen.getByRole('region',{name:'Guía de registro'})
@@ -171,12 +153,6 @@ it('suma las últimas semanas de implementación y distingue los días sin repor
   expect(chart.weeks.map(p => p.value)).toEqual([0,2,3.5])
   expect(chart.days[2]).toEqual({label:'Mié · Sin programación',value:1.5})
   expect(chart.days[0].label).toContain('Sin reporte')
-})
-it('reconoce oscuridad, reflejo y desenfoque con los umbrales de la cámara móvil', () => {
-  const bytes = new Uint8ClampedArray(100*4)
-  expect(qualityWarning(bytes,10,10)).toContain('oscura')
-  expect(qualityWarning(bytes.fill(255),10,10)).toContain('reflejos')
-  expect(qualityWarning(bytes.fill(128),10,10)).toContain('borrosa')
 })
 
 it('abre el perfil de un estudiante sin sede desde un enlace de grupo', async () => {

@@ -35,8 +35,5 @@
 .collect select { max-width:100%; }
 .collect .ui-dialog .collect-actions { position:static; }
 .collect .ui-dialog > button:last-child, .admin-directory section > button { margin-top:8px; }
-.scan-file { display:inline-flex; position:relative; cursor:pointer; }
-.scan-file input { position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer; }
-.scan-file:focus-within { outline:2px solid var(--ink); outline-offset:2px; }
 
 .collect-actions button[aria-pressed] { transition:none; }

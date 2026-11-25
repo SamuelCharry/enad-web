@@ -133,7 +133,7 @@ export function importStudents(schoolId: string, rows: readonly (StudentFields &
   return api(async () => {
     const p = await caller('writer')
     await requireSchool(p, schoolId)
-    if (p.rol === 'docente') fail(403, 'Usa Añadir estudiante o Escanear lista.')
+    if (p.rol === 'docente') fail(403, 'Usa Añadir estudiante.')
     if (!rows.length) fail(400, 'La lista de estudiantes está vacía.')
     const existing = new Set((await getDocs(query(collection(db, 'students'), where('schoolId', '==', schoolId)))).docs.map(d => d.id))
     const skipped: string[] = [], timestamp = now()

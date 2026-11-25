@@ -36,4 +36,4 @@ Inicio compara la asistencia de esta semana con los mismos días de la anterior.
 
 Desde `web-portal/` se ejecuta `npm run typecheck && npm test && npm run lint && npm run build`. Vitest usa datos de prueba en memoria. Para una sesión de prueba integrada, inicia o compila Vite con `VITE_USE_EMULATORS=true` y el proyecto local `demo-enad`. Auth usa 9099, Firestore 8080 y Functions 5001. `VITE_EMULATOR_HOST` permite cambiar el host local. El smoke de Playwright verifica 375, 768 y 1440 px y acepta credenciales de emulador mediante `ENAD_USER` y `ENAD_PASS`.
 
-W2 mantiene el portal autenticado. O2 mantiene OCR, las reglas de nombres, el adaptador de estudiantes y el diálogo de alta y edición en Estudiantes. R2 mantiene las reglas, índices y funciones del backend compartido.
+W2 mantiene el portal autenticado. O2 mantiene el OCR móvil, las reglas de nombres, el adaptador de estudiantes y el diálogo de alta y edición en Estudiantes. R2 mantiene las reglas, índices y funciones del backend compartido.
