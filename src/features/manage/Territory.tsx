@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { collection } from 'firebase/firestore'
 import { db } from '../../data/firebase'
@@ -28,7 +29,7 @@ function Groups({school}: {school: School}) {
 }
 function SchoolDetails({ school }: { school: School }) {
   const [tab, setTab] = useState<Community>('Docentes')
-  return <><h3>{school.name}</h3><p className="territory-note">{[school.municipality, plural(school.campuses.length,'sede','sedes')].filter(Boolean).join(' · ')}</p>
+  return <><h3 tabIndex={-1}>{school.name}</h3><p className="territory-note">{[school.municipality, plural(school.campuses.length,'sede','sedes')].filter(Boolean).join(' · ')}</p>
     <div className="territory-tabs" role="group" aria-label="Comunidad del colegio">{(['Docentes','Estudiantes','Grupos'] as const).map(item => <button key={item} aria-pressed={item === tab} onClick={() => setTab(item)}>{item}</button>)}</div>
     <div className="territory-members">{tab === 'Estudiantes' ? <Students schoolId={school.id}/> : tab === 'Grupos' ? <Groups school={school}/> :
       <ReportRead query={school.id} load={() => rows<{fullName:string; uid:string}>(collection(db,'schools',school.id,'teachers'))}>{teachers => teachers.length ? <ul>{[...teachers].sort((a,b) => a.fullName.localeCompare(b.fullName,'es')).map(t => <li key={t.id}><Link to={'/portal/reportes/docentes?' + new URLSearchParams({schoolId:school.id,teacher:t.uid || t.id})}>{t.fullName}</Link></li>)}</ul> : <p>Sin docentes registrados.</p>}</ReportRead>}</div></>
@@ -39,6 +40,8 @@ export function Territory({schools}: {schools: School[]}) {
   const [selected, setSelected] = useState('')
   const [schoolId, setSchoolId] = useState('')
   const [hover, setHover] = useState('')
+  const directory = useRef<HTMLElement>(null)
+  const mapOrigin = useRef<SVGPathElement | null>(null)
   const byRegion = new Map<string, School[]>()
   for (const school of schools) {
     const id = departmentId(school.department)
@@ -55,6 +58,21 @@ export function Territory({schools}: {schools: School[]}) {
   const local = byRegion.get(selected) ?? []
   const school = local.find(s => s.id === schoolId)
   const select = (id: string) => {setSelected(id);setSchoolId('')}
+  function openDirectoryRow(update: () => void) {
+    flushSync(update)
+    directory.current?.querySelector('h3')?.focus()
+  }
+  function back() {
+    const previous = school?.id ?? selected
+    flushSync(() => school ? setSchoolId('') : select(''))
+    if (!school && mapOrigin.current) {
+      mapOrigin.current.focus()
+      return
+    }
+    const row = Array.from(directory.current?.querySelectorAll<HTMLButtonElement>('[data-row]') ?? [])
+      .find(button => button.dataset.row === previous)
+    row?.focus()
+  }
   const unit = (n:number) => mode === 'campuses' ? plural(n,'sede','sedes') : plural(n,'colegio','colegios')
   const mappedRegions = ranked.filter(id => id !== unknown).length
   return <section className="territory" aria-labelledby="territory-title">
@@ -65,8 +83,8 @@ export function Territory({schools}: {schools: School[]}) {
         <rect className="island-frame" x="12" y="11" width="92" height="110" rx="4"/><text className="inset-label" x="21" y="111">San Andrés y Prov.</text>
         <g className="map-labels" aria-hidden="true"><text x="155" y="45">Mar Caribe</text><text x="25" y="262">Océano Pacífico</text><text x="366" y="127">Venezuela</text><text x="80" y="376">Ecuador</text><text x="227" y="433">Perú</text><text x="392" y="387">Brasil</text></g>
         {departments.map(d => <path key={d.id} d={d.path} fill={color(d.id)} fillRule="evenodd" role="button" tabIndex={0} aria-pressed={d.id===selected} aria-label={d.name + ', ' + unit(count(d.id))}
-          onClick={() => select(d.id)} onMouseEnter={() => setHover(d.id)} onMouseLeave={() => setHover('')} onFocus={() => setHover(d.id)} onBlur={() => setHover('')}
-          onKeyDown={e => {if(e.key==='Enter' || e.key===' '){e.preventDefault();select(d.id)}}}><title>{d.name} · {unit(count(d.id))}</title></path>)}
+          onClick={e => {mapOrigin.current=e.currentTarget;select(d.id)}} onMouseEnter={() => setHover(d.id)} onMouseLeave={() => setHover('')} onFocus={() => setHover(d.id)} onBlur={() => setHover('')}
+          onKeyDown={e => {if(e.key==='Enter' || e.key===' '){e.preventDefault();mapOrigin.current=e.currentTarget;select(d.id)}}}><title>{d.name} · {unit(count(d.id))}</title></path>)}
         {selected && <path className="map-selection" d={departments.find(d => d.id===selected)?.path}/>}
       </svg>
       {hover && <span className="map-hint">{regionName(hover)} · {unit(count(hover))}</span>}
@@ -75,12 +93,12 @@ export function Territory({schools}: {schools: School[]}) {
           const lo=Math.floor(i*max/4)+1, hi=Math.floor((i+1)*max/4)
           return hi>=lo && <span key={c}><i style={{background:c}}/>{lo===hi ? hi : lo+'–'+hi}</span>
         })}<span>{mode==='schools'?'colegios':'sedes'}</span></>}</div>
-    </div><aside className="territory-directory" aria-label="Explorar comunidad por departamento">
-      {selected && <button className="territory-back" onClick={() => school ? setSchoolId('') : select('')}>‹ {school ? regionName(selected) : 'Departamentos'}</button>}
-      {school ? <SchoolDetails key={school.id} school={school}/> : selected ? <><h3>{regionName(selected)}</h3><p className="territory-note">{plural(local.length,'colegio','colegios')}</p>
-        {local.length ? <ul>{local.map(s => <li key={s.id}><button className="territory-row" onClick={() => setSchoolId(s.id)}><span>{s.name}<small>{s.municipality}</small></span><b aria-hidden="true">›</b></button></li>)}</ul> : <p>Sin colegios registrados en este departamento.</p>}</> :
+    </div><aside ref={directory} className="territory-directory" aria-label="Explorar comunidad por departamento">
+      {selected && <button className="territory-back" onClick={back}>‹ {school ? regionName(selected) : 'Departamentos'}</button>}
+      {school ? <SchoolDetails key={school.id} school={school}/> : selected ? <><h3 tabIndex={-1}>{regionName(selected)}</h3><p className="territory-note">{plural(local.length,'colegio','colegios')}</p>
+        {local.length ? <ul>{local.map(s => <li key={s.id}><button className="territory-row" data-row={s.id} onClick={() => openDirectoryRow(() => setSchoolId(s.id))}><span>{s.name}<small>{s.municipality}</small></span><b aria-hidden="true">›</b></button></li>)}</ul> : <p>Sin colegios registrados en este departamento.</p>}</> :
       <><h3>Departamentos</h3><p className="territory-note">Selecciona un departamento para ver sus colegios.</p>
-        <ul>{ranked.map(id => <li key={id}><button className="territory-row" onClick={() => select(id)}><span>{regionName(id)}</span><span className="territory-count">{unit(count(id))}<b aria-hidden="true">›</b></span></button></li>)}</ul></>}
+        <ul>{ranked.map(id => <li key={id}><button className="territory-row" data-row={id} onClick={() => {mapOrigin.current=null;openDirectoryRow(() => select(id))}}><span>{regionName(id)}</span><span className="territory-count">{unit(count(id))}<b aria-hidden="true">›</b></span></button></li>)}</ul></>}
     </aside></div>
     <small className="territory-credit">Límites departamentales de <a href="https://www.geoboundaries.org/api/current/gbOpen/COL/ADM1/">geoBoundaries</a> · © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap y colaboradores (ODbL)</a>. Archipiélago en recuadro ampliado. <a href={import.meta.env.BASE_URL + 'colombia-boundaries.txt'}>Fuente y licencia</a>.</small>
   </section>
