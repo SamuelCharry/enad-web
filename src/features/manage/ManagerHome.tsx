@@ -22,7 +22,7 @@ function StudentAlerts({ school, subject, moment, from, to, declines }: {
     ? decliningStudents(school.id, subject, moment, from, to) : beginnerList(school.id, subject, moment)}>{students =>
       <><h4>{school.name} · {subjectLabel(subject)}</h4>{students.length ? <ul>{students.map(s =>
         <li key={s.id}><Link to={'/portal/reportes/estudiante?' + new URLSearchParams({ schoolId: school.id, student: s.id, subject })}>{s.fullName}</Link></li>)}</ul>
-        : <p>Sin estudiantes en esta selección. Revisa otro momento.</p>}</>}</ReportRead>
+        : <p>Sin estudiantes en esta selección.</p>}</>}</ReportRead>
 }
 function Declines({ schools, moment, from, to }: { schools: School[]; moment: Moment; from: string; to: string }) {
   const [schoolId, setSchool] = useState('')
@@ -39,8 +39,8 @@ function AttendanceDial({ values }: { values: (number | null | undefined)[] }) {
     {values.map((value, i) => {
       const radius = i === 0 ? 48 : 34
       return <g key={radius} fill="none" strokeWidth="9">
-        <circle cx="60" cy="60" r={radius} stroke="#e4e4df" />
-        {value != null && <circle cx="60" cy="60" r={radius} pathLength="100" stroke={i === 0 ? 'var(--red)' : '#525651'}
+        <circle cx="60" cy="60" r={radius} stroke="var(--line)" />
+        {value != null && <circle cx="60" cy="60" r={radius} pathLength="100" stroke={i === 0 ? 'var(--red)' : 'var(--soft-ink)'}
           strokeDasharray={Math.max(0, Math.min(value, 100)) + ' 100'} transform="rotate(-90 60 60)" />}
       </g>
     })}
@@ -90,13 +90,13 @@ function FollowUp({ profile, config, today, schools }: { profile: UserProfile; c
                 ? <StudentAlerts school={schools.find(s => s.id === a.schoolId)!} subject={a.subject} moment={moment} from={config.implementationStartDate} to={today} />
                 : <Link to={a.path}>{a.label}</Link>}</li>)}</ul>}</details>
           })}
-          {!alerts.length && !data.unavailable.length && <p>Sin alertas en esta selección. Consulta los envíos para revisar el detalle semanal.</p>}
+          {!alerts.length && !data.unavailable.length && <p>Sin alertas para este momento.</p>}
           {moment !== 'linea_base' && <details onToggle={e => { const open = e.currentTarget.open; setExpanded(v => ({ ...v, declines: open })) }}>
             <summary>Consultar descensos de nivel</summary>{expanded.declines && <Declines schools={schools} moment={moment} from={config.implementationStartDate} to={today} />}</details>}
         </> : <p>Configura la fecha de inicio y las pausas para calcular las alertas del programa.</p>}
       </section><section><h2>Actividad reciente</h2>{missing('Actividad reciente') && <p>No se pudo cargar toda la actividad.</p>}{feed.length ? <ol className="manage-feed">{(allActivity ? feed : feed.slice(0,4)).map(e => <li key={e.key}><strong>{e.kind} · {e.detail}</strong>
         <span>{e.author} · {e.school}</span><time dateTime={e.savedAt}>{savedTime(e.savedAt)}</time></li>)}</ol>
-        : !missing('Actividad reciente') && <p>Los registros aparecerán aquí cuando se guarden asistencias, evaluaciones u horas.</p>}{feed.length > 4 && <button className="dashboard-disclosure" aria-expanded={allActivity} onClick={() => setAllActivity(v => !v)}>{allActivity ? 'Ver menos actividad' : 'Ver ' + (feed.length - 4) + ' registros más'}</button>}</section></div>
+        : !missing('Actividad reciente') && <p>Aún no se han registrado asistencias, evaluaciones ni horas.</p>}{feed.length > 4 && <button className="dashboard-disclosure" aria-expanded={allActivity} onClick={() => setAllActivity(v => !v)}>{allActivity ? 'Ver menos actividad' : 'Ver ' + (feed.length - 4) + ' registros más'}</button>}</section></div>
     </>
   }}</ReportRead>
 }
@@ -109,7 +109,7 @@ export function ManagerHome({ profile }: { profile: UserProfile }) {
       {calendar.error ? <LoadError message={calendar.error} /> : config ? <p><time dateTime={today}>{classDate(today)}</time> · {week ? 'Semana ' + week + ' de implementación' : today < config.implementationStartDate ? 'Inicio el ' + config.implementationStartDate : 'Semana de receso'}</p>
         : !calendar.loading && <p>Aún falta el calendario del programa.</p>}
       {error ? <LoadError message={error} /> : loading ? <p role="status">Cargando instituciones y sedes…</p> : !schools.length ?
-        <p>Aún no hay instituciones en tu ámbito de consulta. Consulta la asignación con la fundación.</p> :
+        <p>Aún no tienes instituciones asignadas. Consulta con la fundación.</p> :
         <>
           <Territory schools={schools} />
           {(config || showActivity) ? <FollowUp key={JSON.stringify([profile.uid, profile.schoolIds, schools.map(s => s.id)])} profile={profile} config={config} today={today} schools={schools} /> : !calendar.loading && <Button onClick={() => setShowActivity(true)}>Consultar docentes, estudiantes y actividad</Button>}</>}
