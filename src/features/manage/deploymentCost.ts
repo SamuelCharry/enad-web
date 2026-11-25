@@ -19,3 +19,20 @@ export function monthlyCost(teachers: number, usage: Usage) {
     + Math.max(0, images - 5000000) * 0.6) / 1000
   return { firestore, vision, subtotal: firestore + vision }
 }
+
+export const deploymentModes = [
+  { id: 'mobile', label: 'Solo app', mobile: true, web: false },
+  { id: 'web', label: 'Solo web', mobile: false, web: true },
+  { id: 'both', label: 'App y web', mobile: true, web: true },
+] as const
+
+export type DeploymentMode = typeof deploymentModes[number]
+
+export function deploymentBudget(teachers: number, usage: Usage, mode: DeploymentMode) {
+  const { firestore, vision } = monthlyCost(teachers, usage)
+  const photos = mode.mobile ? vision : 0
+  const monthly = firestore + photos
+  const annual = mode.mobile ? 99 : 0
+  const registration = mode.mobile ? 25 : 0
+  return { firestore, photos, monthly, annual, registration, firstYear: monthly * 12 + annual + registration }
+}

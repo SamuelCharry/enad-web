@@ -43,3 +43,22 @@
 }
 .deployment-settings { margin-block: 16px 24px; border-block: 1px solid var(--line); }
 .deployment-settings .deployment-fields { margin-block: 16px; }
+.deployment-scope { padding-block: 24px 40px; border-top: 1px solid var(--line); }
+.deployment-scope > p { max-width: 72ch; line-height: 1.55; }
+.deployment-scope table { border-collapse: collapse; width: 100%; }
+.deployment-scope caption { text-align: right; color: var(--soft-ink); padding-block: 12px; }
+.deployment-scope :is(td,th) { text-align: center; padding: 12px 6px; border-bottom: 1px solid var(--line); }
+.deployment-scope th:first-child { text-align: left; width: 49%; }
+.deployment-scope th small { display: block; margin-top: 3px; font-weight: 400; }
+.deployment-scope td { font-weight: 600; }
+.deployment-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.deployment-modes { display: flex; flex-wrap: wrap; gap: 4px 20px; border: 0; margin: 24px 0 0; padding: 0; }
+.deployment-modes legend { font-weight: 600; }
+.deployment-modes label { display: inline-flex; align-items: center; min-height: 44px; gap: 6px; cursor: pointer; }
+.deployment-modes input { margin: 0; accent-color: var(--ink); }
+@media(max-width: 480px) {
+  .deployment-scope :is(td,th) { padding: 10px 3px; }
+  .deployment-scope thead th { font-size: .9rem; }
+  .deployment-modes { gap: 0 12px; }
+  .deployment-budget { overflow-wrap: anywhere; }
+}

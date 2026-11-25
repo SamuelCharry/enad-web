@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import type { Role } from '../domain/types'
 import { App } from '../app/App'
 import { useSession } from '../data/session'
-import { monthlyCost } from '../features/manage/deploymentCost'
+import { deploymentBudget, deploymentModes, monthlyCost } from '../features/manage/deploymentCost'
 
 vi.mock('../data/session', () => ({
   useSession: vi.fn(() => ({ user: null, profile: null, loading: false })),
@@ -82,7 +82,13 @@ describe('Portada y guía pública', () => {
     expect(screen.getAllByText('0,72')).toHaveLength(2)
     fireEvent.change(photos, { target: { value: '-1' } })
     expect(photos.getAttribute('aria-invalid')).toBe('true')
-    expect(screen.getAllByText('—')).toHaveLength(9)
+    expect(screen.getAllByText('—')).toHaveLength(12)
+    fireEvent.change(photos, { target: { value: '1' } })
+    fireEvent.click(screen.getByRole('radio', { name: 'Solo web' }))
+    expect(screen.queryByRole('rowheader', {name: 'Lectura de fotos / mes'})).toBeNull()
+    expect(screen.getByText('8,64')).toBeTruthy()
+    fireEvent.click(screen.getByRole('radio', { name: 'App y web' }))
+    expect(screen.getByText('294,64')).toBeTruthy()
   })
 })
 
@@ -91,4 +97,14 @@ it('aplica la cuota en cada día activo y prorratea el excedente', () => {
   expect(monthlyCost(1, { days: 2, reads: 50000, writes: 20000, photos: 500 }).subtotal).toBe(0)
   expect(monthlyCost(1, { days: 0, reads: 90000, writes: 90000, photos: 1000 }).subtotal).toBe(0)
   expect(monthlyCost(500, { days: 20, reads: 0, writes: 0, photos: 1000 }).vision).toBeCloseTo(10498.5)
+})
+
+it('comparte la base de datos y cobra las tiendas y el OCR solo para la app', () => {
+  const usage = { days: 20, reads: 200, writes: 60, photos: 1 }
+  const [mobile, web, both] = deploymentModes.map(mode => deploymentBudget(500, usage, mode))
+  expect(mobile).toEqual(both)
+  expect(both.monthly).toBeCloseTo(14.22)
+  expect(both.firstYear).toBeCloseTo(294.64)
+  expect(web).toMatchObject({ photos: 0, annual: 0, registration: 0 })
+  expect(web.firstYear).toBeCloseTo(8.64)
 })
