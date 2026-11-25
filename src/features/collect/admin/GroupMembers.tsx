@@ -8,7 +8,7 @@ import { useAction } from '../useAction'
 
 export function GroupMembers({ group, students }: { group: Group; students: Student[] }) {
   const action = useAction()
-  const [membersOnly, setMembersOnly] = useState(true)
+  const [membersOnly, setMembersOnly] = useState(group.studentIds.length > 0)
   const [undo,setUndo] = useState<()=>Promise<void>>()
   const teams = useGroups(group.schoolId)
   const [selected,setSelected] = useState<string[]>([]), [into,setInto] = useState('')
@@ -17,7 +17,7 @@ export function GroupMembers({ group, students }: { group: Group; students: Stud
   const roster = students.filter(s => s.schoolId === group.schoolId && (members.has(s.id) || (!membersOnly && !s.retired && s.active !== false)))
   return <section><h4>Integrantes de {group.name}</h4>
     <label><input type="checkbox" checked={membersOnly} onChange={e => setMembersOnly(e.target.checked)} /> Solo integrantes actuales</label>
-    {!roster.length ? <p>Desmarca «Solo integrantes actuales» para buscar estudiantes de la institución.</p> :
+    {!roster.length ? <p>{membersOnly ? 'Desmarca «Solo integrantes actuales» para buscar estudiantes de la institución.' : 'Añade un estudiante a la institución para incluirlo en este grupo.'}</p> :
       <Directory showExport={false} title="Asignación al grupo" headers={['Estudiante', 'Código', 'Pertenencia']} rows={roster.map(s => {
         const member = members.has(s.id)
         return {

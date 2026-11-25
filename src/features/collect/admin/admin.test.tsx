@@ -174,5 +174,8 @@ it('protege el alcance del coordinador al abrir enlaces directos', () => {
   view.unmount()
   render(<MemoryRouter initialEntries={['/colegios?school=s&vista=docentes']}><Schools restricted/></MemoryRouter>)
   expect(screen.getByText('Luz')).toBeTruthy()
+  const exportButton = screen.getByRole('button',{name:'Exportar página a Excel · Docentes de la institución'})
+  expect(exportButton.textContent).toBe('')
+  expect(exportButton.getAttribute('title')).toEqual(exportButton.getAttribute('aria-label'))
   expect(screen.queryByRole('button',{name:'Vincular docente'})).toBeNull()
 })
