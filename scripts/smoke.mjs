@@ -80,8 +80,8 @@ try {
     await page.getByRole('button',{name:'Contraer barra lateral'}).click()
     await page.getByRole('button',{name:'Ampliar barra lateral'}).click()
     const primary = page.getByRole('navigation',{name:'Menú principal'})
-    if (!teacher) await primary.getByRole('link',{name:'Comunidad'}).click()
-    const directory = teacher ? primary : page.getByRole('navigation',{name:'Comunidad'})
+    if (!teacher) await primary.getByRole('link',{name:'Colegios y personas'}).click()
+    const directory = teacher ? primary : page.getByRole('navigation',{name:'Colegios y personas'})
     await directory.getByRole('link',{name:'Grupos',exact:true}).click()
     await page.getByRole('heading',{name:'Grupos',level:1}).waitFor()
   }
