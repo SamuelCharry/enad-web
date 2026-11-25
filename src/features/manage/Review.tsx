@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { mergeStudents } from '../../data/functions'
 import { resolveReview, reviewReason, type ReviewAction, useReviewQueue } from '../../data/review'
-import { cleanName } from '../../domain/text/studentNameRules'
+import { cleanName, validateName } from '../../domain/text/studentNameRules'
 import { useSchools } from '../../data/scope'
 import { useStudents } from '../../data/students'
 import type { School, Student } from '../../domain/types'
@@ -27,6 +27,55 @@ function Merge({student,schools,close,done}:{schools:School[];student:Student;cl
     <p>La asistencia, las evaluaciones y los grupos pasarán a la ficha que se conserva.</p>
     <Button variant="primary" loading={action.busy} disabled={!target || action.busy} onClick={() => target && action.run(async () => { await mergeStudents(student.id,target.id); done() })}>{action.busy ? 'Uniendo fichas…' : 'Confirmar unión'}</Button></LiveState>{action.feedback}</Dialog>
 }
+type RowProps = {
+  student: Student
+  candidates: Student[]
+  school?: School
+  busy: boolean
+  approve: () => void
+  edit: () => void
+  merge: () => void
+  discard: () => void
+}
+
+function ReviewRow({student, candidates, school, busy, approve, edit, merge, discard}: RowProps) {
+  const [info, setInfo] = useState(false)
+  const [more, setMore] = useState(false)
+  const corrected = cleanName(student.fullName)
+  const valid = !validateName(corrected).includes('formato_nombre') && corrected.length <= 80
+  const duplicate = student.reviewReasons?.some(reason => reason.startsWith('posible_duplicado:'))
+  const reasons = [...new Set(student.reviewReasons?.map(reviewReason))]
+  const source = student.source && {manual:'Registro manual',ocr:'Lectura de foto',import:'Importación'}[student.source]
+  return <article className="review-row" aria-label={student.fullName}>
+    <div className="review-pair">
+      <div><small>Por revisar</small><h2>{student.fullName}</h2>
+        <p>{[student.code, `Grado ${student.grade}°`, school?.name].filter(Boolean).join(' · ')}</p></div>
+      {candidates.map(candidate => <div key={candidate.id}><small>Posible coincidencia</small>
+        <h3>{candidate.fullName}</h3><p>{candidate.code} · Grado {candidate.grade}°</p></div>)}
+      {!duplicate && valid && corrected !== student.fullName && <div><small>Nombre corregido</small><h3>{corrected}</h3></div>}
+    </div>
+    <div className="review-actions">
+      <Button variant="primary" disabled={busy} onClick={duplicate ? merge : valid ? approve : edit}>
+        {duplicate ? 'Comparar fichas' : valid ? 'Aprobar nombre' : 'Corregir nombre'}</Button>
+      <Button variant="ghost" disabled={busy} aria-expanded={more} onClick={() => setMore(!more)}>Más opciones</Button>
+      <Button variant="ghost" aria-label={'Información sobre '+student.fullName} onClick={() => setInfo(true)}>
+        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7">
+          <circle cx="12" cy="12" r="9"/><path strokeLinecap="round" d="M12 11v5m0-9v.2"/></svg></Button>
+    </div>
+    {more && <div className="review-options">
+      {duplicate && valid && <Button disabled={busy} onClick={approve}>Aprobar como ficha separada</Button>}
+      {(duplicate || valid) && <Button disabled={busy} onClick={edit}>Corregir nombre</Button>}
+      {!duplicate && <Button disabled={busy} onClick={merge}>Unir con otra ficha</Button>}
+      <Button disabled={busy} onClick={discard}>Descartar ficha</Button></div>}
+    {info && <Dialog title="Información del nombre" onClose={() => setInfo(false)}>
+      <p><strong>{student.fullName}</strong></p>
+      {source && <p>{source}</p>}
+      {reasons.length > 0 && <ul>{reasons.map(reason => <li key={reason}>{reason}</li>)}</ul>}
+      {duplicate && valid && corrected !== student.fullName && <p>Al aprobar la ficha separada, se guardará como {corrected}.</p>}
+      {!source && !reasons.length && <p>Sin detalles del registro.</p>}
+    </Dialog>}
+  </article>
+}
 export function Review() {
   const {schools} = useSchools()
   const queue = useReviewQueue(), action = useAction()
@@ -38,11 +87,11 @@ export function Review() {
   const list = queue.data.filter(s => matches(search,s.fullName,s.code))
   const schoolIds = [...new Set(list.map(s => s.schoolId))]
   return <LiveState loading={queue.loading} error={queue.error}><Search value={search} onChange={setSearch}/>
-    {schoolIds.map(id => <ReviewSchool key={id} schoolId={id} students={list.filter(s => s.schoolId === id)}>{(s,others) => <article key={s.id} className="activity-row"><h2>{s.fullName}</h2><p>{s.code} · Grado {s.grade}°</p>
-      {others.length > 0 && <div className="review-pair"><Preview schools={schools} s={s} title="Por revisar"/>{others.map(v => <Preview key={v.id} schools={schools} s={v} title="Posible duplicado"/>)}</div>}
-      <p>Se guardará como {cleanName(s.fullName)}</p><ul>{(s.reviewReasons || []).map(r => <li key={r}>{reviewReason(r)}</li>)}</ul><div className="collect-actions">
-      <Button disabled={action.busy} onClick={() => save(s,'aprobar')}>Aprobar</Button><Button onClick={() => { setEdit(s); setName(s.fullName) }}>Corregir</Button>
-      <Button onClick={() => setMerge(s)}>Unir con…</Button><Button onClick={() => { if (window.confirm('¿Descartar la ficha de '+s.fullName+'? Quedará inactiva.')) save(s,'descartar') }}>Descartar</Button></div></article>}</ReviewSchool>)}
+    {schoolIds.map(id => <ReviewSchool key={id} schoolId={id} students={list.filter(s => s.schoolId === id)}>{(s,others) =>
+      <ReviewRow key={s.id} student={s} candidates={others} school={schools.find(school => school.id === id)} busy={action.busy}
+        approve={() => save(s,'aprobar')} edit={() => { setEdit(s); setName(s.fullName) }} merge={() => setMerge(s)}
+        discard={() => { if (window.confirm('¿Descartar la ficha de '+s.fullName+'? Quedará inactiva.')) save(s,'descartar') }}/>}
+    </ReviewSchool>)}
     {!list.length && <p>{search ? 'No hay coincidencias.' : 'No quedan nombres por revisar.'}</p>}
     {edit && <Dialog title="Corregir nombre" onClose={() => setEdit(undefined)} busy={action.busy}><Field label="Nombre completo"><TextInput value={name} onChange={e => setName(e.target.value)}/></Field>
       <Button variant="primary" loading={action.busy} onClick={() => save(edit,'corregir')}>Guardar corrección</Button>{action.feedback}</Dialog>}
