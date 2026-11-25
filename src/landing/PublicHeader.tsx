@@ -14,7 +14,7 @@ export function PublicHeader({ guide = false }: { guide?: boolean }) {
     <nav aria-label="Navegación principal">
       <Link to="/#funcionamiento">Cómo funciona</Link>
       <Link to="/#roles">Roles</Link>
-      <Link to={guide ? '/guia' : '/#guia'} aria-current={guide ? 'page' : undefined}>Guía de uso</Link>
+      <Link to="/guia" aria-current={guide ? 'page' : undefined}>Guía de despliegue</Link>
     </nav>
     <PortalLink />
   </div></header>

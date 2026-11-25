@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { App } from '../app/App'
 import { useSession } from '../data/session'
-import { guideRoleFromParam } from './guideContent'
+import { monthlyCost } from './deploymentCost'
 
 vi.mock('../data/session', () => ({
   useSession: vi.fn(() => ({ user: null, profile: null, loading: false })),
@@ -36,66 +36,29 @@ describe('Portada y guía pública', () => {
     expect(descriptions[1].textContent).toMatch(/sus colegios/)
     expect(descriptions[2].textContent).toMatch(/todo el programa/)
 
-    const preview = screen.getByRole('region', { name: 'Guía de uso' })
-    fireEvent.click(within(preview).getByRole('link', { name: /Gestión de la fundación/ }))
-    expect(await screen.findByRole('heading', { name: 'Descargar la plantilla' })).toBeTruthy()
+    const preview = screen.getByRole('region', { name: 'Guía de despliegue' })
+    fireEvent.click(within(preview).getByRole('link', { name: /Consultar la guía/ }))
+    expect(await screen.findByRole('heading', { name: 'Calcula un mes de clases' })).toBeTruthy()
     expect(useSession).not.toHaveBeenCalled()
   })
 
-  it('abre /guia sin sesión y cambia de recorrido y de paso', async () => {
+  it('recalcula los tres tamaños y muestra los campos inválidos', async () => {
     open('/guia')
-    await screen.findByRole('heading', { name: 'Ingresar con tu cuenta' })
-    expect(window.location.hash).toBe('#/guia')
-    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }))
-    expect(screen.getByRole('heading', { name: 'Empezar desde Hoy' })).toBeTruthy()
-    fireEvent.change(screen.getByLabelText('Ir al paso'), { target: { value: '2' } })
-    expect(screen.getByRole('heading', { name: 'Guardar la asistencia' })).toBeTruthy()
-    fireEvent.click(screen.getByRole('radio', { name: 'Coordinación / Fundación' }))
-    expect(screen.getByRole('heading', { name: 'Consultar el resumen' })).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: /Exportar a Excel/ }))
-    expect(screen.getByRole('heading', { name: 'Exportar a Excel' })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Siguiente' })).toBeNull()
-    fireEvent.click(screen.getByRole('radio', { name: 'Gestión de la fundación' }))
-    expect(screen.getByRole('heading', { name: 'Descargar la plantilla' })).toBeTruthy()
-    expect(screen.queryByRole('heading', { name: 'Consultar el resumen' })).toBeNull()
+    const photos = await screen.findByLabelText('Fotos por docente al día')
+    expect(screen.getByText('14,22')).toBeTruthy()
+    fireEvent.change(photos, { target: { value: '0' } })
+    expect(screen.queryByText('14,22')).toBeNull()
+    expect(screen.getAllByText('0,72')).toHaveLength(2)
+    fireEvent.change(photos, { target: { value: '-1' } })
+    expect(photos.getAttribute('aria-invalid')).toBe('true')
+    expect(screen.getAllByText('—')).toHaveLength(9)
     expect(useSession).not.toHaveBeenCalled()
-  })
-
-  it('identifica cada captura y reserva el espacio de la pantalla original', async () => {
-    const assets = import.meta.glob('/public/guia/*.webp')
-    const seen = new Set<string>()
-    open('/guia')
-    await screen.findByRole('heading', { name: 'Ingresar con tu cuenta' })
-    for (const role of screen.getAllByRole('radio')) {
-      fireEvent.click(role)
-      for (const button of within(screen.getByRole('navigation', { name: 'Pasos de la guía' })).getAllByRole('button')) {
-        fireEvent.click(button)
-        const image = screen.getByRole('article').querySelector('img')
-        if (!image) continue
-        expect(image.alt.trim().length).toBeGreaterThan(20)
-        expect([image.width, image.height]).toEqual([414, 900])
-        const asset = '/public/guia/' + image.src.split('/').pop()
-        expect(asset in assets).toBe(true)
-        seen.add(asset)
-      }
-    }
-    expect([...seen].sort()).toEqual(Object.keys(assets).sort())
-  })
-
-  it('explica el guardado sin señal y el acceso desde un navegador de celular', async () => {
-    open('/guia')
-    expect(await screen.findByRole('heading', { name: 'El portal en tu celular' })).toBeTruthy()
-    expect(screen.getByText(/Si aparece Instalar app/)).toBeTruthy()
-    expect(screen.getByText(/toca Compartir/)).toBeTruthy()
-    const question = screen.getByText('¿Se pierde lo que registro sin señal?')
-    fireEvent.click(question)
-    expect(question.closest('details')?.open).toBe(true)
-    expect(screen.getByText(/el registro quedó en ese dispositivo/)).toBeTruthy()
   })
 })
 
-it.each([[null, 'docente'], ['inexistente', 'docente'], ['administracion', 'administracion'], ['seguimiento', 'seguimiento']])(
-  'resuelve el recorrido público %s', (input, expected) => {
-    expect(guideRoleFromParam(input)).toBe(expected)
-  },
-)
+it('aplica la cuota en cada día activo y prorratea el excedente', () => {
+  expect(monthlyCost(1, { days: 2, reads: 100000, writes: 40000, photos: 500 }).firestore).toBeCloseTo(0.099)
+  expect(monthlyCost(1, { days: 2, reads: 50000, writes: 20000, photos: 500 }).subtotal).toBe(0)
+  expect(monthlyCost(1, { days: 0, reads: 90000, writes: 90000, photos: 1000 }).subtotal).toBe(0)
+  expect(monthlyCost(500, { days: 20, reads: 0, writes: 0, photos: 1000 }).vision).toBeCloseTo(10498.5)
+})
