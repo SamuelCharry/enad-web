@@ -12,6 +12,7 @@ import { Button, Field, Select } from '../../ui/components'
 import { getMovement } from '../../data/reports'
 import { percent } from '../reports/model'
 import { savedTime } from '../reports/navigation'
+import { Territory } from './Territory'
 import './manage.css'
 
 function StudentAlerts({ school, subject, moment, from, to, declines }: {
@@ -41,14 +42,19 @@ function FollowUp({ profile, config, today, schools }: { profile: UserProfile; c
     const missing = (key:string) => data.unavailable.includes(key)
     return <>
       {data.unavailable.length > 0 && <p role="alert">No disponible · {data.unavailable.join(', ')}</p>}
-      <dl className="coverage-counts"><div><dt>Instituciones</dt><dd>{schools.length}</dd></div><div><dt>Sedes</dt><dd>{schools.reduce((n,s) => n+s.campuses.length,0)}</dd></div></dl>
-      <dl className="coverage-counts"><div><dt>Docentes</dt><dd>{missing('Docentes') ? 'No disponible' : data.teachers}</dd></div>
-        <div><dt>Estudiantes activos</dt><dd>{missing('Estudiantes activos') ? 'No disponible' : data.students}</dd></div></dl>
-      <h2>Esta semana</h2>
-      <dl className="coverage-counts"><div><dt>Asistencia hasta hoy</dt><dd>{missing('Asistencia') ? 'No disponible' : percent(data.insights.attendance[0])}</dd></div>
-        <div><dt>Mismos días de la semana pasada</dt><dd>{missing('Asistencia') ? 'No disponible' : percent(data.insights.attendance[1])}</dd></div>
-        <div><dt>Horas realizadas / planeadas</dt><dd>{missing('Horas') ? 'No disponible' : data.insights.planned || data.insights.worked ? data.insights.worked.toLocaleString('es-CO')+' / '+data.insights.planned.toLocaleString('es-CO') : 'Sin registros'}</dd></div>
-        <div><dt>Docentes que enviaron asistencia</dt><dd>{missing('Envíos') || missing('Docentes') ? 'No disponible' : percent(config && weekOf(today,config) && data.teachers ? 100*data.insights.reporters/data.teachers : null)}</dd></div></dl>
+      <section className="foundation-totals" aria-label="Comunidad del programa">
+        <dl>{[['Colegios',schools.length],['Sedes',schools.reduce((n,s) => n+s.campuses.length,0)],['Docentes',missing('Docentes') ? '—' : data.teachers],['Estudiantes activos',missing('Estudiantes activos') ? '—' : data.students]].map(([name,count]) =>
+          <div key={name}><dt>{name}</dt><dd>{count}</dd></div>)}</dl>
+      </section>
+      <section className="foundation-week"><h2>Esta semana</h2>
+        <div className="week-insights"><div className="week-attendance">{['Asistencia hasta hoy','Mismos días de la semana pasada'].map((label,i) => {
+          const value = data.insights.attendance[i]
+          return <div key={label}><span>{label}</span><strong>{missing('Asistencia') ? 'No disponible' : percent(value)}</strong>
+            {!missing('Asistencia') && value != null && <meter min="0" max="100" value={value} aria-label={label}/>}</div>
+        })}</div>
+        <dl><div><dt>Horas realizadas / planeadas</dt><dd>{missing('Horas') ? 'No disponible' : data.insights.planned || data.insights.worked ? data.insights.worked.toLocaleString('es-CO')+' / '+data.insights.planned.toLocaleString('es-CO') : 'Sin registros'}</dd></div>
+        <div><dt>Docentes que enviaron asistencia</dt><dd>{missing('Envíos') || missing('Docentes') ? 'No disponible' : percent(config && weekOf(today,config) && data.teachers ? 100*data.insights.reporters/data.teachers : null)}</dd></div></dl></div>
+      </section>
       {config && moment !== 'linea_base' && <details onToggle={e => {const open=e.currentTarget.open;setExpanded(v => ({...v,movement:open}))}}>
         <summary>Cambios de nivel · {momentLabel(moment)}</summary>{expanded.movement && SUBJECTS.map(subject => {
           const prior = milestones[milestones.indexOf(moment)-1]
@@ -87,6 +93,7 @@ export function ManagerHome({ profile }: { profile: UserProfile }) {
       {error ? <LoadError message={error} /> : loading ? <p role="status">Cargando instituciones y sedes…</p> : !schools.length ?
         <p>Aún no hay instituciones en tu ámbito de consulta. Consulta la asignación con la fundación.</p> :
         <>
+          <Territory schools={schools} />
           {(config || showActivity) ? <FollowUp key={JSON.stringify([profile.uid, profile.schoolIds, schools.map(s => s.id)])} profile={profile} config={config} today={today} schools={schools} /> : !calendar.loading && <Button onClick={() => setShowActivity(true)}>Consultar docentes, estudiantes y actividad</Button>}</>}
     </section>
     <nav className="shortcut-list" aria-label="Informes"><Link to="/portal/reportes/seguimiento">Seguimiento de envíos</Link>
