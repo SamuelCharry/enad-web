@@ -31,9 +31,9 @@ const review: GuideStep = {
   title: 'Revisar un nombre',
   image: { file: 'revision', alt: 'Revisar muestra los nombres registrados y las opciones para aprobarlos o corregirlos.' },
   actions: [
-    'Abre Revisar. Lee el nombre registrado y compáralo con los nombres que aparecen en el colegio.',
-    'Si está bien escrito, toca Aprobar. Si necesitas corregirlo, toca Corregir nombre, escribe los nombres y apellidos y toca Guardar nombre.',
-    'Si crees que dos fichas corresponden al mismo estudiante, consulta con la fundación. La unión de fichas todavía no está habilitada en la demostración.',
+    'Abre Revisar. Verás el nombre registrado y, si existe, una posible coincidencia. Toca el icono de información para consultar el motivo de la alerta.',
+    'Toca Corregir nombre para completar los nombres y apellidos y luego Guardar nombre. Si el nombre está completo y no tiene coincidencias, puedes tocar Aprobar. Las demás acciones están en Más opciones.',
+    'Si aparece Comparar fichas, revisa los nombres, grados y códigos antes de decidir. La unión de fichas todavía no está habilitada en la demostración.',
   ],
 }
 
