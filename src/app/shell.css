@@ -1,6 +1,6 @@
 .shell-width { width: min(calc(100% - 2 * var(--inset)), 70rem); margin-inline: auto; }
-.skip-link { position: fixed; z-index: 10; top: 6px; left: 6px; padding: 12px; background: var(--paper); color: var(--ink); transform: translateY(-150%); }
-.skip-link:focus-visible { transform: none; }
+.skip-link { position: fixed; z-index: 10; top: 6px; left: 6px; padding: 12px; background: var(--paper); color: var(--ink); transform: translateY(-150%); clip-path: inset(50%); }
+.skip-link:focus-visible { transform: none; clip-path: none; }
 .switch-user p { margin: 4px 0; max-width: 16rem; font-size: var(--text-sm); }
 .session-state { max-width: 36rem; text-align: center; margin: 15vh auto; padding: var(--inset); }
 .session-state h1 { margin: 16px 0 0; }
